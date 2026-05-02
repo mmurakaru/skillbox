@@ -11,17 +11,66 @@ struct PopoverView: View {
 
     @State private var selectedSkillID: String?
     @State private var rowStates: [String: SkillRowView.RowState] = [:]
+    @State private var showingNewSkill = false
 
     @FocusState private var searchFocused: Bool
 
     var body: some View {
+        Group {
+            if showingNewSkill {
+                NewSkillForm(
+                    rootPath: (skillsRootPath as NSString).expandingTildeInPath,
+                    onCreate: { folderURL in
+                        let stub = Skill(
+                            name: folderURL.lastPathComponent,
+                            description: "",
+                            folderURL: folderURL,
+                            modifiedAt: Date()
+                        )
+                        showingNewSkill = false
+                        open(skill: stub)
+                    },
+                    onCancel: { showingNewSkill = false }
+                )
+            } else {
+                browseContent
+            }
+        }
+        .frame(width: 360, height: 480)
+        .task {
+            store.configure(rootPath: skillsRootPath)
+            ensureEditorDefault()
+            if selectedSkillID == nil {
+                selectedSkillID = store.filteredSkills.first?.id
+            }
+            try? await Task.sleep(for: .milliseconds(80))
+            searchFocused = true
+        }
+        .onChange(of: skillsRootPath) { _, newValue in
+            store.configure(rootPath: newValue)
+        }
+        .onKeyPress(.escape) {
+            if showingNewSkill {
+                showingNewSkill = false
+                return .handled
+            }
+            if cancelAnyConfirm() { return .handled }
+            NSApp.deactivate()
+            return .handled
+        }
+    }
+
+    private var browseContent: some View {
         @Bindable var store = store
 
-        VStack(spacing: 0) {
-            searchBar
-                .padding(.horizontal, 10)
-                .padding(.top, 10)
-                .padding(.bottom, 6)
+        return VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                searchBar
+                newSkillButton
+            }
+            .padding(.horizontal, 10)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
 
             Divider()
 
@@ -33,27 +82,34 @@ struct PopoverView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
         }
-        .frame(width: 360, height: 480)
-        .task {
-            store.configure(rootPath: skillsRootPath)
-            ensureEditorDefault()
-            searchFocused = true
-            if selectedSkillID == nil {
-                selectedSkillID = store.filteredSkills.first?.id
-            }
-        }
-        .onChange(of: skillsRootPath) { _, newValue in
-            store.configure(rootPath: newValue)
-        }
-        .onKeyPress(.escape) {
-            if cancelAnyConfirm() { return .handled }
-            NSApp.keyWindow?.close()
-            return .handled
-        }
         .onKeyPress(.upArrow) { moveSelection(by: -1); return .handled }
         .onKeyPress(.downArrow) { moveSelection(by: 1); return .handled }
-        .onKeyPress(.return) { triggerEditOnSelected(); return .handled }
-        .onKeyPress(.delete) { triggerDeleteConfirmOnSelected(); return .handled }
+        .onKeyPress(.return) {
+            if searchFocused { return .ignored }
+            triggerEditOnSelected()
+            return .handled
+        }
+        .onKeyPress(.delete) {
+            if searchFocused { return .ignored }
+            triggerDeleteConfirmOnSelected()
+            return .handled
+        }
+    }
+
+    private var newSkillButton: some View {
+        Button(action: { showingNewSkill = true }) {
+            Image(systemName: "plus")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 28, height: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.secondary.opacity(0.1))
+                )
+        }
+        .buttonStyle(.plain)
+        .help("New skill (⌘N)")
+        .keyboardShortcut("n", modifiers: .command)
     }
 
     private var searchBar: some View {
@@ -192,7 +248,7 @@ struct PopoverView: View {
         let target = OpenTarget(rawValue: openTargetRaw) ?? .folder
         let cmd = editorCommand.isEmpty ? "code" : editorCommand
         EditorLauncher.open(skill: skill, command: cmd, target: target)
-        NSApp.keyWindow?.close()
+        NSApp.deactivate()
     }
 
     private func performDelete(skill: Skill) {
