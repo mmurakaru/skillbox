@@ -17,5 +17,10 @@ let package = Package(
             path: "Sources/Skillbox",
             exclude: ["Resources/Info.plist.template", "Resources/AppIcon.svg"]
         ),
+        .testTarget(
+            name: "SkillboxTests",
+            dependencies: ["Skillbox"],
+            path: "Tests/SkillboxTests"
+        ),
     ]
 )

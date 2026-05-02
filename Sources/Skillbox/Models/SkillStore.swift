@@ -12,6 +12,12 @@ final class SkillStore {
     private var watcher: DirectoryWatcher?
     private var rootPath: String = ""
 
+    init() {}
+
+    init(seedSkills: [Skill]) {
+        self.skills = seedSkills
+    }
+
     var filteredSkills: [Skill] {
         let query = searchQuery.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else { return skills }
