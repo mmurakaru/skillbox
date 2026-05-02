@@ -18,12 +18,16 @@ enum EditorLauncher {
     @discardableResult
     static func open(skill: Skill, command: String, target: OpenTarget) -> Bool {
         let pathToOpen = target == .folder ? skill.folderURL.path : skill.skillFileURL.path
-        let resolved = resolveCommand(command)
+        return openPath(pathToOpen, command: command)
+    }
 
+    @discardableResult
+    static func openPath(_ path: String, command: String) -> Bool {
+        let resolved = resolveCommand(command)
         if let resolved {
-            return runProcess(executable: resolved, arg: pathToOpen)
+            return runProcess(executable: resolved, arg: path)
         }
-        return openWithWorkspace(path: pathToOpen)
+        return openWithWorkspace(path: path)
     }
 
     private static func resolveCommand(_ command: String) -> String? {

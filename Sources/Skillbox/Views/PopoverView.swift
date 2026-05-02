@@ -1,19 +1,41 @@
 import SwiftUI
 import AppKit
 
+enum AppTab: String, CaseIterable, Identifiable {
+    case skills
+    case memory
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .skills: "Skills"
+        case .memory: "Memory"
+        }
+    }
+}
+
 struct PopoverView: View {
     @Environment(SkillStore.self) private var store
+    @Environment(MemoryStore.self) private var memoryStore
     @Environment(\.openSettings) private var openSettings
 
     @AppStorage("editorCommand") private var editorCommand: String = ""
     @AppStorage("openTarget") private var openTargetRaw: String = OpenTarget.folder.rawValue
     @AppStorage("skillsRootPath") private var skillsRootPath: String = "~/.claude/skills"
+    @AppStorage("activeTab") private var activeTabRaw: String = AppTab.skills.rawValue
 
     @State private var selectedSkillID: String?
+    @State private var selectedMemoryID: String?
     @State private var rowStates: [String: SkillRowView.RowState] = [:]
+    @State private var memoryRowStates: [String: SkillRowView.RowState] = [:]
     @State private var showingNewSkill = false
 
     @FocusState private var searchFocused: Bool
+
+    private var activeTab: AppTab {
+        AppTab(rawValue: activeTabRaw) ?? .skills
+    }
 
     var body: some View {
         Group {
@@ -33,7 +55,7 @@ struct PopoverView: View {
                     onCancel: { showingNewSkill = false }
                 )
             } else {
-                browseContent
+                shellContent
             }
         }
         .frame(width: 360, height: 480)
@@ -60,7 +82,44 @@ struct PopoverView: View {
         }
     }
 
-    private var browseContent: some View {
+    private var shellContent: some View {
+        VStack(spacing: 0) {
+            tabSwitcher
+                .padding(.horizontal, 10)
+                .padding(.top, 8)
+                .padding(.bottom, 6)
+
+            Divider()
+
+            Group {
+                switch activeTab {
+                case .skills: skillsBody
+                case .memory: memoryBody
+                }
+            }
+
+            Divider()
+
+            footer
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+        }
+    }
+
+    private var tabSwitcher: some View {
+        Picker("", selection: Binding(
+            get: { activeTab },
+            set: { activeTabRaw = $0.rawValue }
+        )) {
+            ForEach(AppTab.allCases) { tab in
+                Text(tab.label).tag(tab)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+    }
+
+    private var skillsBody: some View {
         @Bindable var store = store
 
         return VStack(spacing: 0) {
@@ -69,18 +128,12 @@ struct PopoverView: View {
                 newSkillButton
             }
             .padding(.horizontal, 10)
-            .padding(.top, 10)
+            .padding(.top, 8)
             .padding(.bottom, 6)
 
             Divider()
 
-            list
-
-            Divider()
-
-            footer
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
+            skillsList
         }
         .onKeyPress(.upArrow) { moveSelection(by: -1); return .handled }
         .onKeyPress(.downArrow) { moveSelection(by: 1); return .handled }
@@ -94,6 +147,13 @@ struct PopoverView: View {
             triggerDeleteConfirmOnSelected()
             return .handled
         }
+    }
+
+    private var memoryBody: some View {
+        MemoryListView(
+            selectedMemoryID: $selectedMemoryID,
+            rowStates: $memoryRowStates
+        )
     }
 
     private var newSkillButton: some View {
@@ -137,12 +197,12 @@ struct PopoverView: View {
         )
     }
 
-    private var list: some View {
+    private var skillsList: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
                     if store.filteredSkills.isEmpty {
-                        emptyState
+                        skillsEmptyState
                             .frame(maxWidth: .infinity, minHeight: 200)
                     } else {
                         ForEach(store.filteredSkills) { skill in
@@ -171,7 +231,7 @@ struct PopoverView: View {
         }
     }
 
-    private var emptyState: some View {
+    private var skillsEmptyState: some View {
         VStack(spacing: 8) {
             Image(systemName: "tray")
                 .font(.system(size: 32))
@@ -206,7 +266,7 @@ struct PopoverView: View {
             .buttonStyle(.borderless)
             .keyboardShortcut(",", modifiers: .command)
 
-            Button(action: { store.rescan() }) {
+            Button(action: { activeRescan() }) {
                 Image(systemName: "arrow.clockwise")
                 Text("Refresh")
             }
@@ -215,7 +275,7 @@ struct PopoverView: View {
 
             Spacer()
 
-            Text("\(store.filteredSkills.count)")
+            Text("\(activeCount)")
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(.secondary)
 
@@ -227,9 +287,33 @@ struct PopoverView: View {
             .keyboardShortcut("q", modifiers: .command)
         }
         .font(.system(size: 11))
+        .background(
+            HStack {
+                Button("") { activeTabRaw = AppTab.skills.rawValue }
+                    .keyboardShortcut("1", modifiers: .command)
+                Button("") { activeTabRaw = AppTab.memory.rawValue }
+                    .keyboardShortcut("2", modifiers: .command)
+            }
+            .opacity(0)
+            .frame(width: 0, height: 0)
+        )
     }
 
-    // MARK: - Actions
+    private var activeCount: Int {
+        switch activeTab {
+        case .skills: store.filteredSkills.count
+        case .memory: memoryStore.filteredMemories.count
+        }
+    }
+
+    private func activeRescan() {
+        switch activeTab {
+        case .skills: store.rescan()
+        case .memory: memoryStore.rescan()
+        }
+    }
+
+    // MARK: - Actions (skills)
 
     private func binding(for id: String) -> Binding<SkillRowView.RowState> {
         Binding(
@@ -242,23 +326,6 @@ struct PopoverView: View {
         if editorCommand.isEmpty, let first = EditorDetector.detect().first {
             editorCommand = first.command
         }
-    }
-
-    private func showSettings() {
-        NSApp.activate(ignoringOtherApps: true)
-        openSettings()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            NSApp.activate(ignoringOtherApps: true)
-            for window in NSApp.windows where isSettingsWindow(window) {
-                window.orderFrontRegardless()
-                window.makeKeyAndOrderFront(nil)
-            }
-        }
-    }
-
-    private func isSettingsWindow(_ window: NSWindow) -> Bool {
-        let id = window.identifier?.rawValue ?? ""
-        return id.contains("Settings") || id.contains("settings") || window.title == "Settings"
     }
 
     private func open(skill: Skill) {
@@ -283,9 +350,12 @@ struct PopoverView: View {
     }
 
     private func cancelAnyConfirm() -> Bool {
-        let active = rowStates.first(where: { $0.value == .confirmingDelete })
-        if let active {
+        if let active = rowStates.first(where: { $0.value == .confirmingDelete }) {
             rowStates[active.key] = .normal
+            return true
+        }
+        if let active = memoryRowStates.first(where: { $0.value == .confirmingDelete }) {
+            memoryRowStates[active.key] = .normal
             return true
         }
         return false
@@ -312,5 +382,24 @@ struct PopoverView: View {
     private func triggerDeleteConfirmOnSelected() {
         guard let id = selectedSkillID else { return }
         rowStates[id] = .confirmingDelete
+    }
+
+    // MARK: - Settings
+
+    private func showSettings() {
+        NSApp.activate(ignoringOtherApps: true)
+        openSettings()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            NSApp.activate(ignoringOtherApps: true)
+            for window in NSApp.windows where isSettingsWindow(window) {
+                window.orderFrontRegardless()
+                window.makeKeyAndOrderFront(nil)
+            }
+        }
+    }
+
+    private func isSettingsWindow(_ window: NSWindow) -> Bool {
+        let id = window.identifier?.rawValue ?? ""
+        return id.contains("Settings") || id.contains("settings") || window.title == "Settings"
     }
 }
