@@ -15,7 +15,7 @@ make install   # copies to /Applications
 make clean
 ```
 
-## Cutting a release
+## Release
 
 Bump `CFBundleShortVersionString` in `Sources/Skillbox/Resources/Info.plist.template`, then:
 
