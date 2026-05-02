@@ -199,7 +199,7 @@ struct PopoverView: View {
 
     private var footer: some View {
         HStack(spacing: 8) {
-            Button(action: { openSettings() }) {
+            Button(action: { showSettings() }) {
                 Image(systemName: "gearshape")
                 Text("Settings")
             }
@@ -242,6 +242,23 @@ struct PopoverView: View {
         if editorCommand.isEmpty, let first = EditorDetector.detect().first {
             editorCommand = first.command
         }
+    }
+
+    private func showSettings() {
+        NSApp.activate(ignoringOtherApps: true)
+        openSettings()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            NSApp.activate(ignoringOtherApps: true)
+            for window in NSApp.windows where isSettingsWindow(window) {
+                window.orderFrontRegardless()
+                window.makeKeyAndOrderFront(nil)
+            }
+        }
+    }
+
+    private func isSettingsWindow(_ window: NSWindow) -> Bool {
+        let id = window.identifier?.rawValue ?? ""
+        return id.contains("Settings") || id.contains("settings") || window.title == "Settings"
     }
 
     private func open(skill: Skill) {
