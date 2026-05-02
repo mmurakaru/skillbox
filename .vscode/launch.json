@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:skillbox}",
+            "name": "Debug Skillbox",
+            "target": "Skillbox",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug Skillbox"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:skillbox}",
+            "name": "Release Skillbox",
+            "target": "Skillbox",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release Skillbox"
+        }
+    ]
+}
