@@ -26,7 +26,7 @@ ditto -c -k --keepParent Skillbox.app Skillbox-$VERSION.zip
 git tag -a $VERSION -m "$VERSION"
 git push origin $VERSION
 gh release create $VERSION --prerelease --title "$VERSION" --notes "..." Skillbox-$VERSION.zip
-rm Skillbox-$VERSION.zip
+rm -f Skillbox-$VERSION.zip
 ```
 
 Drop `--prerelease` once you tag a stable `vX.Y.Z` (no `-beta`/`-rc` suffix).
