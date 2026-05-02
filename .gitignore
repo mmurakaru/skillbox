@@ -2,6 +2,7 @@
 .swiftpm/
 Package.resolved
 Skillbox.app/
+Skillbox-*.zip
 DerivedData/
 *.xcodeproj
 .DS_Store
