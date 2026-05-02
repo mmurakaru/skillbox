@@ -1,4 +1,4 @@
-# skillbox
+# <img src="Sources/Skillbox/Resources/AppIcon.svg" alt="" height="32" valign="middle" /> skillbox
 
 Native macOS menu bar app for managing Claude skills installed at `~/.claude/skills/`.
 
