@@ -3,7 +3,7 @@ import Foundation
 @testable import Skillbox
 
 @MainActor
-struct SkillStoreTests {
+struct FileBackedItemStoreTests {
     private func makeSkill(name: String, description: String = "") -> Skill {
         Skill(
             name: name,
@@ -13,45 +13,45 @@ struct SkillStoreTests {
         )
     }
 
-    @Test func filtered_emptyQuery_returnsAll() {
+    @Test func searching_an_empty_query_returns_all_items() {
         let store = SkillStore(seedSkills: [
             makeSkill(name: "alpha"),
             makeSkill(name: "beta"),
         ])
-        #expect(store.filteredSkills.count == 2)
+        #expect(store.filteredItems.count == 2)
     }
 
-    @Test func filtered_searchByName_caseInsensitive() {
+    @Test func searching_filters_by_the_caller_provided_predicate() {
         let store = SkillStore(seedSkills: [
             makeSkill(name: "FrontendDesigner"),
             makeSkill(name: "BackendDesigner"),
         ])
         store.searchQuery = "frontend"
-        #expect(store.filteredSkills.map(\.name) == ["FrontendDesigner"])
+        #expect(store.filteredItems.map(\.name) == ["FrontendDesigner"])
     }
 
-    @Test func filtered_searchByDescription_matches() {
+    @Test func searching_matches_descriptions_too_for_skills() {
         let store = SkillStore(seedSkills: [
             makeSkill(name: "alpha", description: "uses redis backend"),
             makeSkill(name: "beta", description: "uses postgres"),
         ])
         store.searchQuery = "redis"
-        #expect(store.filteredSkills.map(\.name) == ["alpha"])
+        #expect(store.filteredItems.map(\.name) == ["alpha"])
     }
 
-    @Test func filtered_whitespaceOnly_treatedAsEmpty() {
+    @Test func searching_with_only_whitespace_is_treated_as_empty() {
         let store = SkillStore(seedSkills: [
             makeSkill(name: "alpha"),
             makeSkill(name: "beta"),
         ])
         store.searchQuery = "   "
-        #expect(store.filteredSkills.count == 2)
+        #expect(store.filteredItems.count == 2)
     }
 
-    @Test func remove_dropsMatchingSkill() {
+    @Test func removing_an_item_drops_it_from_the_in_memory_list() {
         let target = makeSkill(name: "doomed")
         let store = SkillStore(seedSkills: [target, makeSkill(name: "survivor")])
         store.remove(target)
-        #expect(store.skills.map(\.name) == ["survivor"])
+        #expect(store.items.map(\.name) == ["survivor"])
     }
 }

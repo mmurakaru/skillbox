@@ -94,7 +94,7 @@ struct PopoverView: View {
             memoryStore.configure(rootPath: memoryRootPath)
             ensureEditorDefault()
             if selectedSkillID == nil {
-                selectedSkillID = store.filteredSkills.first?.id
+                selectedSkillID = store.filteredItems.first?.id
             }
             try? await Task.sleep(for: .milliseconds(80))
             searchFocused = true
@@ -232,7 +232,7 @@ struct PopoverView: View {
     }
 
     private var remoteSkills: [Skill] {
-        store.skills.filter { $0.provenance != nil }
+        store.items.filter { $0.provenance != nil }
     }
 
     private var searchBar: some View {
@@ -264,11 +264,11 @@ struct PopoverView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
-                    if store.filteredSkills.isEmpty {
+                    if store.filteredItems.isEmpty {
                         skillsEmptyState
                             .frame(maxWidth: .infinity, minHeight: 200)
                     } else {
-                        ForEach(store.filteredSkills) { skill in
+                        ForEach(store.filteredItems) { skill in
                             SkillRowView(
                                 skill: skill,
                                 isSelected: selectedSkillID == skill.id,
@@ -368,7 +368,7 @@ struct PopoverView: View {
 
     private var activeCount: Int {
         switch activeTab {
-        case .skills: store.filteredSkills.count
+        case .skills: store.filteredItems.count
         case .memory: memoryStore.filteredMemories.count
         }
     }
@@ -408,7 +408,7 @@ struct PopoverView: View {
         case .success:
             store.remove(skill)
             if selectedSkillID == skill.id {
-                selectedSkillID = store.filteredSkills.first?.id
+                selectedSkillID = store.filteredItems.first?.id
             }
         case .failure(let err):
             NSSound.beep()
@@ -429,7 +429,7 @@ struct PopoverView: View {
     }
 
     private func moveSelection(by delta: Int) {
-        let items = store.filteredSkills
+        let items = store.filteredItems
         guard !items.isEmpty else { return }
         searchFocused = false
         if let current = selectedSkillID, let idx = items.firstIndex(where: { $0.id == current }) {
@@ -442,7 +442,7 @@ struct PopoverView: View {
 
     private func triggerEditOnSelected() {
         guard let id = selectedSkillID,
-              let skill = store.filteredSkills.first(where: { $0.id == id }) else { return }
+              let skill = store.filteredItems.first(where: { $0.id == id }) else { return }
         open(skill: skill)
     }
 
