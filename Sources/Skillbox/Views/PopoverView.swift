@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 
+/// Top-level tab in the popover.
 enum AppTab: String, CaseIterable, Identifiable {
     case skills
     case memory
@@ -13,6 +14,15 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .memory: "Memory"
         }
     }
+}
+
+/// Mutually-exclusive screens reachable from the Skills tab.
+/// Replaces three `@State Bool`s so the popover can only ever be in one state.
+enum SkillsTabRoute: Equatable {
+    case list
+    case newSkill
+    case installFromURL
+    case registry
 }
 
 struct PopoverView: View {
@@ -31,9 +41,7 @@ struct PopoverView: View {
     @State private var selectedMemoryID: String?
     @State private var rowStates: [String: SkillRowView.RowState] = [:]
     @State private var memoryRowStates: [String: SkillRowView.RowState] = [:]
-    @State private var showingNewSkill = false
-    @State private var showingInstall = false
-    @State private var showingRegistry = false
+    @State private var skillsRoute: SkillsTabRoute = .list
     @State private var updatingSkillIDs: Set<String> = []
 
     @FocusState private var searchFocused: Bool
@@ -44,7 +52,10 @@ struct PopoverView: View {
 
     var body: some View {
         Group {
-            if showingNewSkill {
+            switch skillsRoute {
+            case .list:
+                shellContent
+            case .newSkill:
                 NewSkillForm(
                     rootPath: (skillsRootPath as NSString).expandingTildeInPath,
                     onCreate: { folderURL in
@@ -54,34 +65,27 @@ struct PopoverView: View {
                             folderURL: folderURL,
                             modifiedAt: Date()
                         )
-                        showingNewSkill = false
+                        skillsRoute = .list
                         open(skill: stub)
                     },
-                    onCancel: { showingNewSkill = false }
+                    onCancel: { skillsRoute = .list }
                 )
-            } else if showingInstall {
+            case .installFromURL:
                 InstallFromURLSheet(
                     skillsRootPath: skillsRootPath,
                     onInstalled: { _ in
-                        showingInstall = false
+                        skillsRoute = .list
                         store.rescan()
                     },
-                    onBrowseRegistry: {
-                        showingInstall = false
-                        showingRegistry = true
-                    },
-                    onCancel: { showingInstall = false }
+                    onBrowseRegistry: { skillsRoute = .registry },
+                    onCancel: { skillsRoute = .list }
                 )
-            } else if showingRegistry {
+            case .registry:
                 RegistryView(
                     skillsRootPath: skillsRootPath,
-                    onInstalled: { _ in
-                        store.rescan()
-                    },
-                    onBack: { showingRegistry = false }
+                    onInstalled: { _ in store.rescan() },
+                    onBack: { skillsRoute = .list }
                 )
-            } else {
-                shellContent
             }
         }
         .frame(width: 360, height: 480)
@@ -102,8 +106,8 @@ struct PopoverView: View {
             memoryStore.configure(rootPath: newValue)
         }
         .onKeyPress(.escape) {
-            if showingNewSkill {
-                showingNewSkill = false
+            if skillsRoute != .list {
+                skillsRoute = .list
                 return .handled
             }
             if cancelAnyConfirm() { return .handled }
@@ -188,7 +192,7 @@ struct PopoverView: View {
     }
 
     private var newSkillButton: some View {
-        Button(action: { showingNewSkill = true }) {
+        Button(action: { skillsRoute = .newSkill }) {
             Image(systemName: "plus")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.secondary)
@@ -205,9 +209,9 @@ struct PopoverView: View {
 
     private var installButton: some View {
         Menu {
-            Button("Install from URL…") { showingInstall = true }
+            Button("Install from URL…") { skillsRoute = .installFromURL }
                 .keyboardShortcut("i", modifiers: .command)
-            Button("Browse registry…") { showingRegistry = true }
+            Button("Browse registry…") { skillsRoute = .registry }
             Divider()
             Button("Check for updates") { Task { await checkForUpdates() } }
                 .disabled(remoteSkills.isEmpty)
