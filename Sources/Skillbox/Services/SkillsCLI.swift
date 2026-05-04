@@ -39,17 +39,50 @@ enum SkillsCLI {
 
     // MARK: - Detection
 
-    static func detect() async -> Availability {
-        do {
-            let result = try await runShell("command -v npx")
-            if result.exitCode == 0,
-               !result.combinedOutput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                return .available
+    private static let cachedNpxPath = NpxPathCache()
+
+    static func resolvedNpxPath() async -> String? {
+        if let cached = cachedNpxPath.get() { return cached }
+
+        // 1. Ask an interactive login zsh — picks up .zshrc setup (nvm/fnm/asdf/Homebrew shellenv).
+        if let viaShell = try? await runShellRaw("command -v npx"),
+           viaShell.exitCode == 0 {
+            if let path = extractNpxPath(from: viaShell.combinedOutput) {
+                cachedNpxPath.set(path)
+                return path
             }
-            return .missing
-        } catch {
-            return .missing
         }
+
+        // 2. Probe well-known absolute paths.
+        let candidates = [
+            "/opt/homebrew/bin/npx",
+            "/usr/local/bin/npx",
+            (NSHomeDirectory() as NSString).appendingPathComponent(".volta/bin/npx"),
+        ]
+        for candidate in candidates where FileManager.default.isExecutableFile(atPath: candidate) {
+            cachedNpxPath.set(candidate)
+            return candidate
+        }
+        return nil
+    }
+
+    static func detect() async -> Availability {
+        await resolvedNpxPath() != nil ? .available : .missing
+    }
+
+    static func clearDetectionCache() {
+        cachedNpxPath.set(nil)
+    }
+
+    private static func extractNpxPath(from output: String) -> String? {
+        for line in output.components(separatedBy: "\n").reversed() {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("/"), trimmed.hasSuffix("npx"),
+               FileManager.default.isExecutableFile(atPath: trimmed) {
+                return trimmed
+            }
+        }
+        return nil
     }
 
     // MARK: - Public commands
@@ -108,24 +141,25 @@ enum SkillsCLI {
         args: [String],
         stream: @escaping @Sendable (String) -> Void
     ) async throws -> RunResult {
-        let availability = await detect()
-        guard availability == .available else { throw CLIError.npxMissing }
+        guard let npxPath = await resolvedNpxPath() else { throw CLIError.npxMissing }
 
-        let quoted = (["npx", "--yes", "skills"] + args)
+        // Run npx via its absolute path through an interactive login zsh so node-version-manager
+        // shims and PATH are fully populated for the subprocess (npx still needs `node` on PATH).
+        let quoted = ([npxPath, "--yes", "skills"] + args)
             .map(shellQuote)
             .joined(separator: " ")
-        return try await runShell(quoted, stream: stream)
+        return try await runShellRaw(quoted, stream: stream)
     }
 
     @discardableResult
-    private static func runShell(
+    static func runShellRaw(
         _ command: String,
         stream: (@Sendable (String) -> Void)? = nil
     ) async throws -> RunResult {
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<RunResult, Error>) in
             let task = Process()
             task.executableURL = URL(fileURLWithPath: "/bin/zsh")
-            task.arguments = ["-l", "-c", command]
+            task.arguments = ["-i", "-l", "-c", command]
 
             let pipe = Pipe()
             task.standardOutput = pipe
@@ -183,5 +217,20 @@ private final class OutputBuffer: @unchecked Sendable {
     func snapshot() -> String {
         lock.lock(); defer { lock.unlock() }
         return value
+    }
+}
+
+private final class NpxPathCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: String?
+
+    func get() -> String? {
+        lock.lock(); defer { lock.unlock() }
+        return value
+    }
+
+    func set(_ newValue: String?) {
+        lock.lock(); defer { lock.unlock() }
+        value = newValue
     }
 }
