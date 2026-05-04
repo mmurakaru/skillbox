@@ -23,6 +23,7 @@ struct PopoverView: View {
     @AppStorage("editorCommand") private var editorCommand: String = ""
     @AppStorage("openTarget") private var openTargetRaw: String = OpenTarget.folder.rawValue
     @AppStorage("skillsRootPath") private var skillsRootPath: String = "~/.claude/skills"
+    @AppStorage("memoryRootPath") private var memoryRootPath: String = "~/.claude/projects"
     @AppStorage("activeTab") private var activeTabRaw: String = AppTab.skills.rawValue
 
     @State private var selectedSkillID: String?
@@ -61,6 +62,7 @@ struct PopoverView: View {
         .frame(width: 360, height: 480)
         .task {
             store.configure(rootPath: skillsRootPath)
+            memoryStore.configure(rootPath: memoryRootPath)
             ensureEditorDefault()
             if selectedSkillID == nil {
                 selectedSkillID = store.filteredSkills.first?.id
@@ -70,6 +72,9 @@ struct PopoverView: View {
         }
         .onChange(of: skillsRootPath) { _, newValue in
             store.configure(rootPath: newValue)
+        }
+        .onChange(of: memoryRootPath) { _, newValue in
+            memoryStore.configure(rootPath: newValue)
         }
         .onKeyPress(.escape) {
             if showingNewSkill {

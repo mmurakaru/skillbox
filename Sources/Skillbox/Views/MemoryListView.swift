@@ -35,7 +35,6 @@ struct MemoryListView: View {
             list
         }
         .task {
-            store.configure(rootPath: "~/.claude/projects")
             applyStickyOrDefault()
         }
         .onChange(of: store.memories.count) { _, _ in

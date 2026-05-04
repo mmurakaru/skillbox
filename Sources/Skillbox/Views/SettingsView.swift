@@ -4,6 +4,7 @@ import AppKit
 
 struct SettingsView: View {
     @AppStorage("skillsRootPath") private var skillsRootPath: String = "~/.claude/skills"
+    @AppStorage("memoryRootPath") private var memoryRootPath: String = "~/.claude/projects"
     @AppStorage("editorCommand") private var editorCommand: String = ""
     @AppStorage("openTarget") private var openTargetRaw: String = OpenTarget.folder.rawValue
     @AppStorage("launchAtLogin") private var launchAtLogin: Bool = false
@@ -16,10 +17,20 @@ struct SettingsView: View {
                 HStack {
                     TextField("Skills directory", text: $skillsRootPath)
                         .textFieldStyle(.roundedBorder)
-                    Button("Browse…") { browseForFolder() }
+                    Button("Browse…") { browseForFolder(binding: $skillsRootPath) }
                 }
             } header: {
                 Text("Skills")
+            }
+
+            Section {
+                HStack {
+                    TextField("Memory directory", text: $memoryRootPath)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Browse…") { browseForFolder(binding: $memoryRootPath) }
+                }
+            } header: {
+                Text("Memory")
             }
 
             Section {
@@ -67,14 +78,14 @@ struct SettingsView: View {
         }
     }
 
-    private func browseForFolder() {
+    private func browseForFolder(binding: Binding<String>) {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
-        panel.directoryURL = URL(fileURLWithPath: (skillsRootPath as NSString).expandingTildeInPath)
+        panel.directoryURL = URL(fileURLWithPath: (binding.wrappedValue as NSString).expandingTildeInPath)
         if panel.runModal() == .OK, let url = panel.url {
-            skillsRootPath = url.path
+            binding.wrappedValue = url.path
         }
     }
 
