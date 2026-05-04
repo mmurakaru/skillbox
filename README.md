@@ -4,6 +4,22 @@ Native macOS menu bar app for managing claude skills (`~/.claude/skills/`) and a
 
 See [PRD.md](PRD.md) for the spec.
 
+## Features
+
+- Skills tab: browse, search, open, and trash skills under `~/.claude/skills/`.
+- Memory tab: browse Claude auto-memory entries (`~/.claude/projects/<project>/memory/*.md`) per project, with type badges and edit/delete.
+- Toggle tabs with ⌘1 / ⌘2.
+
+## Install
+
+Grab the latest `Skillbox-vX.Y.Z.zip` from [Releases](https://github.com/mmurakaru/skillbox/releases), unzip, and drag `Skillbox.app` to `/Applications`.
+
+The app is ad-hoc signed, not notarized. On first launch macOS Gatekeeper will refuse to open it. Either right-click → Open and confirm, or strip the quarantine attribute:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Skillbox.app
+```
+
 ## Build & run
 
 Requires macOS 14+, Swift 6 toolchain (Command Line Tools is enough).
@@ -14,6 +30,8 @@ make run       # builds and opens
 make install   # copies to /Applications
 make clean
 ```
+
+Run tests with `swift test`.
 
 ## Release
 
