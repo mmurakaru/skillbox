@@ -18,6 +18,7 @@ enum AppTab: String, CaseIterable, Identifiable {
 struct PopoverView: View {
     @Environment(SkillStore.self) private var store
     @Environment(MemoryStore.self) private var memoryStore
+    @Environment(RemoteSkillService.self) private var remoteSkillService
     @Environment(\.openSettings) private var openSettings
 
     @AppStorage("editorCommand") private var editorCommand: String = ""
@@ -469,51 +470,17 @@ struct PopoverView: View {
 
     @MainActor
     private func runUpdate(skill: Skill) async {
-        guard let provenance = skill.provenance else { return }
         let key = skill.id
         updatingSkillIDs.insert(key)
         defer { updatingSkillIDs.remove(key) }
 
-        let target = provenance.skill ?? skill.name
-        do {
-            let result = try await SkillsCLI.update(skillName: target) { _ in }
-            if result.exitCode == 0,
-               let coords = SkillSourceCoordinates.parse(provenance: provenance),
-               let sha = try? await SkillRegistry.latestSHA(repo: coords.repo, branch: coords.branch, path: coords.path) {
-                var updated = provenance
-                updated.sha = sha
-                updated.latestKnownSHA = sha
-                updated.lastCheckedAt = Date()
-                try? SkillProvenanceStore.write(updated, to: skill.folderURL)
-            }
-        } catch {
-            // Keep silent on row; user can re-trigger
-        }
+        try? await remoteSkillService.update(skill) { _ in }
         store.rescan()
     }
 
     @MainActor
     private func checkForUpdates() async {
-        for skill in remoteSkills {
-            guard
-                let provenance = skill.provenance,
-                let coords = SkillSourceCoordinates.parse(provenance: provenance)
-            else { continue }
-            do {
-                let sha = try await SkillRegistry.latestSHA(
-                    repo: coords.repo,
-                    branch: coords.branch,
-                    path: coords.path
-                )
-                var updated = provenance
-                updated.latestKnownSHA = sha
-                updated.lastCheckedAt = Date()
-                if updated.sha == nil { updated.sha = sha }
-                try? SkillProvenanceStore.write(updated, to: skill.folderURL)
-            } catch {
-                continue
-            }
-        }
+        await remoteSkillService.checkForUpdates(remoteSkills)
         store.rescan()
     }
 }

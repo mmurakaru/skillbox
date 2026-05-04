@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct RegistryView: View {
+    @Environment(RemoteSkillService.self) private var service
+
     let skillsRootPath: String
     let onInstalled: (String) -> Void
     let onBack: () -> Void
@@ -223,51 +225,20 @@ struct RegistryView: View {
         installing = entry.id
         showLogFor = entry.id
         streamLog = ""
-        let opts = SkillsCLI.InstallOptions(
-            source: SkillRegistry.defaultRepo,
-            skill: entry.folderName
-        )
+
         do {
-            let result = try await SkillsCLI.install(opts) { chunk in
-                Task { @MainActor in
-                    streamLog += chunk
-                }
+            let installed = try await service.install(
+                source: SkillRegistry.defaultRepo,
+                skill: entry.folderName,
+                rootPath: skillsRootPath
+            ) { chunk in
+                streamLog += chunk
             }
-            if result.exitCode == 0 {
-                recordProvenance(skillName: entry.folderName, sourcePath: entry.path)
-                lastInstalledName = entry.folderName
-                onInstalled(entry.folderName)
-            } else {
-                streamLog += "\nFailed (exit \(result.exitCode))"
-            }
+            lastInstalledName = installed.name
+            onInstalled(installed.name)
         } catch {
             streamLog += "\n\((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)"
         }
         installing = nil
-    }
-
-    private func recordProvenance(skillName: String, sourcePath: String) {
-        let folder = URL(fileURLWithPath: (skillsRootPath as NSString).expandingTildeInPath)
-            .appendingPathComponent(skillName)
-        guard FileManager.default.fileExists(atPath: folder.path) else { return }
-        let provenance = SkillProvenance(
-            source: SkillRegistry.defaultRepo,
-            skill: skillName,
-            ref: SkillRegistry.defaultBranch,
-            sha: nil,
-            installedAt: Date(),
-            lastCheckedAt: Date(),
-            latestKnownSHA: nil
-        )
-        try? SkillProvenanceStore.write(provenance, to: folder)
-
-        Task {
-            if let sha = try? await SkillRegistry.latestSHA(path: sourcePath) {
-                var updated = provenance
-                updated.sha = sha
-                updated.latestKnownSHA = sha
-                try? SkillProvenanceStore.write(updated, to: folder)
-            }
-        }
     }
 }

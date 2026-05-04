@@ -2,6 +2,8 @@ import SwiftUI
 import AppKit
 
 struct InstallFromURLSheet: View {
+    @Environment(RemoteSkillService.self) private var service
+
     let skillsRootPath: String
     let onInstalled: (String) -> Void
     let onBrowseRegistry: () -> Void
@@ -198,66 +200,20 @@ struct InstallFromURLSheet: View {
         phase = .running
         logText = ""
 
-        Task {
-            let availability = await SkillsCLI.detect()
-            guard availability == .available else {
-                await MainActor.run {
-                    errorText = SkillsCLI.CLIError.npxMissing.errorDescription
-                    phase = .input
-                }
-                return
-            }
-
-            let opts = SkillsCLI.InstallOptions(
-                source: trimmed,
-                skill: trimmedSkill.isEmpty ? nil : trimmedSkill
-            )
-
+        Task { @MainActor in
             do {
-                let result = try await SkillsCLI.install(opts) { chunk in
-                    Task { @MainActor in
-                        logText += chunk
-                    }
+                let installed = try await service.install(
+                    source: trimmed,
+                    skill: trimmedSkill.isEmpty ? nil : trimmedSkill,
+                    rootPath: skillsRootPath
+                ) { chunk in
+                    logText += chunk
                 }
-                await MainActor.run {
-                    if result.exitCode == 0 {
-                        let installedName = trimmedSkill.isEmpty ? inferNameFromSource(trimmed) : trimmedSkill
-                        recordProvenance(skillName: installedName, source: trimmed)
-                        phase = .done(installedSkill: installedName)
-                    } else {
-                        errorText = "skills add exited with code \(result.exitCode)"
-                        phase = .input
-                    }
-                }
+                phase = .done(installedSkill: installed.name)
             } catch {
-                await MainActor.run {
-                    errorText = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-                    phase = .input
-                }
+                errorText = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                phase = .input
             }
         }
-    }
-
-    private func inferNameFromSource(_ source: String) -> String {
-        if let path = source.split(separator: "/").last {
-            return String(path).replacingOccurrences(of: ".git", with: "")
-        }
-        return source
-    }
-
-    private func recordProvenance(skillName: String, source: String) {
-        let folder = URL(fileURLWithPath: (skillsRootPath as NSString).expandingTildeInPath)
-            .appendingPathComponent(skillName)
-        guard FileManager.default.fileExists(atPath: folder.path) else { return }
-        let provenance = SkillProvenance(
-            source: source,
-            skill: skillName,
-            ref: "main",
-            sha: nil,
-            installedAt: Date(),
-            lastCheckedAt: nil,
-            latestKnownSHA: nil
-        )
-        try? SkillProvenanceStore.write(provenance, to: folder)
     }
 }
