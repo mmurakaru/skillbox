@@ -31,6 +31,9 @@ struct PopoverView: View {
     @State private var rowStates: [String: SkillRowView.RowState] = [:]
     @State private var memoryRowStates: [String: SkillRowView.RowState] = [:]
     @State private var showingNewSkill = false
+    @State private var showingInstall = false
+    @State private var showingRegistry = false
+    @State private var updatingSkillIDs: Set<String> = []
 
     @FocusState private var searchFocused: Bool
 
@@ -54,6 +57,27 @@ struct PopoverView: View {
                         open(skill: stub)
                     },
                     onCancel: { showingNewSkill = false }
+                )
+            } else if showingInstall {
+                InstallFromURLSheet(
+                    skillsRootPath: skillsRootPath,
+                    onInstalled: { _ in
+                        showingInstall = false
+                        store.rescan()
+                    },
+                    onBrowseRegistry: {
+                        showingInstall = false
+                        showingRegistry = true
+                    },
+                    onCancel: { showingInstall = false }
+                )
+            } else if showingRegistry {
+                RegistryView(
+                    skillsRootPath: skillsRootPath,
+                    onInstalled: { _ in
+                        store.rescan()
+                    },
+                    onBack: { showingRegistry = false }
                 )
             } else {
                 shellContent
@@ -130,6 +154,7 @@ struct PopoverView: View {
         return VStack(spacing: 0) {
             HStack(spacing: 6) {
                 searchBar
+                installButton
                 newSkillButton
             }
             .padding(.horizontal, 10)
@@ -177,6 +202,34 @@ struct PopoverView: View {
         .keyboardShortcut("n", modifiers: .command)
     }
 
+    private var installButton: some View {
+        Menu {
+            Button("Install from URL…") { showingInstall = true }
+                .keyboardShortcut("i", modifiers: .command)
+            Button("Browse registry…") { showingRegistry = true }
+            Divider()
+            Button("Check for updates") { Task { await checkForUpdates() } }
+                .disabled(remoteSkills.isEmpty)
+        } label: {
+            Image(systemName: "arrow.down.circle")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 28, height: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.secondary.opacity(0.1))
+                )
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .frame(width: 28, height: 26)
+        .help("Install or update remote skills")
+    }
+
+    private var remoteSkills: [Skill] {
+        store.skills.filter { $0.provenance != nil }
+    }
+
     private var searchBar: some View {
         @Bindable var store = store
         return HStack(spacing: 6) {
@@ -214,8 +267,12 @@ struct PopoverView: View {
                             SkillRowView(
                                 skill: skill,
                                 isSelected: selectedSkillID == skill.id,
+                                isUpdating: updatingSkillIDs.contains(skill.id),
                                 onEdit: { open(skill: skill) },
                                 onDelete: { performDelete(skill: skill) },
+                                onUpdate: skill.provenance?.hasUpdate == true
+                                    ? { Task { await runUpdate(skill: skill) } }
+                                    : nil,
                                 rowState: binding(for: skill.id)
                             )
                             .id(skill.id)
@@ -406,5 +463,57 @@ struct PopoverView: View {
     private func isSettingsWindow(_ window: NSWindow) -> Bool {
         let id = window.identifier?.rawValue ?? ""
         return id.contains("Settings") || id.contains("settings") || window.title == "Settings"
+    }
+
+    // MARK: - Remote update flow
+
+    @MainActor
+    private func runUpdate(skill: Skill) async {
+        guard let provenance = skill.provenance else { return }
+        let key = skill.id
+        updatingSkillIDs.insert(key)
+        defer { updatingSkillIDs.remove(key) }
+
+        let target = provenance.skill ?? skill.name
+        do {
+            let result = try await SkillsCLI.update(skillName: target) { _ in }
+            if result.exitCode == 0,
+               let coords = SkillSourceCoordinates.parse(provenance: provenance),
+               let sha = try? await SkillRegistry.latestSHA(repo: coords.repo, branch: coords.branch, path: coords.path) {
+                var updated = provenance
+                updated.sha = sha
+                updated.latestKnownSHA = sha
+                updated.lastCheckedAt = Date()
+                try? SkillProvenanceStore.write(updated, to: skill.folderURL)
+            }
+        } catch {
+            // Keep silent on row; user can re-trigger
+        }
+        store.rescan()
+    }
+
+    @MainActor
+    private func checkForUpdates() async {
+        for skill in remoteSkills {
+            guard
+                let provenance = skill.provenance,
+                let coords = SkillSourceCoordinates.parse(provenance: provenance)
+            else { continue }
+            do {
+                let sha = try await SkillRegistry.latestSHA(
+                    repo: coords.repo,
+                    branch: coords.branch,
+                    path: coords.path
+                )
+                var updated = provenance
+                updated.latestKnownSHA = sha
+                updated.lastCheckedAt = Date()
+                if updated.sha == nil { updated.sha = sha }
+                try? SkillProvenanceStore.write(updated, to: skill.folderURL)
+            } catch {
+                continue
+            }
+        }
+        store.rescan()
     }
 }

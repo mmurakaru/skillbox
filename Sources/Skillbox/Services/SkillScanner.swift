@@ -32,11 +32,14 @@ enum SkillScanner {
         let modifiedAt = (try? skillFileURL.resourceValues(forKeys: [.contentModificationDateKey]))?
             .contentModificationDate ?? Date()
 
+        let provenance = SkillProvenanceStore.read(from: folderURL)
+
         return Skill(
             name: name,
             description: description,
             folderURL: folderURL,
-            modifiedAt: modifiedAt
+            modifiedAt: modifiedAt,
+            provenance: provenance
         )
     }
 

@@ -3,14 +3,34 @@ import SwiftUI
 struct SkillRowView: View {
     let skill: Skill
     let isSelected: Bool
+    let isUpdating: Bool
     let onEdit: () -> Void
     let onDelete: () -> Void
+    let onUpdate: (() -> Void)?
 
     @Binding var rowState: RowState
 
     @State private var isHoveringRow = false
     @State private var isHoveringEdit = false
     @State private var isHoveringDelete = false
+
+    init(
+        skill: Skill,
+        isSelected: Bool,
+        isUpdating: Bool = false,
+        onEdit: @escaping () -> Void,
+        onDelete: @escaping () -> Void,
+        onUpdate: (() -> Void)? = nil,
+        rowState: Binding<RowState>
+    ) {
+        self.skill = skill
+        self.isSelected = isSelected
+        self.isUpdating = isUpdating
+        self.onEdit = onEdit
+        self.onDelete = onDelete
+        self.onUpdate = onUpdate
+        self._rowState = rowState
+    }
 
     enum RowState: Equatable {
         case normal
@@ -55,9 +75,17 @@ struct SkillRowView: View {
                 .frame(width: 18)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text(skill.name)
-                    .font(.system(size: 13, weight: .semibold))
-                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(skill.name)
+                        .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
+                    if skill.provenance != nil {
+                        Image(systemName: "link")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                            .help(remoteSourceTooltip)
+                    }
+                }
                 Text(skill.description)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
@@ -66,6 +94,8 @@ struct SkillRowView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .help(skill.description)
+
+            updatePill
 
             iconButton(
                 systemName: "pencil",
@@ -82,6 +112,35 @@ struct SkillRowView: View {
                 help: "Move to Trash",
                 action: { rowState = .confirmingDelete }
             )
+        }
+    }
+
+    private var remoteSourceTooltip: String {
+        guard let p = skill.provenance else { return "" }
+        let suffix = p.skill.map { " (\($0))" } ?? ""
+        return "Installed from \(p.source)\(suffix)"
+    }
+
+    @ViewBuilder
+    private var updatePill: some View {
+        if isUpdating {
+            ProgressView()
+                .controlSize(.small)
+                .frame(width: 22, height: 22)
+        } else if let onUpdate, skill.provenance?.hasUpdate == true {
+            Button(action: onUpdate) {
+                Text("Update")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.accentColor)
+                    )
+            }
+            .buttonStyle(.plain)
+            .help("Pull latest from \(skill.provenance?.source ?? "remote")")
         }
     }
 
