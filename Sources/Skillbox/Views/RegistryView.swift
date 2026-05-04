@@ -95,10 +95,7 @@ struct RegistryView: View {
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.secondary.opacity(0.1))
-        )
+        .glassEffect(.regular, in: .rect(cornerRadius: 6))
     }
 
     @ViewBuilder
@@ -149,6 +146,7 @@ struct RegistryView: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 4)
         }
+        .scrollEdgeEffectStyle(.soft, for: .all)
     }
 
     private func row(for entry: RegistryEntry) -> some View {

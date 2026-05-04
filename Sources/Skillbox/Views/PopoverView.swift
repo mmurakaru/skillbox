@@ -138,16 +138,32 @@ struct PopoverView: View {
     }
 
     private var tabSwitcher: some View {
-        Picker("", selection: Binding(
-            get: { activeTab },
-            set: { activeTabRaw = $0.rawValue }
-        )) {
+        HStack(spacing: 6) {
             ForEach(AppTab.allCases) { tab in
-                Text(tab.label).tag(tab)
+                tabButton(for: tab)
             }
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
+    }
+
+    private func tabButton(for tab: AppTab) -> some View {
+        let isSelected = activeTab == tab
+        return Button(action: { activeTabRaw = tab.rawValue }) {
+            Text(tab.label)
+                .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                .foregroundStyle(isSelected ? Color.white : Color.primary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 5)
+                .background(
+                    Group {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 6).fill(Color.accentColor)
+                        }
+                    }
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular, in: .rect(cornerRadius: 6))
     }
 
     private var skillsBody: some View {
@@ -194,10 +210,7 @@ struct PopoverView: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.secondary)
                 .frame(width: 28, height: 26)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.secondary.opacity(0.1))
-                )
+                .glassEffect(.regular, in: .rect(cornerRadius: 6))
         }
         .buttonStyle(.plain)
         .help("New skill (⌘N)")
@@ -217,10 +230,7 @@ struct PopoverView: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.secondary)
                 .frame(width: 28, height: 26)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.secondary.opacity(0.1))
-                )
+                .glassEffect(.regular, in: .rect(cornerRadius: 6))
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
@@ -251,10 +261,7 @@ struct PopoverView: View {
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.secondary.opacity(0.1))
-        )
+        .glassEffect(.regular, in: .rect(cornerRadius: 6))
     }
 
     private var skillsList: some View {
@@ -285,6 +292,7 @@ struct PopoverView: View {
                 .padding(.horizontal, 6)
                 .padding(.vertical, 4)
             }
+            .scrollEdgeEffectStyle(.soft, for: .all)
             .onChange(of: selectedSkillID) { _, newValue in
                 if let id = newValue {
                     withAnimation(.easeOut(duration: 0.1)) {

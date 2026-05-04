@@ -18,6 +18,8 @@ struct MemoryListView: View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
                 projectPicker
+                    .fixedSize()
+                Spacer(minLength: 0)
                 openFolderButton
             }
             .padding(.horizontal, 10)
@@ -81,27 +83,19 @@ struct MemoryListView: View {
     private var projectPicker: some View {
         @Bindable var store = store
         return Menu {
-            Button {
-                store.selectedProjectPath = nil
-            } label: {
-                if store.selectedProjectPath == nil {
-                    Label("All projects", systemImage: "checkmark")
-                } else {
-                    Text("All projects")
-                }
+            Button { store.selectedProjectPath = nil } label: {
+                projectMenuItemLabel(
+                    text: "All projects",
+                    isSelected: store.selectedProjectPath == nil
+                )
             }
             Divider()
             ForEach(store.availableProjects) { project in
-                Button {
-                    store.selectedProjectPath = project.folderURL.path
-                } label: {
-                    HStack {
-                        if store.selectedProjectPath == project.folderURL.path {
-                            Label("\(project.displayName) (\(project.count))", systemImage: "checkmark")
-                        } else {
-                            Text("\(project.displayName) (\(project.count))")
-                        }
-                    }
+                Button { store.selectedProjectPath = project.folderURL.path } label: {
+                    projectMenuItemLabel(
+                        text: "\(project.displayName) (\(project.count))",
+                        isSelected: store.selectedProjectPath == project.folderURL.path
+                    )
                 }
             }
         } label: {
@@ -118,15 +112,20 @@ struct MemoryListView: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.secondary.opacity(0.1))
-            )
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .glassEffect(.regular, in: .rect(cornerRadius: 6))
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .help(currentProjectTooltip)
+    }
+
+    private func projectMenuItemLabel(text: String, isSelected: Bool) -> some View {
+        Label {
+            Text(text)
+        } icon: {
+            Image(systemName: "checkmark")
+                .opacity(isSelected ? 1 : 0)
+        }
     }
 
     private var currentProjectLabel: String {
@@ -151,10 +150,8 @@ struct MemoryListView: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(folderButtonEnabled ? Color.secondary : Color.secondary.opacity(0.4))
                 .frame(width: 28, height: 26)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.secondary.opacity(folderButtonEnabled ? 0.1 : 0.05))
-                )
+                .glassEffect(.regular, in: .rect(cornerRadius: 6))
+                .opacity(folderButtonEnabled ? 1.0 : 0.5)
         }
         .buttonStyle(.plain)
         .disabled(!folderButtonEnabled)
@@ -179,16 +176,14 @@ struct MemoryListView: View {
                 Button(action: { store.searchQuery = "" }) {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
+
                 }
                 .buttonStyle(.borderless)
             }
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.secondary.opacity(0.1))
-        )
+        .glassEffect(.regular, in: .rect(cornerRadius: 6))
     }
 
     private var list: some View {
@@ -216,6 +211,7 @@ struct MemoryListView: View {
                 .padding(.horizontal, 6)
                 .padding(.vertical, 4)
             }
+            .scrollEdgeEffectStyle(.soft, for: .all)
             .onChange(of: selectedMemoryID) { _, newValue in
                 if let id = newValue {
                     withAnimation(.easeOut(duration: 0.1)) {
