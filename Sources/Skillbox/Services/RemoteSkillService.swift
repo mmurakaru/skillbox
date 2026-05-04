@@ -1,13 +1,7 @@
 import Foundation
 import Observation
 
-/// Owns the full lifecycle of remote-installed skills:
-/// install via the `skills` CLI, refresh upstream SHA into a sidecar,
-/// run updates, and check whether the upstream has advanced.
-///
-/// Hides the orchestration of the CLI, the GitHub registry, and the
-/// `.skillbox.json` sidecar so views have a single small surface to
-/// call instead of stitching the pieces themselves.
+/// Install / update / check-for-updates lifecycle for remote-installed skills.
 @MainActor
 @Observable
 final class RemoteSkillService {
@@ -25,13 +19,11 @@ final class RemoteSkillService {
         self.fileSystem = fileSystem
     }
 
-    /// Result of a successful install.
     struct InstalledSkill: Equatable {
         let folderURL: URL
         let name: String
     }
 
-    /// Errors surfaced to the UI. CLI/registry/filesystem errors are wrapped here.
     enum ServiceError: LocalizedError {
         case installFailed(exitCode: Int32, output: String)
         case updateFailed(exitCode: Int32, output: String)
@@ -54,13 +46,6 @@ final class RemoteSkillService {
 
     // MARK: - Install
 
-    /// Install a remote skill, write its provenance sidecar, and stamp the latest upstream SHA.
-    ///
-    /// - Parameters:
-    ///   - source: The CLI source (e.g. `vercel-labs/agent-skills` or a full GitHub URL).
-    ///   - skill: Optional skill name within a multi-skill repo.
-    ///   - rootPath: The configured Skillbox skills root (sidecar is written here).
-    ///   - stream: Receives CLI output line-by-line on the main actor.
     func install(
         source: String,
         skill: String?,
@@ -124,8 +109,7 @@ final class RemoteSkillService {
 
     // MARK: - Update
 
-    /// Run `skills update` for an installed skill, then refresh its sidecar SHA.
-    /// If the CLI fails, the existing sidecar is left untouched.
+    /// CLI failure leaves the existing sidecar untouched.
     func update(
         _ skill: Skill,
         stream: @escaping @MainActor (String) -> Void
@@ -153,9 +137,7 @@ final class RemoteSkillService {
 
     // MARK: - Check for updates
 
-    /// For each remote-installed skill, fetch the upstream SHA and stamp it into the sidecar.
-    /// Skills whose source can't be parsed (or whose registry call fails) are silently skipped
-    /// so one bad entry doesn't stall the whole batch.
+    /// Skills whose source can't be parsed (or registry call fails) are silently skipped.
     func checkForUpdates(_ skills: [Skill]) async {
         for skill in skills {
             guard let provenance = skill.provenance else { continue }
@@ -165,11 +147,10 @@ final class RemoteSkillService {
 
     // MARK: - Private
 
-    /// What to write back when a SHA is fetched from the registry.
     private enum SHAStamp {
-        /// User just installed or updated — record the new SHA as both installed and upstream.
+        /// Install / update — record the new SHA as both installed and upstream.
         case acceptedUpgrade
-        /// Background poll — record only the upstream SHA so the UI can flag the gap.
+        /// Background poll — record only the upstream SHA.
         case upstreamOnly
     }
 

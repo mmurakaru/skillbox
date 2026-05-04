@@ -1,7 +1,6 @@
 import SwiftUI
 import AppKit
 
-/// Top-level tab in the popover.
 enum AppTab: String, CaseIterable, Identifiable {
     case skills
     case memory
@@ -16,8 +15,6 @@ enum AppTab: String, CaseIterable, Identifiable {
     }
 }
 
-/// Mutually-exclusive screens reachable from the Skills tab.
-/// Replaces three `@State Bool`s so the popover can only ever be in one state.
 enum SkillsTabRoute: Equatable {
     case list
     case newSkill
@@ -403,16 +400,15 @@ struct PopoverView: View {
     }
 
     private func performDelete(skill: Skill) {
-        let result = SkillDeleter.trash(skill)
-        switch result {
-        case .success:
+        do {
+            try FileManager.default.trashItem(at: skill.folderURL, resultingItemURL: nil)
             store.remove(skill)
             if selectedSkillID == skill.id {
                 selectedSkillID = store.filteredItems.first?.id
             }
-        case .failure(let err):
+        } catch {
             NSSound.beep()
-            print("Delete failed: \(err)")
+            print("Delete failed: \(error)")
         }
     }
 

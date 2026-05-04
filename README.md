@@ -33,6 +33,16 @@ make clean
 
 Run tests with `swift test`.
 
+## Architecture
+
+The app has three layers under `Sources/Skillbox/`:
+
+- **Models** - `Skill`, `Memory`, and `FileBackedItemStore<Item>` (the generic store that powers both `SkillStore` and `MemoryStore`).
+- **Services** - leaf utilities (`SkillScanner`, `SkillsCLI`, `SkillRegistry`, `EditorLauncher`, `DirectoryWatcher`) and one deep module: `RemoteSkillService` owns the install / update / check-for-updates lifecycle behind a small interface. `Ports.swift` defines the protocols views talk to so tests can substitute in-memory adapters.
+- **Views** - SwiftUI views. `PopoverView` is the menu-bar entry point; sheets like `InstallFromURLSheet` and `RegistryView` route through a `SkillsTabRoute` enum.
+
+For the quickest tour of what the app does, read `Tests/SkillboxTests/AppTourTest.swift`.
+
 ## Release
 
 Bump `CFBundleShortVersionString` in `Sources/Skillbox/Resources/Info.plist.template`, then:

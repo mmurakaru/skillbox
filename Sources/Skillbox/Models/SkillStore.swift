@@ -1,7 +1,5 @@
 import Foundation
 
-/// The store the Skills tab observes. A specialisation of `FileBackedItemStore`
-/// that knows how to scan `~/.claude/skills/` and search by name + description.
 typealias SkillStore = FileBackedItemStore<Skill>
 
 extension FileBackedItemStore where Item == Skill {

@@ -1,7 +1,6 @@
 import Foundation
 import Observation
 
-/// Aggregated metadata for a single Claude project that owns memory entries.
 struct ProjectSummary: Identifiable, Hashable {
     let folderURL: URL
     let displayName: String
@@ -12,17 +11,13 @@ struct ProjectSummary: Identifiable, Hashable {
     var id: String { folderURL.path }
 }
 
-/// The store the Memory tab observes. Wraps a `FileBackedItemStore<Memory>`
-/// for the file-watching plumbing and adds the project picker logic
-/// (selectedProjectPath, availableProjects, project-aware filtering)
-/// that the memory tab needs but the skills tab does not.
+/// Wraps a `FileBackedItemStore<Memory>` and adds project-picker state.
 @MainActor
 @Observable
 final class MemoryStore {
-    /// The list-of-files plumbing — the same one the Skills tab uses.
     let backing: FileBackedItemStore<Memory>
 
-    /// Path of the project currently filtering the list, or nil for "all projects".
+    /// `nil` or empty means "all projects".
     var selectedProjectPath: String?
 
     init() {
@@ -60,7 +55,6 @@ final class MemoryStore {
 
     // MARK: - Project-aware view
 
-    /// Distinct projects among the loaded memory entries, with per-project counts.
     var availableProjects: [ProjectSummary] {
         let groups = Dictionary(grouping: memories) { $0.projectFolderURL.path }
         return groups.map { (_, entries) in
@@ -77,8 +71,6 @@ final class MemoryStore {
         .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
     }
 
-    /// Memory entries after the project picker and search query are applied.
-    /// "All projects" is represented by `selectedProjectPath == nil` or empty string.
     var filteredMemories: [Memory] {
         let scoped = memories.filter { mem in
             guard let selected = selectedProjectPath, !selected.isEmpty else { return true }

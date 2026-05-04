@@ -1,5 +1,6 @@
 import Foundation
 
+/// Fires `onChange` (debounced ~200ms) when files inside the watched directory change.
 final class DirectoryWatcher {
     private let fd: Int32
     private let source: DispatchSourceFileSystemObject

@@ -1,22 +1,14 @@
 import Foundation
 import Observation
 
-/// Loads items from a configurable root directory and keeps the list in sync as
-/// files change on disk. Specialised for skills and memory entries via the
-/// `SkillStore`/`MemoryStore` typealiases below — adding a third item type is
-/// a one-line conformance + a `convenience init`.
-///
-/// Why generic? Both concrete stores share the same shape: configure a path,
-/// scan once, watch for changes, expose a filtered view of the results. The
-/// generic captures the shape; callers inject the per-type pieces (how to
-/// scan, how to match a search query, how to sort).
+/// Loads items from a directory, watches for changes, exposes a search-filtered view.
+/// Callers inject the per-type scan/match/sort closures (see `SkillStore`, `MemoryStore`).
 @MainActor
 @Observable
 final class FileBackedItemStore<Item: Identifiable & Sendable> {
     private(set) var items: [Item] = []
     private(set) var lastError: String?
 
-    /// The user's current search query. Filtering is applied lazily via `filteredItems`.
     var searchQuery: String = ""
 
     private let scan: (URL) throws -> [Item]
@@ -36,16 +28,12 @@ final class FileBackedItemStore<Item: Identifiable & Sendable> {
         self.sort = sort
     }
 
-    /// Items remaining after the current `searchQuery` is applied. Whitespace-only
-    /// queries are treated as empty so a stray space doesn't blank the list.
     var filteredItems: [Item] {
         let query = searchQuery.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else { return items }
         return items.filter { matchesQuery($0, query) }
     }
 
-    /// Point the store at a new root directory. Re-scans and starts watching for changes.
-    /// No-op when the path hasn't actually changed.
     func configure(rootPath: String) {
         let expanded = (rootPath as NSString).expandingTildeInPath
         if expanded == self.rootPath { return }
@@ -54,7 +42,6 @@ final class FileBackedItemStore<Item: Identifiable & Sendable> {
         startWatching()
     }
 
-    /// Force a re-read of the configured root.
     func rescan() {
         let url = URL(fileURLWithPath: rootPath)
         do {
@@ -66,8 +53,6 @@ final class FileBackedItemStore<Item: Identifiable & Sendable> {
         }
     }
 
-    /// Drop a single item from the in-memory list (e.g. after the file is trashed).
-    /// Filesystem deletion is the caller's responsibility; this store mirrors disk state.
     func remove(_ item: Item) {
         items.removeAll { $0.id == item.id }
     }
@@ -80,7 +65,6 @@ final class FileBackedItemStore<Item: Identifiable & Sendable> {
         }
     }
 
-    /// Inject seed items for tests. Bypasses scan/watch.
     func _seedForTesting(_ items: [Item]) {
         self.items = items
     }

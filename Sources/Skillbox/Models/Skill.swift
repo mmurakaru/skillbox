@@ -35,6 +35,7 @@ struct SkillProvenance: Codable, Hashable {
     }
 }
 
+/// `provenance` is non-nil only for skills installed via `RemoteSkillService`.
 struct Skill: Identifiable, Hashable {
     let id: String
     let name: String

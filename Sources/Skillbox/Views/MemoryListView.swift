@@ -288,16 +288,15 @@ struct MemoryListView: View {
     }
 
     private func performDelete(memory: Memory) {
-        let result = SkillDeleter.trashURL(memory.fileURL)
-        switch result {
-        case .success:
+        do {
+            try FileManager.default.trashItem(at: memory.fileURL, resultingItemURL: nil)
             store.remove(memory)
             if selectedMemoryID == memory.id {
                 selectedMemoryID = store.filteredMemories.first?.id
             }
-        case .failure(let err):
+        } catch {
             NSSound.beep()
-            print("Memory delete failed: \(err)")
+            print("Memory delete failed: \(error)")
         }
     }
 

@@ -1,9 +1,6 @@
 import Foundation
 
-/// Runs the `skills` CLI on behalf of `RemoteSkillService`.
-///
-/// Production wraps `SkillsCLI` (subprocess via `npx skills`).
-/// Tests substitute an in-memory adapter that records calls.
+/// Production: wraps `SkillsCLI`. Tests: in-memory adapter.
 protocol SkillsCLIRunning: Sendable {
     func install(
         _ options: SkillsCLI.InstallOptions,
@@ -16,18 +13,12 @@ protocol SkillsCLIRunning: Sendable {
     ) async throws -> SkillsCLI.RunResult
 }
 
-/// Reads metadata from a remote skills registry (currently GitHub).
-///
-/// Production wraps `SkillRegistry` (HTTPS to api.github.com).
-/// Tests substitute an in-memory adapter that returns canned SHAs.
+/// Production: wraps `SkillRegistry`. Tests: in-memory adapter with canned SHAs.
 protocol SkillRegistryFetching: Sendable {
     func latestSHA(repo: String, branch: String, path: String) async throws -> String?
 }
 
-/// Persists the per-skill `.skillbox.json` provenance sidecar.
-///
-/// Production wraps `SkillProvenanceStore` (filesystem).
-/// Tests substitute an in-memory dictionary keyed by folder URL.
+/// Production: wraps `SkillProvenanceStore`. Tests: in-memory dictionary.
 protocol SkillsFileSystem: Sendable {
     func readProvenance(at folderURL: URL) -> SkillProvenance?
     func writeProvenance(_ provenance: SkillProvenance, to folderURL: URL) throws
@@ -36,7 +27,6 @@ protocol SkillsFileSystem: Sendable {
 
 // MARK: - Production adapters
 
-/// Production CLI adapter: shells out via `SkillsCLI` (npx skills).
 struct SystemSkillsCLI: SkillsCLIRunning {
     func install(
         _ options: SkillsCLI.InstallOptions,
@@ -53,14 +43,12 @@ struct SystemSkillsCLI: SkillsCLIRunning {
     }
 }
 
-/// Production registry adapter: fetches from `SkillRegistry` (GitHub Contents/Commits API).
 struct GitHubSkillRegistry: SkillRegistryFetching {
     func latestSHA(repo: String, branch: String, path: String) async throws -> String? {
         try await SkillRegistry.latestSHA(repo: repo, branch: branch, path: path)
     }
 }
 
-/// Production filesystem adapter: reads/writes `.skillbox.json` via `SkillProvenanceStore`.
 struct DefaultSkillsFileSystem: SkillsFileSystem {
     func readProvenance(at folderURL: URL) -> SkillProvenance? {
         SkillProvenanceStore.read(from: folderURL)
