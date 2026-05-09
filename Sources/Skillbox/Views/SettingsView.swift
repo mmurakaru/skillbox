@@ -7,6 +7,7 @@ struct SettingsView: View {
     @AppStorage("memoryRootPath") private var memoryRootPath: String = "~/.claude/projects"
     @AppStorage("editorCommand") private var editorCommand: String = ""
     @AppStorage("openTarget") private var openTargetRaw: String = OpenTarget.folder.rawValue
+    @AppStorage("claudeCommand") private var claudeCommand: String = ""
     @AppStorage("launchAtLogin") private var launchAtLogin: Bool = false
 
     @State private var detectedEditors: [DetectedEditor] = []
@@ -62,6 +63,19 @@ struct SettingsView: View {
             }
 
             Section {
+                HStack {
+                    TextField("auto-detect", text: $claudeCommand)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Browse…") { browseForFile(binding: $claudeCommand) }
+                }
+                Text("Leave blank to find `claude` on PATH. Used by the Insights button.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            } header: {
+                Text("Claude CLI")
+            }
+
+            Section {
                 Toggle("Launch Skillbox at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, newValue in
                         applyLaunchAtLogin(newValue)
@@ -71,7 +85,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 460, height: 380)
+        .frame(width: 460, height: 460)
         .task {
             detectedEditors = EditorDetector.detect()
             syncLaunchAtLoginFromSystem()
@@ -84,6 +98,19 @@ struct SettingsView: View {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         panel.directoryURL = URL(fileURLWithPath: (binding.wrappedValue as NSString).expandingTildeInPath)
+        if panel.runModal() == .OK, let url = panel.url {
+            binding.wrappedValue = url.path
+        }
+    }
+
+    private func browseForFile(binding: Binding<String>) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.treatsFilePackagesAsDirectories = true
+        let initial = binding.wrappedValue.isEmpty ? "/usr/local/bin" : (binding.wrappedValue as NSString).expandingTildeInPath
+        panel.directoryURL = URL(fileURLWithPath: initial)
         if panel.runModal() == .OK, let url = panel.url {
             binding.wrappedValue = url.path
         }

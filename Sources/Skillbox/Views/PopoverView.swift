@@ -31,8 +31,11 @@ struct PopoverView: View {
     @Environment(MemoryStore.self) private var memoryStore
     @Environment(HookStore.self) private var hookStore
     @Environment(EnvVarStore.self) private var envStore
+    @Environment(InsightsModel.self) private var insightsModel
     @Environment(RemoteSkillService.self) private var remoteSkillService
     @Environment(\.openSettings) private var openSettings
+
+    @AppStorage("claudeCommand") private var claudeCommand: String = ""
 
     @AppStorage("editorCommand") private var editorCommand: String = ""
     @AppStorage("openTarget") private var openTargetRaw: String = OpenTarget.folder.rawValue
@@ -128,6 +131,10 @@ struct PopoverView: View {
             NSApp.deactivate()
             return .handled
         }
+    }
+
+    private func triggerInsights() {
+        insightsModel.run(claudeOverride: claudeCommand)
     }
 
     private var shellContent: some View {
@@ -377,6 +384,22 @@ struct PopoverView: View {
             }
             .buttonStyle(.borderless)
             .keyboardShortcut("r", modifiers: .command)
+
+            Button(action: triggerInsights) {
+                if insightsModel.isRunning {
+                    ProgressView()
+                        .controlSize(.small)
+                        .scaleEffect(0.7)
+                        .frame(width: 12, height: 12)
+                } else {
+                    Image(systemName: "lightbulb")
+                }
+                Text("Insights")
+            }
+            .buttonStyle(.borderless)
+            .keyboardShortcut("i", modifiers: .command)
+            .disabled(insightsModel.isRunning)
+            .help(insightsModel.isRunning ? "Generating insights…" : "Run /insights and open report")
 
             Spacer()
 

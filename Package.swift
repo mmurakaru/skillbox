@@ -9,11 +9,15 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/jpsim/Yams.git", from: "5.1.0"),
+        .package(url: "https://github.com/apple/swift-markdown.git", from: "0.5.0"),
     ],
     targets: [
         .executableTarget(
             name: "Skillbox",
-            dependencies: ["Yams"],
+            dependencies: [
+                "Yams",
+                .product(name: "Markdown", package: "swift-markdown"),
+            ],
             path: "Sources/Skillbox",
             exclude: ["Resources/Info.plist.template", "Resources/AppIcon.svg"]
         ),
