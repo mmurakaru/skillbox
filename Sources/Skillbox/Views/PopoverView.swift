@@ -4,6 +4,7 @@ import AppKit
 enum AppTab: String, CaseIterable, Identifiable {
     case skills
     case memory
+    case hooks
 
     var id: String { rawValue }
 
@@ -11,6 +12,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         switch self {
         case .skills: "Skills"
         case .memory: "Memory"
+        case .hooks: "Hooks"
         }
     }
 }
@@ -25,6 +27,7 @@ enum SkillsTabRoute: Equatable {
 struct PopoverView: View {
     @Environment(SkillStore.self) private var store
     @Environment(MemoryStore.self) private var memoryStore
+    @Environment(HookStore.self) private var hookStore
     @Environment(RemoteSkillService.self) private var remoteSkillService
     @Environment(\.openSettings) private var openSettings
 
@@ -32,12 +35,15 @@ struct PopoverView: View {
     @AppStorage("openTarget") private var openTargetRaw: String = OpenTarget.folder.rawValue
     @AppStorage("skillsRootPath") private var skillsRootPath: String = "~/.claude/skills"
     @AppStorage("memoryRootPath") private var memoryRootPath: String = "~/.claude/projects"
+    @AppStorage("hooksClaudeHomePath") private var hooksClaudeHomePath: String = "~/.claude"
     @AppStorage("activeTab") private var activeTabRaw: String = AppTab.skills.rawValue
 
     @State private var selectedSkillID: String?
     @State private var selectedMemoryID: String?
+    @State private var selectedHookID: String?
     @State private var rowStates: [String: SkillRowView.RowState] = [:]
     @State private var memoryRowStates: [String: SkillRowView.RowState] = [:]
+    @State private var hookRowStates: [String: SkillRowView.RowState] = [:]
     @State private var skillsRoute: SkillsTabRoute = .list
     @State private var updatingSkillIDs: Set<String> = []
 
@@ -89,6 +95,7 @@ struct PopoverView: View {
         .task {
             store.configure(rootPath: skillsRootPath)
             memoryStore.configure(rootPath: memoryRootPath)
+            hookStore.configure(claudeHomePath: hooksClaudeHomePath)
             ensureEditorDefault()
             if selectedSkillID == nil {
                 selectedSkillID = store.filteredItems.first?.id
@@ -101,6 +108,9 @@ struct PopoverView: View {
         }
         .onChange(of: memoryRootPath) { _, newValue in
             memoryStore.configure(rootPath: newValue)
+        }
+        .onChange(of: hooksClaudeHomePath) { _, newValue in
+            hookStore.configure(claudeHomePath: newValue)
         }
         .onKeyPress(.escape) {
             if skillsRoute != .list {
@@ -126,6 +136,7 @@ struct PopoverView: View {
                 switch activeTab {
                 case .skills: skillsBody
                 case .memory: memoryBody
+                case .hooks: hooksBody
                 }
             }
 
@@ -201,6 +212,13 @@ struct PopoverView: View {
         MemoryListView(
             selectedMemoryID: $selectedMemoryID,
             rowStates: $memoryRowStates
+        )
+    }
+
+    private var hooksBody: some View {
+        HookListView(
+            selectedHookID: $selectedHookID,
+            rowStates: $hookRowStates
         )
     }
 
@@ -365,6 +383,8 @@ struct PopoverView: View {
                     .keyboardShortcut("1", modifiers: .command)
                 Button("") { activeTabRaw = AppTab.memory.rawValue }
                     .keyboardShortcut("2", modifiers: .command)
+                Button("") { activeTabRaw = AppTab.hooks.rawValue }
+                    .keyboardShortcut("3", modifiers: .command)
             }
             .opacity(0)
             .frame(width: 0, height: 0)
@@ -375,6 +395,7 @@ struct PopoverView: View {
         switch activeTab {
         case .skills: store.filteredItems.count
         case .memory: memoryStore.filteredMemories.count
+        case .hooks: hookStore.filteredHooks.count
         }
     }
 
@@ -382,6 +403,7 @@ struct PopoverView: View {
         switch activeTab {
         case .skills: store.rescan()
         case .memory: memoryStore.rescan()
+        case .hooks: hookStore.rescan()
         }
     }
 
@@ -427,6 +449,10 @@ struct PopoverView: View {
         }
         if let active = memoryRowStates.first(where: { $0.value == .confirmingDelete }) {
             memoryRowStates[active.key] = .normal
+            return true
+        }
+        if let active = hookRowStates.first(where: { $0.value == .confirmingDelete }) {
+            hookRowStates[active.key] = .normal
             return true
         }
         return false

@@ -1,6 +1,6 @@
 # <img src="Sources/Skillbox/Resources/AppIcon.svg" alt="" height="48" valign="middle" /> skillbox
 
-Native macOS menu bar app for managing claude skills (`~/.claude/skills/`) and auto-memory (`~/.claude/projects/*/memory/`).
+Native macOS menu bar app for Claude Code: skills, auto-memory, and hooks.
 
 See [PRD.md](PRD.md) for the spec.
 
@@ -8,7 +8,8 @@ See [PRD.md](PRD.md) for the spec.
 
 - Skills tab: browse, search, open, and trash skills under `~/.claude/skills/`.
 - Memory tab: browse Claude auto-memory entries (`~/.claude/projects/<project>/memory/*.md`) per project, with type badges and edit/delete.
-- Toggle tabs with ⌘1 / ⌘2.
+- Hooks tab: browse hooks across `~/.claude/settings.json` and per-project `.claude/settings.json` / `settings.local.json`, with scope filter and edit/delete.
+- Toggle tabs with ⌘1 / ⌘2 / ⌘3.
 
 ## Install
 
@@ -37,7 +38,7 @@ Run tests with `swift test`.
 
 The app has three layers under `Sources/Skillbox/`:
 
-- **Models** - `Skill`, `Memory`, and `FileBackedItemStore<Item>` (the generic store that powers both `SkillStore` and `MemoryStore`).
+- **Models** - `Skill`, `Memory`, `Hook`. `FileBackedItemStore<Item>` is the generic single-root store powering `SkillStore` and `MemoryStore`; `HookStore` is bespoke because hooks aggregate from multiple `settings.json` files across scopes.
 - **Services** - leaf utilities (`SkillScanner`, `SkillsCLI`, `SkillRegistry`, `EditorLauncher`, `DirectoryWatcher`) and one deep module: `RemoteSkillService` owns the install / update / check-for-updates lifecycle behind a small interface. `Ports.swift` defines the protocols views talk to so tests can substitute in-memory adapters.
 - **Views** - SwiftUI views. `PopoverView` is the menu-bar entry point; sheets like `InstallFromURLSheet` and `RegistryView` route through a `SkillsTabRoute` enum.
 
