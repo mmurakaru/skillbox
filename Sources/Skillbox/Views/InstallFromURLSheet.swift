@@ -6,7 +6,6 @@ struct InstallFromURLSheet: View {
 
     let skillsRootPath: String
     let onInstalled: (String) -> Void
-    let onBrowseRegistry: () -> Void
     let onCancel: () -> Void
 
     @State private var rawSource: String = ""
@@ -117,8 +116,6 @@ struct InstallFromURLSheet: View {
             Spacer()
 
             HStack {
-                Button("Browse registry…", action: onBrowseRegistry)
-                    .buttonStyle(.borderless)
                 Spacer()
                 Button("Cancel", action: onCancel)
                     .keyboardShortcut(.cancelAction)

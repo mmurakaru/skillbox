@@ -278,11 +278,16 @@ final class EnvVarStore {
         guard !claudeHomePath.isEmpty else { return [] }
         let fm = FileManager.default
         var sources: [EnvSource] = []
+        // Dedupe by absolute file path - some encoded "projects" decode to the
+        // user's home dir, where `.claude/settings.json` IS the global file. See
+        // matching note in HookStore.discoverSources.
+        var seenPaths: Set<String> = []
 
         let home = URL(fileURLWithPath: claudeHomePath)
         let globalSettings = home.appendingPathComponent("settings.json")
         if fm.fileExists(atPath: globalSettings.path) {
             sources.append(EnvSource(fileURL: globalSettings, scope: .userGlobal))
+            seenPaths.insert(globalSettings.path)
         }
 
         let projectsRoot = home.appendingPathComponent("projects")
@@ -300,18 +305,20 @@ final class EnvVarStore {
             let claudeDir = URL(fileURLWithPath: decoded.full).appendingPathComponent(".claude")
 
             let committed = claudeDir.appendingPathComponent("settings.json")
-            if fm.fileExists(atPath: committed.path) {
+            if fm.fileExists(atPath: committed.path), !seenPaths.contains(committed.path) {
                 sources.append(EnvSource(
                     fileURL: committed,
                     scope: .project(name: decoded.last, path: decoded.full)
                 ))
+                seenPaths.insert(committed.path)
             }
             let local = claudeDir.appendingPathComponent("settings.local.json")
-            if fm.fileExists(atPath: local.path) {
+            if fm.fileExists(atPath: local.path), !seenPaths.contains(local.path) {
                 sources.append(EnvSource(
                     fileURL: local,
                     scope: .projectLocal(name: decoded.last, path: decoded.full)
                 ))
+                seenPaths.insert(local.path)
             }
         }
         return sources

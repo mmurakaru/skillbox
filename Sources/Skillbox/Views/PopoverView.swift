@@ -23,7 +23,6 @@ enum SkillsTabRoute: Equatable {
     case list
     case newSkill
     case installFromURL
-    case registry
 }
 
 struct PopoverView: View {
@@ -53,7 +52,6 @@ struct PopoverView: View {
     @State private var hookRowStates: [String: SkillRowView.RowState] = [:]
     @State private var envRowStates: [String: SkillRowView.RowState] = [:]
     @State private var skillsRoute: SkillsTabRoute = .list
-    @State private var updatingSkillIDs: Set<String> = []
 
     @FocusState private var searchFocused: Bool
 
@@ -88,14 +86,7 @@ struct PopoverView: View {
                         skillsRoute = .list
                         store.rescan()
                     },
-                    onBrowseRegistry: { skillsRoute = .registry },
                     onCancel: { skillsRoute = .list }
-                )
-            case .registry:
-                RegistryView(
-                    skillsRootPath: skillsRootPath,
-                    onInstalled: { _ in store.rescan() },
-                    onBack: { skillsRoute = .list }
                 )
             }
         }
@@ -135,6 +126,14 @@ struct PopoverView: View {
 
     private func triggerInsights() {
         insightsModel.run(claudeOverride: claudeCommand)
+    }
+
+    private func openClaudeMd() {
+        let path = (hooksClaudeHomePath as NSString).expandingTildeInPath
+        let target = (path as NSString).appendingPathComponent("CLAUDE.md")
+        let cmd = editorCommand.isEmpty ? "code" : editorCommand
+        EditorLauncher.openPath(target, command: cmd)
+        NSApp.deactivate()
     }
 
     private var shellContent: some View {
@@ -258,28 +257,15 @@ struct PopoverView: View {
     }
 
     private var installButton: some View {
-        Menu {
-            Button("Install from URL…") { skillsRoute = .installFromURL }
-                .keyboardShortcut("i", modifiers: .command)
-            Button("Browse registry…") { skillsRoute = .registry }
-            Divider()
-            Button("Check for updates") { Task { await checkForUpdates() } }
-                .disabled(remoteSkills.isEmpty)
-        } label: {
+        Button(action: { skillsRoute = .installFromURL }) {
             Image(systemName: "arrow.down.circle")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.secondary)
                 .frame(width: 28, height: 26)
                 .glassEffect(.regular, in: .rect(cornerRadius: 6))
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .frame(width: 28, height: 26)
-        .help("Install or update remote skills")
-    }
-
-    private var remoteSkills: [Skill] {
-        store.items.filter { $0.provenance != nil }
+        .buttonStyle(.plain)
+        .help("Install skill from URL")
     }
 
     private var searchBar: some View {
@@ -316,12 +302,8 @@ struct PopoverView: View {
                             SkillRowView(
                                 skill: skill,
                                 isSelected: selectedSkillID == skill.id,
-                                isUpdating: updatingSkillIDs.contains(skill.id),
                                 onEdit: { open(skill: skill) },
                                 onDelete: { performDelete(skill: skill) },
-                                onUpdate: skill.provenance?.hasUpdate == true
-                                    ? { Task { await runUpdate(skill: skill) } }
-                                    : nil,
                                 rowState: binding(for: skill.id)
                             )
                             .id(skill.id)
@@ -400,6 +382,13 @@ struct PopoverView: View {
             .keyboardShortcut("i", modifiers: .command)
             .disabled(insightsModel.isRunning)
             .help(insightsModel.isRunning ? "Generating insights…" : "Run /insights and open report")
+
+            Button(action: openClaudeMd) {
+                Image(systemName: "text.book.closed")
+                Text("CLAUDE.md")
+            }
+            .buttonStyle(.borderless)
+            .help("Open ~/.claude/CLAUDE.md")
 
             Spacer()
 
@@ -546,21 +535,4 @@ struct PopoverView: View {
         return id.contains("Settings") || id.contains("settings") || window.title == "Settings"
     }
 
-    // MARK: - Remote update flow
-
-    @MainActor
-    private func runUpdate(skill: Skill) async {
-        let key = skill.id
-        updatingSkillIDs.insert(key)
-        defer { updatingSkillIDs.remove(key) }
-
-        try? await remoteSkillService.update(skill) { _ in }
-        store.rescan()
-    }
-
-    @MainActor
-    private func checkForUpdates() async {
-        await remoteSkillService.checkForUpdates(remoteSkills)
-        store.rescan()
-    }
 }
