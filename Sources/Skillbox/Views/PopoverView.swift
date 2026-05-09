@@ -5,6 +5,7 @@ enum AppTab: String, CaseIterable, Identifiable {
     case skills
     case memory
     case hooks
+    case env
 
     var id: String { rawValue }
 
@@ -13,6 +14,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .skills: "Skills"
         case .memory: "Memory"
         case .hooks: "Hooks"
+        case .env: "Env"
         }
     }
 }
@@ -28,6 +30,7 @@ struct PopoverView: View {
     @Environment(SkillStore.self) private var store
     @Environment(MemoryStore.self) private var memoryStore
     @Environment(HookStore.self) private var hookStore
+    @Environment(EnvVarStore.self) private var envStore
     @Environment(RemoteSkillService.self) private var remoteSkillService
     @Environment(\.openSettings) private var openSettings
 
@@ -41,9 +44,11 @@ struct PopoverView: View {
     @State private var selectedSkillID: String?
     @State private var selectedMemoryID: String?
     @State private var selectedHookID: String?
+    @State private var selectedEnvID: String?
     @State private var rowStates: [String: SkillRowView.RowState] = [:]
     @State private var memoryRowStates: [String: SkillRowView.RowState] = [:]
     @State private var hookRowStates: [String: SkillRowView.RowState] = [:]
+    @State private var envRowStates: [String: SkillRowView.RowState] = [:]
     @State private var skillsRoute: SkillsTabRoute = .list
     @State private var updatingSkillIDs: Set<String> = []
 
@@ -96,6 +101,7 @@ struct PopoverView: View {
             store.configure(rootPath: skillsRootPath)
             memoryStore.configure(rootPath: memoryRootPath)
             hookStore.configure(claudeHomePath: hooksClaudeHomePath)
+            envStore.configure(claudeHomePath: hooksClaudeHomePath)
             ensureEditorDefault()
             if selectedSkillID == nil {
                 selectedSkillID = store.filteredItems.first?.id
@@ -111,6 +117,7 @@ struct PopoverView: View {
         }
         .onChange(of: hooksClaudeHomePath) { _, newValue in
             hookStore.configure(claudeHomePath: newValue)
+            envStore.configure(claudeHomePath: newValue)
         }
         .onKeyPress(.escape) {
             if skillsRoute != .list {
@@ -137,6 +144,7 @@ struct PopoverView: View {
                 case .skills: skillsBody
                 case .memory: memoryBody
                 case .hooks: hooksBody
+                case .env: envBody
                 }
             }
 
@@ -219,6 +227,13 @@ struct PopoverView: View {
         HookListView(
             selectedHookID: $selectedHookID,
             rowStates: $hookRowStates
+        )
+    }
+
+    private var envBody: some View {
+        EnvListView(
+            selectedEnvID: $selectedEnvID,
+            rowStates: $envRowStates
         )
     }
 
@@ -385,6 +400,8 @@ struct PopoverView: View {
                     .keyboardShortcut("2", modifiers: .command)
                 Button("") { activeTabRaw = AppTab.hooks.rawValue }
                     .keyboardShortcut("3", modifiers: .command)
+                Button("") { activeTabRaw = AppTab.env.rawValue }
+                    .keyboardShortcut("4", modifiers: .command)
             }
             .opacity(0)
             .frame(width: 0, height: 0)
@@ -396,6 +413,7 @@ struct PopoverView: View {
         case .skills: store.filteredItems.count
         case .memory: memoryStore.filteredMemories.count
         case .hooks: hookStore.filteredHooks.count
+        case .env: envStore.filteredEnvVars.count
         }
     }
 
@@ -404,6 +422,7 @@ struct PopoverView: View {
         case .skills: store.rescan()
         case .memory: memoryStore.rescan()
         case .hooks: hookStore.rescan()
+        case .env: envStore.rescan()
         }
     }
 
@@ -453,6 +472,10 @@ struct PopoverView: View {
         }
         if let active = hookRowStates.first(where: { $0.value == .confirmingDelete }) {
             hookRowStates[active.key] = .normal
+            return true
+        }
+        if let active = envRowStates.first(where: { $0.value == .confirmingDelete }) {
+            envRowStates[active.key] = .normal
             return true
         }
         return false

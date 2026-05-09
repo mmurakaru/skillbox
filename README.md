@@ -1,6 +1,6 @@
 # <img src="Sources/Skillbox/Resources/AppIcon.svg" alt="" height="48" valign="middle" /> skillbox
 
-Native macOS menu bar app for Claude Code: skills, auto-memory, and hooks.
+Native macOS menu bar app for Claude Code: skills, auto-memory, hooks, and env vars.
 
 See [PRD.md](PRD.md) for the spec.
 
@@ -9,7 +9,8 @@ See [PRD.md](PRD.md) for the spec.
 - Skills tab: browse, search, open, and trash skills under `~/.claude/skills/`.
 - Memory tab: browse Claude auto-memory entries (`~/.claude/projects/<project>/memory/*.md`) per project, with type badges and edit/delete.
 - Hooks tab: browse hooks across `~/.claude/settings.json` and per-project `.claude/settings.json` / `settings.local.json`, with scope filter and edit/delete.
-- Toggle tabs with ⌘1 / ⌘2 / ⌘3.
+- Env tab: toggle individual env vars on/off without losing values (disabled vars stash in `~/.claude/skillbox-env-stash.json`); add new vars with autocomplete from a built-in catalog of well-known Claude Code env vars.
+- Toggle tabs with ⌘1 / ⌘2 / ⌘3 / ⌘4.
 
 ## Install
 
@@ -38,7 +39,7 @@ Run tests with `swift test`.
 
 The app has three layers under `Sources/Skillbox/`:
 
-- **Models** - `Skill`, `Memory`, `Hook`. `FileBackedItemStore<Item>` is the generic single-root store powering `SkillStore` and `MemoryStore`; `HookStore` is bespoke because hooks aggregate from multiple `settings.json` files across scopes.
+- **Models** - `Skill`, `Memory`, `Hook`, `EnvVar`. `FileBackedItemStore<Item>` is the generic single-root store powering `SkillStore` and `MemoryStore`; `HookStore` and `EnvVarStore` are bespoke because they aggregate from multiple `settings.json` files across scopes (and `EnvVarStore` also manages a private stash file for disabled values).
 - **Services** - leaf utilities (`SkillScanner`, `SkillsCLI`, `SkillRegistry`, `EditorLauncher`, `DirectoryWatcher`) and one deep module: `RemoteSkillService` owns the install / update / check-for-updates lifecycle behind a small interface. `Ports.swift` defines the protocols views talk to so tests can substitute in-memory adapters.
 - **Views** - SwiftUI views. `PopoverView` is the menu-bar entry point; sheets like `InstallFromURLSheet` and `RegistryView` route through a `SkillsTabRoute` enum.
 
