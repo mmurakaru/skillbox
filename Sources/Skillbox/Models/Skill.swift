@@ -35,7 +35,8 @@ struct SkillProvenance: Codable, Hashable {
     }
 }
 
-/// `provenance` is non-nil only for skills installed via `RemoteSkillService`.
+/// `provenance` is non-nil only for skills installed via `RemoteSkillService`
+/// or adopted via the "Adopt as remote" action.
 struct Skill: Identifiable, Hashable {
     let id: String
     let name: String
@@ -44,8 +45,18 @@ struct Skill: Identifiable, Hashable {
     let skillFileURL: URL
     let modifiedAt: Date
     let provenance: SkillProvenance?
+    /// True when the skill's SKILL.md frontmatter sets `disable-model-invocation: true`.
+    /// Surfaced as a read-only badge; `skillOverrides` still layers on top.
+    let authorLocked: Bool
 
-    init(name: String, description: String, folderURL: URL, modifiedAt: Date, provenance: SkillProvenance? = nil) {
+    init(
+        name: String,
+        description: String,
+        folderURL: URL,
+        modifiedAt: Date,
+        provenance: SkillProvenance? = nil,
+        authorLocked: Bool = false
+    ) {
         self.id = folderURL.path
         self.name = name
         self.description = description
@@ -53,6 +64,14 @@ struct Skill: Identifiable, Hashable {
         self.skillFileURL = folderURL.appendingPathComponent("SKILL.md")
         self.modifiedAt = modifiedAt
         self.provenance = provenance
+        self.authorLocked = authorLocked
+    }
+
+    /// GitHub-style `@owner` derived from `provenance.source`, or `nil` for non-remote skills.
+    var authorHandle: String? {
+        guard let provenance,
+              let coords = SkillSourceCoordinates.parse(provenance: provenance) else { return nil }
+        return coords.repo.split(separator: "/").first.map(String.init)
     }
 }
 

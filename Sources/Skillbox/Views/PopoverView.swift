@@ -23,6 +23,7 @@ enum SkillsTabRoute: Equatable {
     case list
     case newSkill
     case installFromURL
+    case adopt(Skill)
 }
 
 struct PopoverView: View {
@@ -32,6 +33,8 @@ struct PopoverView: View {
     @Environment(EnvVarStore.self) private var envStore
     @Environment(InsightsModel.self) private var insightsModel
     @Environment(RemoteSkillService.self) private var remoteSkillService
+    @Environment(SkillOverridesStore.self) private var overridesStore
+    @Environment(SkillFolderSync.self) private var skillFolderSync
     @Environment(\.openSettings) private var openSettings
 
     @AppStorage("claudeCommand") private var claudeCommand: String = ""
@@ -42,6 +45,7 @@ struct PopoverView: View {
     @AppStorage("memoryRootPath") private var memoryRootPath: String = "~/.claude/projects"
     @AppStorage("hooksClaudeHomePath") private var hooksClaudeHomePath: String = "~/.claude"
     @AppStorage("activeTab") private var activeTabRaw: String = AppTab.skills.rawValue
+    @AppStorage("syncRemoteSkillsOnLaunch") private var syncRemoteSkillsOnLaunch: Bool = false
 
     @State private var selectedSkillID: String?
     @State private var selectedMemoryID: String?
@@ -88,6 +92,15 @@ struct PopoverView: View {
                     },
                     onCancel: { skillsRoute = .list }
                 )
+            case .adopt(let target):
+                AdoptAsRemoteSheet(
+                    skill: target,
+                    onAdopted: {
+                        skillsRoute = .list
+                        store.rescan()
+                    },
+                    onCancel: { skillsRoute = .list }
+                )
             }
         }
         .frame(width: 360, height: 480)
@@ -96,12 +109,20 @@ struct PopoverView: View {
             memoryStore.configure(rootPath: memoryRootPath)
             hookStore.configure(claudeHomePath: hooksClaudeHomePath)
             envStore.configure(claudeHomePath: hooksClaudeHomePath)
+            overridesStore.configure(claudeHomePath: hooksClaudeHomePath)
             ensureEditorDefault()
             if selectedSkillID == nil {
                 selectedSkillID = store.filteredItems.first?.id
             }
             try? await Task.sleep(for: .milliseconds(80))
             searchFocused = true
+            if syncRemoteSkillsOnLaunch {
+                let remoteSkills = store.items.filter { $0.provenance != nil }
+                Task.detached(priority: .background) { [weak skillFolderSync] in
+                    await skillFolderSync?.syncAll(remoteSkills)
+                    await MainActor.run { store.rescan() }
+                }
+            }
         }
         .onChange(of: skillsRootPath) { _, newValue in
             store.configure(rootPath: newValue)
@@ -112,6 +133,7 @@ struct PopoverView: View {
         .onChange(of: hooksClaudeHomePath) { _, newValue in
             hookStore.configure(claudeHomePath: newValue)
             envStore.configure(claudeHomePath: newValue)
+            overridesStore.configure(claudeHomePath: newValue)
         }
         .onKeyPress(.escape) {
             if skillsRoute != .list {
@@ -302,8 +324,13 @@ struct PopoverView: View {
                             SkillRowView(
                                 skill: skill,
                                 isSelected: selectedSkillID == skill.id,
+                                overrideState: overridesStore.state(for: skill.name),
+                                isSyncing: skillFolderSync.isSyncing(skill),
                                 onEdit: { open(skill: skill) },
                                 onDelete: { performDelete(skill: skill) },
+                                onSetOverride: { newState in setOverride(skill, to: newState) },
+                                onSync: skill.provenance != nil ? { triggerSync(skill) } : nil,
+                                onAdopt: skill.provenance == nil ? { skillsRoute = .adopt(skill) } : nil,
                                 rowState: binding(for: skill.id)
                             )
                             .id(skill.id)
@@ -470,6 +497,27 @@ struct PopoverView: View {
         } catch {
             NSSound.beep()
             print("Delete failed: \(error)")
+        }
+    }
+
+    private func setOverride(_ skill: Skill, to state: SkillOverride) {
+        do {
+            try overridesStore.set(skill.name, to: state)
+        } catch {
+            NSSound.beep()
+            print("Override write failed: \(error)")
+        }
+    }
+
+    private func triggerSync(_ skill: Skill) {
+        Task { @MainActor in
+            do {
+                _ = try await skillFolderSync.sync(skill)
+                store.rescan()
+            } catch {
+                NSSound.beep()
+                print("Sync failed for \(skill.name): \(error)")
+            }
         }
     }
 

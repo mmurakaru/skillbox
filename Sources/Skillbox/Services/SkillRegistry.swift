@@ -84,18 +84,22 @@ enum SkillRegistry {
         let path: String
     }
 
+    /// A single file at some relative path inside a remote skill folder.
+    /// `relativePath` is the path within the skill root (e.g. "SKILL.md", "scripts/run.sh").
+    /// `absolutePath` is the full path inside the repo (e.g. "skills/foo/scripts/run.sh").
+    struct FileEntry: Hashable {
+        let relativePath: String
+        let absolutePath: String
+    }
+
     static func listDirectories(
         repo: String,
         branch: String,
         path: String,
         session: URLSession
     ) async throws -> [DirEntry] {
-        let url = URL(string: "https://api.github.com/repos/\(repo)/contents/\(path)?ref=\(branch)&per_page=100")!
-        let data = try await fetchData(url: url, session: session)
-        guard let array = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-            throw RegistryError.decoding("contents response is not an array")
-        }
-        return array.compactMap { item in
+        let entries = try await listContents(repo: repo, branch: branch, path: path, session: session)
+        return entries.compactMap { item in
             guard
                 (item["type"] as? String) == "dir",
                 let name = item["name"] as? String,
@@ -103,6 +107,82 @@ enum SkillRegistry {
             else { return nil }
             return DirEntry(name: name, path: p)
         }
+    }
+
+    /// Recursively enumerate every file under `path` in the remote repo.
+    /// Returns files with their path relative to `path` so callers can mirror the tree locally.
+    static func listAll(
+        repo: String = defaultRepo,
+        branch: String = defaultBranch,
+        path: String,
+        session: URLSession = .shared
+    ) async throws -> [FileEntry] {
+        var results: [FileEntry] = []
+        try await walk(repo: repo, branch: branch, basePath: path, currentPath: path, into: &results, session: session)
+        return results
+    }
+
+    private static func walk(
+        repo: String,
+        branch: String,
+        basePath: String,
+        currentPath: String,
+        into results: inout [FileEntry],
+        session: URLSession
+    ) async throws {
+        let entries = try await listContents(repo: repo, branch: branch, path: currentPath, session: session)
+        for item in entries {
+            guard let type = item["type"] as? String,
+                  let absolute = item["path"] as? String else { continue }
+            if type == "file" {
+                let relative = relativizePath(absolute, base: basePath)
+                results.append(FileEntry(relativePath: relative, absolutePath: absolute))
+            } else if type == "dir" {
+                try await walk(
+                    repo: repo,
+                    branch: branch,
+                    basePath: basePath,
+                    currentPath: absolute,
+                    into: &results,
+                    session: session
+                )
+            }
+        }
+    }
+
+    private static func relativizePath(_ absolute: String, base: String) -> String {
+        let trimmedBase = base.hasSuffix("/") ? String(base.dropLast()) : base
+        if absolute == trimmedBase { return absolute.split(separator: "/").last.map(String.init) ?? absolute }
+        let prefix = trimmedBase + "/"
+        if absolute.hasPrefix(prefix) {
+            return String(absolute.dropFirst(prefix.count))
+        }
+        return absolute
+    }
+
+    private static func listContents(
+        repo: String,
+        branch: String,
+        path: String,
+        session: URLSession
+    ) async throws -> [[String: Any]] {
+        let url = URL(string: "https://api.github.com/repos/\(repo)/contents/\(path)?ref=\(branch)&per_page=100")!
+        let data = try await fetchData(url: url, session: session)
+        guard let array = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            throw RegistryError.decoding("contents response is not an array")
+        }
+        return array
+    }
+
+    /// Fetch raw bytes for a file at `path` on `repo/branch`. Public so sync services can reuse it.
+    static func fetchRawData(
+        repo: String,
+        branch: String,
+        path: String,
+        session: URLSession = .shared
+    ) async throws -> Data {
+        let url = URL(string: "https://raw.githubusercontent.com/\(repo)/\(branch)/\(path)")!
+        return try await fetchData(url: url, session: session)
     }
 
     private static func fetchRaw(

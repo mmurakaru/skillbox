@@ -3,14 +3,19 @@ import ServiceManagement
 import AppKit
 
 struct SettingsView: View {
+    @Environment(SkillStore.self) private var skillStore
+    @Environment(SkillFolderSync.self) private var skillFolderSync
+
     @AppStorage("skillsRootPath") private var skillsRootPath: String = "~/.claude/skills"
     @AppStorage("memoryRootPath") private var memoryRootPath: String = "~/.claude/projects"
     @AppStorage("editorCommand") private var editorCommand: String = ""
     @AppStorage("openTarget") private var openTargetRaw: String = OpenTarget.folder.rawValue
     @AppStorage("claudeCommand") private var claudeCommand: String = ""
     @AppStorage("launchAtLogin") private var launchAtLogin: Bool = false
+    @AppStorage("syncRemoteSkillsOnLaunch") private var syncRemoteSkillsOnLaunch: Bool = false
 
     @State private var detectedEditors: [DetectedEditor] = []
+    @State private var isSyncingAll = false
 
     var body: some View {
         Form {
@@ -76,6 +81,36 @@ struct SettingsView: View {
             }
 
             Section {
+                Toggle("Sync remote skills on launch", isOn: $syncRemoteSkillsOnLaunch)
+                Text("When enabled, Skillbox pulls the latest content for every adopted/installed skill on app start.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+
+                HStack {
+                    Button(action: syncAllNow) {
+                        if isSyncingAll {
+                            HStack(spacing: 6) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .scaleEffect(0.7)
+                                    .frame(width: 12, height: 12)
+                                Text("Syncing…")
+                            }
+                        } else {
+                            Text("Sync all now")
+                        }
+                    }
+                    .disabled(isSyncingAll)
+                    Spacer()
+                    Text("\(remoteSkillCount) remote skill\(remoteSkillCount == 1 ? "" : "s")")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
+            } header: {
+                Text("Remote skills")
+            }
+
+            Section {
                 Toggle("Launch Skillbox at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, newValue in
                         applyLaunchAtLogin(newValue)
@@ -130,5 +165,19 @@ struct SettingsView: View {
 
     private func syncLaunchAtLoginFromSystem() {
         launchAtLogin = SMAppService.mainApp.status == .enabled
+    }
+
+    private var remoteSkillCount: Int {
+        skillStore.items.filter { $0.provenance != nil }.count
+    }
+
+    private func syncAllNow() {
+        let remoteSkills = skillStore.items.filter { $0.provenance != nil }
+        isSyncingAll = true
+        Task { @MainActor in
+            await skillFolderSync.syncAll(remoteSkills)
+            skillStore.rescan()
+            isSyncingAll = false
+        }
     }
 }

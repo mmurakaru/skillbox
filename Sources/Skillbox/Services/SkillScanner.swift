@@ -28,6 +28,7 @@ enum SkillScanner {
 
         let name = (yaml["name"] as? String) ?? folderURL.lastPathComponent
         let description = (yaml["description"] as? String) ?? ""
+        let authorLocked = (yaml["disable-model-invocation"] as? Bool) ?? false
 
         let modifiedAt = (try? skillFileURL.resourceValues(forKeys: [.contentModificationDateKey]))?
             .contentModificationDate ?? Date()
@@ -39,7 +40,8 @@ enum SkillScanner {
             description: description,
             folderURL: folderURL,
             modifiedAt: modifiedAt,
-            provenance: provenance
+            provenance: provenance,
+            authorLocked: authorLocked
         )
     }
 

@@ -8,6 +8,8 @@ struct SkillboxApp: App {
     @State private var envStore = EnvVarStore()
     @State private var insightsModel: InsightsModel
     @State private var remoteSkillService = RemoteSkillService()
+    @State private var overridesStore = SkillOverridesStore()
+    @State private var skillFolderSync = SkillFolderSync()
 
     init() {
         let model = InsightsModel()
@@ -32,6 +34,8 @@ struct SkillboxApp: App {
                 .environment(envStore)
                 .environment(insightsModel)
                 .environment(remoteSkillService)
+                .environment(overridesStore)
+                .environment(skillFolderSync)
         } label: {
             Image(nsImage: MenuBarIcon.nsImage)
         }
@@ -39,6 +43,8 @@ struct SkillboxApp: App {
 
         Settings {
             SettingsView()
+                .environment(store)
+                .environment(skillFolderSync)
         }
     }
 }
