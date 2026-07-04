@@ -1,0 +1,49 @@
+name: Changesets
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: changesets-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  version:
+    name: Version PR / tag release
+    runs-on: ubuntu-latest
+    if: github.repository == 'mmurakaru/skillbox'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Create Version PR or tag release
+        uses: changesets/action@v1
+        with:
+          # The script that bumps package.json AND propagates the new
+          # version into Info.plist.template via scripts/sync-version.mjs.
+          version: npm run version-bump
+          # We don't publish to npm. Tagging is handled by changesets/action;
+          # the actual GH Release + bundle build happens in release.yml on
+          # tag push.
+          publish: ""
+          commit: "chore: release"
+          title: "chore: release"
+          createGithubReleases: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

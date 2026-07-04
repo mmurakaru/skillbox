@@ -1,4 +1,5 @@
 import SwiftUI
+import Sparkle
 
 @main
 struct SkillboxApp: App {
@@ -10,6 +11,8 @@ struct SkillboxApp: App {
     @State private var remoteSkillService = RemoteSkillService()
     @State private var overridesStore = SkillOverridesStore()
     @State private var skillFolderSync = SkillFolderSync()
+
+    private let updaterController: SPUStandardUpdaterController
 
     init() {
         let model = InsightsModel()
@@ -23,6 +26,12 @@ struct SkillboxApp: App {
             alert.runModal()
         }
         self._insightsModel = State(initialValue: model)
+
+        self.updaterController = SPUStandardUpdaterController(
+            startingUpdater: true,
+            updaterDelegate: nil,
+            userDriverDelegate: nil
+        )
     }
 
     var body: some Scene {
@@ -36,6 +45,7 @@ struct SkillboxApp: App {
                 .environment(remoteSkillService)
                 .environment(overridesStore)
                 .environment(skillFolderSync)
+                .environment(\.sparkleUpdater, updaterController.updater)
         } label: {
             Image(nsImage: MenuBarIcon.nsImage)
         }
@@ -45,6 +55,18 @@ struct SkillboxApp: App {
             SettingsView()
                 .environment(store)
                 .environment(skillFolderSync)
+                .environment(\.sparkleUpdater, updaterController.updater)
         }
+    }
+}
+
+private struct SparkleUpdaterKey: EnvironmentKey {
+    static let defaultValue: SPUUpdater? = nil
+}
+
+extension EnvironmentValues {
+    var sparkleUpdater: SPUUpdater? {
+        get { self[SparkleUpdaterKey.self] }
+        set { self[SparkleUpdaterKey.self] = newValue }
     }
 }
