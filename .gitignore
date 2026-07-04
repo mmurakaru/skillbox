@@ -6,3 +6,5 @@ Skillbox-*.zip
 DerivedData/
 *.xcodeproj
 .DS_Store
+node_modules/
+.sparkle-tools/

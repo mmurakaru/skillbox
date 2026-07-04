@@ -1,0 +1,107 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    name: Build, sign, and publish
+    runs-on: macos-14
+    if: github.repository == 'mmurakaru/skillbox'
+    env:
+      SPARKLE_VERSION: "2.6.4"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      - name: Build release bundle
+        run: make bundle
+
+      - name: Resolve version + zip name
+        id: meta
+        run: |
+          TAG="${GITHUB_REF##*/}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          ZIP="Skillbox-$TAG.zip"
+          echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
+          # Pre-release if tag has a pre-release suffix (e.g. -beta.1, -rc.2).
+          if [[ "$TAG" =~ -[a-zA-Z] ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Zip the bundle
+        run: ditto -c -k --keepParent Skillbox.app "${{ steps.meta.outputs.zip }}"
+
+      - name: Download Sparkle tools
+        run: |
+          mkdir -p .sparkle
+          curl -sL "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz" -o .sparkle/sparkle.tar.xz
+          tar -xJf .sparkle/sparkle.tar.xz -C .sparkle
+          ls .sparkle/bin
+
+      - name: Sparkle-sign the zip
+        id: sign
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: |
+          if [ -z "$SPARKLE_ED_PRIVATE_KEY" ]; then
+            echo "SPARKLE_ED_PRIVATE_KEY secret is missing. See SETUP.md."
+            exit 1
+          fi
+          SIG_LINE=$(echo "$SPARKLE_ED_PRIVATE_KEY" | .sparkle/bin/sign_update --ed-key-file - "${{ steps.meta.outputs.zip }}")
+          # sign_update prints: sparkle:edSignature="..." length="..."
+          echo "ed_line<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$SIG_LINE" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          FLAGS=""
+          if [ "${{ steps.meta.outputs.prerelease }}" = "true" ]; then
+            FLAGS="--prerelease"
+          fi
+          gh release create "${{ steps.meta.outputs.tag }}" $FLAGS \
+            --title "${{ steps.meta.outputs.tag }}" \
+            --notes-from-tag \
+            "${{ steps.meta.outputs.zip }}"
+
+      - name: Regenerate appcast.xml
+        env:
+          ZIP: ${{ steps.meta.outputs.zip }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          ED_LINE: ${{ steps.sign.outputs.ed_line }}
+        run: |
+          node scripts/append-appcast.mjs
+
+      - name: Commit appcast back to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout main
+          git pull --ff-only
+          git add docs/appcast.xml
+          if git diff --cached --quiet; then
+            echo "appcast.xml unchanged; skipping commit."
+          else
+            git commit -m "chore: appcast for ${{ steps.meta.outputs.tag }}"
+            git push origin main
+          fi

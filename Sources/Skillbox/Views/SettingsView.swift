@@ -1,10 +1,12 @@
 import SwiftUI
 import ServiceManagement
 import AppKit
+import Sparkle
 
 struct SettingsView: View {
     @Environment(SkillStore.self) private var skillStore
     @Environment(SkillFolderSync.self) private var skillFolderSync
+    @Environment(\.sparkleUpdater) private var sparkleUpdater
 
     @AppStorage("skillsRootPath") private var skillsRootPath: String = "~/.claude/skills"
     @AppStorage("memoryRootPath") private var memoryRootPath: String = "~/.claude/projects"
@@ -19,6 +21,8 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            updatesSection
+
             Section {
                 HStack {
                     TextField("Skills directory", text: $skillsRootPath)
@@ -179,5 +183,38 @@ struct SettingsView: View {
             skillStore.rescan()
             isSyncingAll = false
         }
+    }
+
+    @ViewBuilder
+    private var updatesSection: some View {
+        if let updater = sparkleUpdater {
+            Section {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(currentVersionLine)
+                            .font(.system(size: 12, weight: .medium))
+                        Text("Skillbox checks GitHub for updates daily. You can also check manually.")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                    }
+                    Spacer()
+                    CheckForUpdatesView(updater: updater)
+                }
+
+                Toggle("Automatically check for updates", isOn: Binding(
+                    get: { updater.automaticallyChecksForUpdates },
+                    set: { updater.automaticallyChecksForUpdates = $0 }
+                ))
+            } header: {
+                Text("Updates")
+            }
+        }
+    }
+
+    private var currentVersionLine: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "Current version: \(short) (build \(build))"
     }
 }
