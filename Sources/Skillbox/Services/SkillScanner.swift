@@ -11,11 +11,21 @@ enum SkillScanner {
         )
 
         return children.compactMap { childURL in
-            guard (try? childURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { return nil }
+            guard isSkillDirectory(childURL) else { return nil }
             let skillFile = childURL.appendingPathComponent("SKILL.md")
             guard fm.fileExists(atPath: skillFile.path) else { return nil }
             return parseSkill(folderURL: childURL, skillFileURL: skillFile)
         }
+    }
+
+    private static func isSkillDirectory(_ url: URL) -> Bool {
+        if (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+            return true
+        }
+        guard (try? url.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true else {
+            return false
+        }
+        return (try? url.resolvingSymlinksInPath().resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
     }
 
     private static func parseSkill(folderURL: URL, skillFileURL: URL) -> Skill? {

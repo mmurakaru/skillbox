@@ -108,4 +108,28 @@ struct SkillScannerTests {
         let skill = try #require(result.first)
         #expect(skill.name == "foldername")
     }
+
+    @Test func scan_followsSymlinkedSkillDirectories() throws {
+        let root = try makeFixture()
+        defer { cleanup(root) }
+
+        let agentsRoot = root.appendingPathComponent("agents")
+        let claudeRoot = root.appendingPathComponent("claude")
+        let skillFolder = agentsRoot.appendingPathComponent("linked")
+        try writeFile(
+            at: skillFolder.appendingPathComponent("SKILL.md"),
+            contents: "---\nname: linked\ndescription: linked skill\n---\n"
+        )
+        try FileManager.default.createDirectory(at: claudeRoot, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(
+            atPath: claudeRoot.appendingPathComponent("linked").path,
+            withDestinationPath: skillFolder.path
+        )
+
+        let result = try SkillScanner.scan(rootURL: claudeRoot)
+
+        let skill = try #require(result.first)
+        #expect(skill.name == "linked")
+        #expect(skill.description == "linked skill")
+    }
 }
