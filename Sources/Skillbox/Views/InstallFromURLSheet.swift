@@ -5,6 +5,7 @@ struct InstallFromURLSheet: View {
     @Environment(RemoteSkillService.self) private var service
 
     let skillsRootPath: String
+    let claudeSkillsMountPath: String
     let onInstalled: (String) -> Void
     let onCancel: () -> Void
 
@@ -19,15 +20,6 @@ struct InstallFromURLSheet: View {
         case input
         case running
         case done(installedSkill: String)
-    }
-
-    private var pathMismatchWarning: String? {
-        let expanded = (skillsRootPath as NSString).expandingTildeInPath
-        let defaultExpanded = (("~/.claude/skills" as NSString).expandingTildeInPath)
-        if expanded != defaultExpanded {
-            return "The CLI installs into \(defaultExpanded), but Skillbox is reading \(expanded). Reset the path in Settings or installs won't show up here."
-        }
-        return nil
     }
 
     var body: some View {
@@ -91,20 +83,9 @@ struct InstallFromURLSheet: View {
             VStack(alignment: .leading, spacing: 4) {
                 TextField("Skill name in repo (optional)", text: $skillName)
                     .textFieldStyle(.roundedBorder)
-                Text("For multi-skill repos: pick one. Leave blank to install all.")
+                Text("For multi-skill repos: pick one. Leave blank to use the repo name.")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
-            }
-
-            if let warn = pathMismatchWarning {
-                Text(warn)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.orange)
-                    .padding(8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.orange.opacity(0.12))
-                    )
             }
 
             if let err = errorText {
@@ -202,7 +183,8 @@ struct InstallFromURLSheet: View {
                 let installed = try await service.install(
                     source: trimmed,
                     skill: trimmedSkill.isEmpty ? nil : trimmedSkill,
-                    rootPath: skillsRootPath
+                    rootPath: skillsRootPath,
+                    claudeMountPath: claudeSkillsMountPath
                 ) { chunk in
                     logText += chunk
                 }

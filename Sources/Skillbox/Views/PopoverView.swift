@@ -41,7 +41,8 @@ struct PopoverView: View {
 
     @AppStorage("editorCommand") private var editorCommand: String = ""
     @AppStorage("openTarget") private var openTargetRaw: String = OpenTarget.folder.rawValue
-    @AppStorage("skillsRootPath") private var skillsRootPath: String = "~/.claude/skills"
+    @AppStorage("skillsRootPath") private var skillsRootPath: String = "~/.agents/skills"
+    @AppStorage("claudeSkillsMountPath") private var claudeSkillsMountPath: String = "~/.claude/skills"
     @AppStorage("memoryRootPath") private var memoryRootPath: String = "~/.claude/projects"
     @AppStorage("hooksClaudeHomePath") private var hooksClaudeHomePath: String = "~/.claude"
     @AppStorage("activeTab") private var activeTabRaw: String = AppTab.skills.rawValue
@@ -72,6 +73,15 @@ struct PopoverView: View {
                 NewSkillForm(
                     rootPath: (skillsRootPath as NSString).expandingTildeInPath,
                     onCreate: { folderURL in
+                        do {
+                            _ = try SkillMountSync.ensureMount(
+                                sourceURL: folderURL,
+                                mountRoot: URL(fileURLWithPath: (claudeSkillsMountPath as NSString).expandingTildeInPath)
+                            )
+                        } catch {
+                            print("Claude skills mount creation failed for \(folderURL.lastPathComponent): \(error)")
+                        }
+                        store.rescan()
                         let stub = Skill(
                             name: folderURL.lastPathComponent,
                             description: "",
@@ -86,6 +96,7 @@ struct PopoverView: View {
             case .installFromURL:
                 InstallFromURLSheet(
                     skillsRootPath: skillsRootPath,
+                    claudeSkillsMountPath: claudeSkillsMountPath,
                     onInstalled: { _ in
                         skillsRoute = .list
                         store.rescan()
@@ -106,6 +117,7 @@ struct PopoverView: View {
         .frame(width: 360, height: 480)
         .task {
             store.configure(rootPath: skillsRootPath)
+            ensureClaudeSkillMounts()
             memoryStore.configure(rootPath: memoryRootPath)
             hookStore.configure(claudeHomePath: hooksClaudeHomePath)
             envStore.configure(claudeHomePath: hooksClaudeHomePath)
@@ -120,12 +132,19 @@ struct PopoverView: View {
                 let remoteSkills = store.items.filter { $0.provenance != nil }
                 Task.detached(priority: .background) { [weak skillFolderSync] in
                     await skillFolderSync?.syncAll(remoteSkills)
-                    await MainActor.run { store.rescan() }
+                    await MainActor.run {
+                        ensureClaudeSkillMounts()
+                        store.rescan()
+                    }
                 }
             }
         }
         .onChange(of: skillsRootPath) { _, newValue in
             store.configure(rootPath: newValue)
+            ensureClaudeSkillMounts()
+        }
+        .onChange(of: claudeSkillsMountPath) { _, _ in
+            ensureClaudeSkillMounts()
         }
         .onChange(of: memoryRootPath) { _, newValue in
             memoryStore.configure(rootPath: newValue)
@@ -458,7 +477,9 @@ struct PopoverView: View {
 
     private func activeRescan() {
         switch activeTab {
-        case .skills: store.rescan()
+        case .skills:
+            store.rescan()
+            ensureClaudeSkillMounts()
         case .memory: memoryStore.rescan()
         case .hooks: hookStore.rescan()
         case .env: envStore.rescan()
@@ -480,6 +501,17 @@ struct PopoverView: View {
         }
     }
 
+    private func ensureClaudeSkillMounts() {
+        do {
+            _ = try SkillMountSync.ensureAll(
+                sourceRootPath: skillsRootPath,
+                mountRootPath: claudeSkillsMountPath
+            )
+        } catch {
+            print("Claude skills mount sync failed: \(error)")
+        }
+    }
+
     private func open(skill: Skill) {
         let target = OpenTarget(rawValue: openTargetRaw) ?? .folder
         let cmd = editorCommand.isEmpty ? "code" : editorCommand
@@ -490,6 +522,7 @@ struct PopoverView: View {
     private func performDelete(skill: Skill) {
         do {
             try FileManager.default.trashItem(at: skill.folderURL, resultingItemURL: nil)
+            try? SkillMountSync.removeMount(named: skill.folderURL.lastPathComponent, mountRootPath: claudeSkillsMountPath)
             store.remove(skill)
             if selectedSkillID == skill.id {
                 selectedSkillID = store.filteredItems.first?.id
@@ -513,6 +546,7 @@ struct PopoverView: View {
         Task { @MainActor in
             do {
                 _ = try await skillFolderSync.sync(skill)
+                ensureClaudeSkillMounts()
                 store.rescan()
             } catch {
                 NSSound.beep()

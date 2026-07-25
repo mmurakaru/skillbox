@@ -8,7 +8,8 @@ struct SettingsView: View {
     @Environment(SkillFolderSync.self) private var skillFolderSync
     @Environment(\.sparkleUpdater) private var sparkleUpdater
 
-    @AppStorage("skillsRootPath") private var skillsRootPath: String = "~/.claude/skills"
+    @AppStorage("skillsRootPath") private var skillsRootPath: String = "~/.agents/skills"
+    @AppStorage("claudeSkillsMountPath") private var claudeSkillsMountPath: String = "~/.claude/skills"
     @AppStorage("memoryRootPath") private var memoryRootPath: String = "~/.claude/projects"
     @AppStorage("editorCommand") private var editorCommand: String = ""
     @AppStorage("openTarget") private var openTargetRaw: String = OpenTarget.folder.rawValue
@@ -24,10 +25,26 @@ struct SettingsView: View {
             updatesSection
 
             Section {
-                HStack {
-                    TextField("Skills directory", text: $skillsRootPath)
-                        .textFieldStyle(.roundedBorder)
-                    Button("Browse…") { browseForFolder(binding: $skillsRootPath) }
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        TextField("Skills source directory", text: $skillsRootPath)
+                            .textFieldStyle(.roundedBorder)
+                        Button("Browse…") { browseForFolder(binding: $skillsRootPath) }
+                    }
+                    Text("Canonical skill files. Default: ~/.agents/skills")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        TextField("Claude skills mount", text: $claudeSkillsMountPath)
+                            .textFieldStyle(.roundedBorder)
+                        Button("Browse…") { browseForFolder(binding: $claudeSkillsMountPath) }
+                    }
+                    Text("Compatibility symlink mount for Claude Code. Default: ~/.claude/skills")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
                 }
             } header: {
                 Text("Skills")
@@ -180,6 +197,7 @@ struct SettingsView: View {
         isSyncingAll = true
         Task { @MainActor in
             await skillFolderSync.syncAll(remoteSkills)
+            _ = try? SkillMountSync.ensureAll(sourceRootPath: skillsRootPath, mountRootPath: claudeSkillsMountPath)
             skillStore.rescan()
             isSyncingAll = false
         }
