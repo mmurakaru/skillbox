@@ -116,6 +116,7 @@ struct PopoverView: View {
         }
         .frame(width: 360, height: 480)
         .task {
+            migrateLegacySkillsRootIfNeeded()
             store.configure(rootPath: skillsRootPath)
             ensureClaudeSkillMounts()
             memoryStore.configure(rootPath: memoryRootPath)
@@ -498,6 +499,15 @@ struct PopoverView: View {
     private func ensureEditorDefault() {
         if editorCommand.isEmpty, let first = EditorDetector.detect().first {
             editorCommand = first.command
+        }
+    }
+
+    private func migrateLegacySkillsRootIfNeeded() {
+        let legacy = ("~/.claude/skills" as NSString).expandingTildeInPath
+        let current = (skillsRootPath as NSString).expandingTildeInPath
+        let agents = ("~/.agents/skills" as NSString).expandingTildeInPath
+        if current == legacy, FileManager.default.fileExists(atPath: agents) {
+            skillsRootPath = "~/.agents/skills"
         }
     }
 
