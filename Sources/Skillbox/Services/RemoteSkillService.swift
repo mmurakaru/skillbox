@@ -50,11 +50,13 @@ final class RemoteSkillService {
         source: String,
         skill: String?,
         rootPath: String,
+        claudeMountPath: String? = nil,
         stream: @escaping @MainActor (String) -> Void
     ) async throws -> InstalledSkill {
         let installedName = skill ?? Self.inferName(fromSource: source)
-        let folderURL = URL(fileURLWithPath: (rootPath as NSString).expandingTildeInPath)
-            .appendingPathComponent(installedName)
+        let rootURL = URL(fileURLWithPath: (rootPath as NSString).expandingTildeInPath)
+        let mountRootURL = claudeMountPath.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
+        let mountedFolderURL = mountRootURL?.appendingPathComponent(installedName)
 
         let options = SkillsCLI.InstallOptions(source: source, skill: skill)
 
@@ -73,9 +75,11 @@ final class RemoteSkillService {
             throw ServiceError.installFailed(exitCode: result.exitCode, output: result.combinedOutput)
         }
 
-        guard fileSystem.folderExists(at: folderURL) else {
-            throw ServiceError.folderMissingAfterInstall(folderURL)
-        }
+        let realFolderURL = try reconcileInstalledFolder(
+            installedName: installedName,
+            sourceRootURL: rootURL,
+            mountedFolderURL: mountedFolderURL
+        )
 
         let now = Date()
         var provenance = SkillProvenance(
@@ -99,12 +103,15 @@ final class RemoteSkillService {
         }
 
         do {
-            try fileSystem.writeProvenance(provenance, to: folderURL)
+            try fileSystem.writeProvenance(provenance, to: realFolderURL)
+            if let mountRootURL {
+                _ = try SkillMountSync.ensureMount(sourceURL: realFolderURL, mountRoot: mountRootURL)
+            }
         } catch {
             throw ServiceError.underlying(error)
         }
 
-        return InstalledSkill(folderURL: folderURL, name: installedName)
+        return InstalledSkill(folderURL: realFolderURL, name: installedName)
     }
 
     // MARK: - Update
@@ -172,6 +179,35 @@ final class RemoteSkillService {
             if updated.sha == nil { updated.sha = sha }   // seed once on first check
         }
         try? fileSystem.writeProvenance(updated, to: folderURL)
+    }
+
+    private func reconcileInstalledFolder(
+        installedName: String,
+        sourceRootURL: URL,
+        mountedFolderURL: URL?
+    ) throws -> URL {
+        let fm = FileManager.default
+        let folderURL = sourceRootURL.appendingPathComponent(installedName)
+
+        if fileSystem.folderExists(at: folderURL) {
+            return folderURL
+        }
+
+        guard let mountedFolderURL else {
+            throw ServiceError.folderMissingAfterInstall(folderURL)
+        }
+
+        if SkillMountSync.isSymlink(mountedFolderURL), fileSystem.folderExists(at: folderURL) {
+            return folderURL
+        }
+
+        guard fm.fileExists(atPath: mountedFolderURL.path) else {
+            throw ServiceError.folderMissingAfterInstall(folderURL)
+        }
+
+        try fm.createDirectory(at: sourceRootURL, withIntermediateDirectories: true)
+        try fm.moveItem(at: mountedFolderURL, to: folderURL)
+        return folderURL
     }
 
     static func inferName(fromSource source: String) -> String {

@@ -4,9 +4,20 @@ Native macOS menu bar app for Claude Code: skills, auto-memory, hooks, and env v
 
 See [PRD.md](PRD.md) for the spec.
 
+## Skill storage model
+
+Skillbox treats `~/.agents/skills` as the canonical skill source of truth. Claude Code still reads `~/.claude/skills`, so Skillbox maintains that directory as a compatibility mount of symlinks:
+
+```txt
+~/.agents/skills/<skill>/...      # real files
+~/.claude/skills/<skill>          # symlink -> ~/.agents/skills/<skill>
+```
+
+New skills, deletes, remote sync, and backup tooling should operate on `.agents`; `.claude/skills` is only the Claude-facing mount.
+
 ## Features
 
-- Skills tab: browse, search, open, and trash skills under `~/.claude/skills/`.
+- Skills tab: browse, search, open, and trash skills under `~/.agents/skills/` by default; Skillbox keeps `~/.claude/skills/<skill>` mounted as symlinks for Claude Code compatibility.
 - Memory tab: browse Claude auto-memory entries (`~/.claude/projects/<project>/memory/*.md`) per project, with type badges and edit/delete.
 - Hooks tab: browse hooks across `~/.claude/settings.json` and per-project `.claude/settings.json` / `settings.local.json`, with scope filter and edit/delete.
 - Env tab: toggle individual env vars on/off without losing values (disabled vars stash in `~/.claude/skillbox-env-stash.json`); add new vars with autocomplete from a built-in catalog of well-known Claude Code env vars.
