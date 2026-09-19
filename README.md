@@ -21,7 +21,8 @@ New skills, deletes, remote sync, and backup tooling should operate on `.agents`
 - Memory tab: browse Claude auto-memory entries (`~/.claude/projects/<project>/memory/*.md`) per project, with type badges and edit/delete.
 - Hooks tab: browse hooks across `~/.claude/settings.json` and per-project `.claude/settings.json` / `settings.local.json`, with scope filter and edit/delete.
 - Env tab: toggle individual env vars on/off without losing values (disabled vars stash in `~/.claude/skillbox-env-stash.json`); add new vars with autocomplete from a built-in catalog of well-known Claude Code env vars.
-- Insights button (⌘I): runs `claude -p "/insights"` headlessly in the background, footer shows a spinner during the run, then opens the resulting HTML report (the skill's own `~/.claude/usage-data/report.html` if it produced one, otherwise a markdown-rendered fallback at `~/Library/Caches/Skillbox/`) in your default browser.
+- Insights button (⌘I): starts `claude --bg "/insights"`, shows a spinner while Claude generates `~/.claude/usage-data/report.html`, opens the report, then stops the temporary background session.
+- AGENTS.md footer button: opens `~/AGENTS.md`, the shared instruction file used across agent harnesses.
 - Toggle tabs with ⌘1 / ⌘2 / ⌘3 / ⌘4.
 - Auto-updates: powered by [Sparkle](https://sparkle-project.org). Skillbox checks `https://mmurakaru.github.io/skillbox/appcast.xml` every 24 hours and prompts when a new signed release is available. Manual check via Settings → Updates → "Check for Updates…".
 

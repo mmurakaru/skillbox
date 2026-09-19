@@ -3,47 +3,32 @@ import Foundation
 @testable import Skillbox
 
 struct InsightsServiceTests {
-    @Test func parseOutput_validJSON_returnsAllFields() throws {
-        let json = #"""
-        {
-          "session_id": "abc-123",
-          "result": "# Insights\n\nLooks good.",
-          "total_cost_usd": 0.0421
-        }
-        """#
-        let result = try InsightsService.parseOutput(json)
-        #expect(result.markdown == "# Insights\n\nLooks good.")
-        #expect(result.sessionId == "abc-123")
-        #expect(result.costUSD == 0.0421)
+    @Test func parseBackgroundSessionID_extractsID() {
+        let output = """
+        backgrounded · 4cfcfe41
+          claude agents             list sessions
+          claude attach 4cfcfe41    open in this terminal
+        """
+        #expect(InsightsService.parseBackgroundSessionID(output) == "4cfcfe41")
     }
 
-    @Test func parseOutput_resultOnly_succeedsWithMissingOptionals() throws {
-        let json = #"{"result": "hello"}"#
-        let result = try InsightsService.parseOutput(json)
-        #expect(result.markdown == "hello")
-        #expect(result.sessionId == nil)
-        #expect(result.costUSD == nil)
+    @Test func parseBackgroundSessionID_acceptsUUIDStyleID() {
+        let output = "backgrounded · 4cfcfe41-1234-abcd"
+        #expect(InsightsService.parseBackgroundSessionID(output) == "4cfcfe41-1234-abcd")
     }
 
-    @Test func parseOutput_malformedJSON_throws() {
-        #expect(throws: InsightsServiceError.self) {
-            try InsightsService.parseOutput("not json")
-        }
+    @Test func parseBackgroundSessionID_rejectsOldPrintModeReceipt() {
+        let output = #"{"result":"","local_command":"insights","type":"result"}"#
+        #expect(InsightsService.parseBackgroundSessionID(output) == nil)
     }
 
-    @Test func parseOutput_validJSONWithoutResult_throwsMissingResult() {
-        do {
-            _ = try InsightsService.parseOutput(#"{"session_id": "x"}"#)
-            Issue.record("expected throw")
-        } catch InsightsServiceError.missingResultField {
-            // ok
-        } catch {
-            Issue.record("wrong error: \(error)")
-        }
+    @Test func reportURL_usesDefaultClaudeDirectory() {
+        let url = InsightsService.reportURL(environment: [:])
+        #expect(url.path == NSHomeDirectory() + "/.claude/usage-data/report.html")
     }
 
-    @Test func parseOutput_handlesLeadingTrailingWhitespace() throws {
-        let result = try InsightsService.parseOutput("  \n{\"result\": \"x\"}\n  ")
-        #expect(result.markdown == "x")
+    @Test func reportURL_honorsClaudeConfigDirectory() {
+        let url = InsightsService.reportURL(environment: ["CLAUDE_CONFIG_DIR": "/tmp/custom-claude"])
+        #expect(url.path == "/tmp/custom-claude/usage-data/report.html")
     }
 }

@@ -170,9 +170,8 @@ struct PopoverView: View {
         insightsModel.run(claudeOverride: claudeCommand)
     }
 
-    private func openClaudeMd() {
-        let path = (hooksClaudeHomePath as NSString).expandingTildeInPath
-        let target = (path as NSString).appendingPathComponent("CLAUDE.md")
+    private func openAgentsMd() {
+        let target = (NSHomeDirectory() as NSString).appendingPathComponent("AGENTS.md")
         let cmd = editorCommand.isEmpty ? "code" : editorCommand
         EditorLauncher.openPath(target, command: cmd)
         NSApp.deactivate()
@@ -428,14 +427,14 @@ struct PopoverView: View {
             .buttonStyle(.borderless)
             .keyboardShortcut("i", modifiers: .command)
             .disabled(insightsModel.isRunning)
-            .help(insightsModel.isRunning ? "Generating insights…" : "Run /insights and open report")
+            .help(insightsModel.isRunning ? "Generating insights…" : "Generate and open Claude Insights")
 
-            Button(action: openClaudeMd) {
+            Button(action: openAgentsMd) {
                 Image(systemName: "text.book.closed")
-                Text("CLAUDE.md")
+                Text("AGENTS.md")
             }
             .buttonStyle(.borderless)
-            .help("Open ~/.claude/CLAUDE.md")
+            .help("Open ~/AGENTS.md")
 
             Spacer()
 
