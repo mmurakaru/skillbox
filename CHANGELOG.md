@@ -1,5 +1,11 @@
 # skillbox
 
+## 0.3.1
+
+### Patch Changes
+
+- [#6](https://github.com/mmurakaru/skillbox/pull/6) [`a3ebc07`](https://github.com/mmurakaru/skillbox/commit/a3ebc07a8435d78bdccc685acbcdad5c84bec576) Thanks [@mmurakaru](https://github.com/mmurakaru)! - Open the cross-harness `~/AGENTS.md` instruction file from the footer and generate Claude Insights through a background session compatible with current Claude Code releases.
+
 ## 0.3.0
 
 ### Minor Changes
