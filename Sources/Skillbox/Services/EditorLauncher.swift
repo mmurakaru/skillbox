@@ -25,9 +25,32 @@ enum EditorLauncher {
     static func openPath(_ path: String, command: String) -> Bool {
         let resolved = resolveCommand(command)
         if let resolved {
-            return runProcess(executable: resolved, arg: path)
+            return runProcess(executable: resolved, arguments: [path])
         }
         return openWithWorkspace(path: path)
+    }
+
+    @discardableResult
+    static func openAsWorkspace(_ path: String, command: String) -> Bool {
+        guard command == EditorDetector.preferredCommand,
+              let resolved = resolveCommand(command) else {
+            return openPath(path, command: command)
+        }
+
+        let targetURL = URL(fileURLWithPath: path)
+        var isDirectory: ObjCBool = false
+        let targetIsDirectory = FileManager.default.fileExists(
+            atPath: targetURL.path,
+            isDirectory: &isDirectory
+        ) && isDirectory.boolValue
+        let workspaceURL = targetIsDirectory ? targetURL : targetURL.deletingLastPathComponent()
+        let arguments = targetIsDirectory ? ["."] : [".", targetURL.lastPathComponent]
+        return runProcess(
+            executable: resolved,
+            arguments: arguments,
+            currentDirectoryURL: workspaceURL,
+            fallbackPath: path
+        )
     }
 
     private static func resolveCommand(_ command: String) -> String? {
@@ -37,16 +60,22 @@ enum EditorLauncher {
         return EditorDetector.detect().first(where: { $0.command == command })?.path
     }
 
-    private static func runProcess(executable: String, arg: String) -> Bool {
+    private static func runProcess(
+        executable: String,
+        arguments: [String],
+        currentDirectoryURL: URL? = nil,
+        fallbackPath: String? = nil
+    ) -> Bool {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: executable)
-        task.arguments = [arg]
+        task.arguments = arguments
+        task.currentDirectoryURL = currentDirectoryURL
         task.environment = ProcessInfo.processInfo.environment
         do {
             try task.run()
             return true
         } catch {
-            return openWithWorkspace(path: arg)
+            return openWithWorkspace(path: fallbackPath ?? arguments.last ?? ".")
         }
     }
 
