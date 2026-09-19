@@ -1,5 +1,11 @@
 # skillbox
 
+## 0.3.2
+
+### Patch Changes
+
+- [#8](https://github.com/mmurakaru/skillbox/pull/8) [`047c35d`](https://github.com/mmurakaru/skillbox/commit/047c35d273561a414cea57bb0d82b529506d1082) Thanks [@mmurakaru](https://github.com/mmurakaru)! - Prefer Zed when opening AGENTS.md and skill folders.
+
 ## 0.3.1
 
 ### Patch Changes
