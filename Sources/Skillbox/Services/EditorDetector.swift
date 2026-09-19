@@ -7,10 +7,12 @@ struct DetectedEditor: Hashable {
 }
 
 enum EditorDetector {
+    static let preferredCommand = "zed"
+
     static let knownEditors: [(displayName: String, command: String)] = [
+        ("Zed", preferredCommand),
         ("Visual Studio Code", "code"),
         ("Cursor", "cursor"),
-        ("Zed", "zed"),
         ("Sublime Text", "subl"),
         ("Nova", "nova"),
         ("BBEdit", "bbedit"),

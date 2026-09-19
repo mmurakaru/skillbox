@@ -172,8 +172,8 @@ struct PopoverView: View {
 
     private func openAgentsMd() {
         let target = (NSHomeDirectory() as NSString).appendingPathComponent("AGENTS.md")
-        let cmd = editorCommand.isEmpty ? "code" : editorCommand
-        EditorLauncher.openPath(target, command: cmd)
+        let cmd = editorCommand.isEmpty ? EditorDetector.preferredCommand : editorCommand
+        EditorLauncher.openAsWorkspace(target, command: cmd)
         NSApp.deactivate()
     }
 
@@ -523,8 +523,9 @@ struct PopoverView: View {
 
     private func open(skill: Skill) {
         let target = OpenTarget(rawValue: openTargetRaw) ?? .folder
-        let cmd = editorCommand.isEmpty ? "code" : editorCommand
-        EditorLauncher.open(skill: skill, command: cmd, target: target)
+        let cmd = editorCommand.isEmpty ? EditorDetector.preferredCommand : editorCommand
+        let path = target == .folder ? skill.folderURL.path : skill.skillFileURL.path
+        EditorLauncher.openAsWorkspace(path, command: cmd)
         NSApp.deactivate()
     }
 
