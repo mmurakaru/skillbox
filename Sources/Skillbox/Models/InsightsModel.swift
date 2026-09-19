@@ -39,14 +39,7 @@ final class InsightsModel {
                     cwd: cwd,
                     onChunk: { _ in }
                 )
-                if let externalURL = InsightsLinkExtractor.firstExistingHTMLLink(in: result.markdown) {
-                    NSWorkspace.shared.open(externalURL)
-                    return
-                }
-                let title = "Skillbox insights — \(formattedNow())"
-                let html = MarkdownHTMLRenderer.render(markdown: result.markdown, title: title)
-                let url = try InsightsReportWriter.write(html: html)
-                NSWorkspace.shared.open(url)
+                NSWorkspace.shared.open(result.reportURL)
             } catch {
                 let msg = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                 presentError(msg)
@@ -54,10 +47,4 @@ final class InsightsModel {
         }
     }
 
-    private func formattedNow() -> String {
-        let f = DateFormatter()
-        f.dateStyle = .medium
-        f.timeStyle = .short
-        return f.string(from: Date())
-    }
 }

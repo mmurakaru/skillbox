@@ -1,9 +1,8 @@
 import Foundation
 
 struct InsightsResult: Sendable {
-    let markdown: String
-    let sessionId: String?
-    let costUSD: Double?
+    let reportURL: URL
+    let backgroundSessionID: String
 }
 
 enum InsightsServiceError: Error, LocalizedError {
@@ -11,8 +10,8 @@ enum InsightsServiceError: Error, LocalizedError {
     case overrideMissing(String)
     case launchFailed(String)
     case nonZeroExit(code: Int32, stderrTail: String)
-    case malformedJSON(rawTail: String)
-    case missingResultField
+    case missingBackgroundSessionID(rawOutput: String)
+    case reportTimedOut(URL)
 
     var errorDescription: String? {
         switch self {
@@ -26,53 +25,82 @@ enum InsightsServiceError: Error, LocalizedError {
         case .nonZeroExit(let code, let tail):
             let trimmed = tail.trimmingCharacters(in: .whitespacesAndNewlines)
             return "claude exited with code \(code).\(trimmed.isEmpty ? "" : "\n\n\(trimmed)")"
-        case .malformedJSON(let tail):
-            let trimmed = tail.trimmingCharacters(in: .whitespacesAndNewlines)
-            return "claude output was not valid JSON.\(trimmed.isEmpty ? "" : "\n\n…\(trimmed)")"
-        case .missingResultField:
-            return "claude JSON response had no `result` field."
+        case .missingBackgroundSessionID(let output):
+            let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+            return "Claude did not return an Insights background-session ID.\(trimmed.isEmpty ? "" : "\n\n\(trimmed)")"
+        case .reportTimedOut(let url):
+            return "Claude did not update the Insights report at \(url.path) before the run timed out."
         }
     }
 }
 
-/// Spawns `claude -p "/insights" --output-format json --allowedTools Read` from a given cwd
-/// and returns the parsed markdown output. Mirrors the subprocess pattern in
-/// `SkillsCLI.runShellRaw` (Sources/Skillbox/Services/SkillsCLI.swift:155-197) but adapted
-/// for an absolute-path binary plus structured JSON parsing on completion.
+/// Starts `/insights` as a Claude background session, waits for Claude's documented
+/// `usage-data/report.html` output to change, then stops the temporary session.
 enum InsightsService {
     static func run(
         claudePath: String,
         cwd: URL,
-        onChunk: @escaping @Sendable (String) -> Void
+        onChunk: @escaping @Sendable (String) -> Void,
+        timeout: Duration = .seconds(900)
     ) async throws -> InsightsResult {
-        let result = try await runProcess(
+        let reportURL = reportURL()
+        let previousSnapshot = fileSnapshot(at: reportURL)
+        let launch = try await runProcess(
             claudePath: claudePath,
             cwd: cwd,
-            arguments: ["-p", "/insights", "--output-format", "json", "--allowedTools", "Read"],
+            arguments: ["--bg", "/insights"],
             onChunk: onChunk
         )
-        if result.exitCode != 0 {
+        if launch.exitCode != 0 {
             throw InsightsServiceError.nonZeroExit(
-                code: result.exitCode,
-                stderrTail: trailingLines(result.stderr, max: 30)
+                code: launch.exitCode,
+                stderrTail: trailingLines(launch.stderr, max: 30)
             )
         }
-        return try parseOutput(result.stdout)
+
+        let combinedOutput = launch.stdout + launch.stderr
+        guard let sessionID = parseBackgroundSessionID(combinedOutput) else {
+            throw InsightsServiceError.missingBackgroundSessionID(rawOutput: combinedOutput)
+        }
+
+        do {
+            let freshReport = try await waitForFreshReport(
+                at: reportURL,
+                previousSnapshot: previousSnapshot,
+                timeout: timeout
+            )
+            await stopBackgroundSession(sessionID, claudePath: claudePath, cwd: cwd)
+            return InsightsResult(reportURL: freshReport, backgroundSessionID: sessionID)
+        } catch {
+            await stopBackgroundSession(sessionID, claudePath: claudePath, cwd: cwd)
+            throw error
+        }
     }
 
-    /// Pure parsing layer - exposed for tests.
-    static func parseOutput(_ stdout: String) throws -> InsightsResult {
-        let trimmed = stdout.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let data = trimmed.data(using: .utf8),
-              let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw InsightsServiceError.malformedJSON(rawTail: trailingLines(stdout, max: 20))
+    /// Pure parsing layer exposed for tests.
+    static func parseBackgroundSessionID(_ output: String) -> String? {
+        guard let regex = try? NSRegularExpression(
+            pattern: #"backgrounded\s+·\s+([A-Za-z0-9-]+)"#
+        ) else {
+            return nil
         }
-        guard let markdown = parsed["result"] as? String else {
-            throw InsightsServiceError.missingResultField
+        let range = NSRange(output.startIndex..., in: output)
+        guard let match = regex.firstMatch(in: output, range: range),
+              let idRange = Range(match.range(at: 1), in: output) else {
+            return nil
         }
-        let sessionId = parsed["session_id"] as? String
-        let cost = (parsed["total_cost_usd"] as? NSNumber)?.doubleValue
-        return InsightsResult(markdown: markdown, sessionId: sessionId, costUSD: cost)
+        return String(output[idRange])
+    }
+
+    static func reportURL(environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
+        let configRoot: String
+        if let configured = environment["CLAUDE_CONFIG_DIR"], !configured.isEmpty {
+            configRoot = (configured as NSString).expandingTildeInPath
+        } else {
+            configRoot = (NSHomeDirectory() as NSString).appendingPathComponent(".claude")
+        }
+        return URL(fileURLWithPath: configRoot)
+            .appendingPathComponent("usage-data/report.html")
     }
 
     // MARK: - Subprocess
@@ -81,6 +109,51 @@ enum InsightsService {
         let exitCode: Int32
         let stdout: String
         let stderr: String
+    }
+
+    private struct FileSnapshot: Equatable {
+        let modificationDate: Date?
+        let size: UInt64?
+    }
+
+    private static func fileSnapshot(at url: URL) -> FileSnapshot? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else {
+            return nil
+        }
+        return FileSnapshot(
+            modificationDate: attributes[.modificationDate] as? Date,
+            size: (attributes[.size] as? NSNumber)?.uint64Value
+        )
+    }
+
+    private static func waitForFreshReport(
+        at url: URL,
+        previousSnapshot: FileSnapshot?,
+        timeout: Duration
+    ) async throws -> URL {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: timeout)
+        while clock.now < deadline {
+            try Task.checkCancellation()
+            if let currentSnapshot = fileSnapshot(at: url), currentSnapshot != previousSnapshot {
+                return url
+            }
+            try await Task.sleep(for: .milliseconds(500))
+        }
+        throw InsightsServiceError.reportTimedOut(url)
+    }
+
+    private static func stopBackgroundSession(
+        _ sessionID: String,
+        claudePath: String,
+        cwd: URL
+    ) async {
+        _ = try? await runProcess(
+            claudePath: claudePath,
+            cwd: cwd,
+            arguments: ["stop", sessionID],
+            onChunk: { _ in }
+        )
     }
 
     private static func runProcess(
