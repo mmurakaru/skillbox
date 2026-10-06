@@ -6,6 +6,13 @@ struct SkillSourceCoordinates: Equatable {
     var path: String     // path within repo, e.g. "skills/find-skills"
 
     static func parse(provenance: SkillProvenance) -> SkillSourceCoordinates? {
+        if case .unresolved = provenance.remotePath { return nil }
+        guard var coordinates = parseSource(provenance: provenance) else { return nil }
+        if case .resolved(let path) = provenance.remotePath { coordinates.path = path }
+        return coordinates
+    }
+
+    private static func parseSource(provenance: SkillProvenance) -> SkillSourceCoordinates? {
         let raw = provenance.source.trimmingCharacters(in: .whitespaces)
         if raw.isEmpty { return nil }
 

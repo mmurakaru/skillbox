@@ -327,24 +327,11 @@ final class EnvVarStore {
 
     private func startWatching() {
         guard !claudeHomePath.isEmpty else { return }
-        let home = URL(fileURLWithPath: claudeHomePath)
-        let projects = (try? FileManager.default.contentsOfDirectory(
-            at: home.appendingPathComponent("projects"),
-            includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]
-        )) ?? []
-        let projectSettings = projects.filter {
-            (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
-        }.map {
-            URL(fileURLWithPath: Memory.decodeProjectPath($0.lastPathComponent).full).appendingPathComponent(".claude")
-        }
-        let urls = [home] + projectSettings
+        let urls = ClaudeSettingsWatchRoots.watchURLs(claudeHomePath: claudeHomePath)
         let paths = urls.map(\.path).sorted()
         guard paths != watchedPaths else { return }
         watchedPaths = paths
-        watcher = DirectoryWatcher(urls: urls, acceptsPath: { path in
-            let url = URL(fileURLWithPath: path)
-            return ["settings.json", "settings.local.json", "skillbox-env-stash.json"].contains(url.lastPathComponent) || url.pathExtension.isEmpty
-        }) { [weak self] in
+        watcher = DirectoryWatcher(urls: urls, acceptsPath: ClaudeSettingsWatchRoots.acceptsWatchPath) { [weak self] in
             Task { @MainActor in self?.rescan() }
         }
     }

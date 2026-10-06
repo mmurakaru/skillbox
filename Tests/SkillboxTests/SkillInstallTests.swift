@@ -40,6 +40,9 @@ struct SkillInstallTests {
         let installed = try SkillScanner.scan(rootURL: agents)
         #expect(Set(installed.map(\.name)) == ["teach", "tdd"])
         #expect(installed.allSatisfy { $0.provenance?.sha == "fixture-sha" })
+        for skill in installed {
+            #expect(SkillSourceCoordinates.parse(provenance: try #require(skill.provenance))?.path == (skill.name == "teach" ? "skills/productivity/teach" : "skills/engineering/tdd"))
+        }
         for name in model.installedNames {
             #expect(SkillMountSync.isSymlink(claude.appendingPathComponent(name)))
         }
@@ -70,7 +73,26 @@ struct SkillInstallTests {
         #expect(SkillMountSync.isSymlink(claude.appendingPathComponent("teach")))
         let backups = try FileManager.default.contentsOfDirectory(at: agents.appendingPathComponent(".skillbox-backups"), includingPropertiesForKeys: nil)
         #expect(backups.count == 2)
+        for name in result.names {
+            let content = try String(contentsOf: agents.appendingPathComponent(name + "/SKILL.md"), encoding: .utf8)
+            #expect(content.contains("Fixture skill"))
+        }
+        for backup in backups {
+            let folders = try FileManager.default.contentsOfDirectory(at: backup, includingPropertiesForKeys: nil)
+            let content = try String(contentsOf: try #require(folders.first).appendingPathComponent("SKILL.md"), encoding: .utf8)
+            #expect(content.contains("Canonical"))
+        }
         #expect(try SkillScanner.scan(rootURL: agents).count == 2)
+    }
+
+    @Test func remotePathsRespectCollectionsRootSkillsAndUncertainty() {
+        let source = "https://github.com/owner/repo/tree/main/skills/productivity"
+        let coordinates = SkillSourceCoordinates.parse(provenance: SkillProvenance(source: source))
+        #expect(RemoteSkillService.resolveRemotePath(name: "teach", source: source, coordinates: coordinates, paths: ["skills/productivity/teach", "skills/engineering/teach"]) == .resolved("skills/productivity/teach"))
+        #expect(RemoteSkillService.resolveRemotePath(name: "custom-name", source: "owner/repo", coordinates: coordinates, paths: [""]) == .resolved(""))
+        #expect(RemoteSkillService.resolveRemotePath(name: "unknown", source: "owner/repo", coordinates: coordinates, paths: []) == .unresolved)
+        #expect(SkillSourceCoordinates.parse(provenance: SkillProvenance(source: "owner/repo", remotePath: .unresolved)) == nil)
+        #expect(SkillSourceCoordinates.parse(provenance: SkillProvenance(source: "owner/repo")) != nil)
     }
 
     @Test func renderInstallProgressHarness() throws {
@@ -125,5 +147,10 @@ private struct FixtureInstallCLI: SkillsCLIRunning {
 }
 
 private struct FixtureInstallRegistry: SkillRegistryFetching {
-    func latestSHA(repo: String, branch: String, path: String) async throws -> String? { "fixture-sha" }
+    func skillPaths(repo: String, branch: String) async throws -> [String] {
+        ["skills/productivity/teach", "skills/engineering/tdd"]
+    }
+    func latestSHA(repo: String, branch: String, path: String) async throws -> String? {
+        ["skills/productivity/teach", "skills/engineering/tdd"].contains(path) ? "fixture-sha" : nil
+    }
 }

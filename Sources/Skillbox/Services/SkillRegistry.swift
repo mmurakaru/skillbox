@@ -79,6 +79,23 @@ enum SkillRegistry {
 
     // MARK: - Internal helpers
 
+    /// One tree request finds actual skill directories, including nested categories and repository roots.
+    static func skillPaths(repo: String, branch: String, session: URLSession = .shared) async throws -> [String] {
+        let url = URL(string: "https://api.github.com/repos/\(repo)/git/trees/\(branch)?recursive=1")!
+        let data = try await fetchData(url: url, session: session)
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              root["truncated"] as? Bool != true,
+              let tree = root["tree"] as? [[String: Any]] else {
+            throw RegistryError.decoding("Skill directory tree is missing or truncated")
+        }
+        return tree.compactMap { item in
+            guard item["type"] as? String == "blob", let path = item["path"] as? String else { return nil }
+            if path == "SKILL.md" { return "" }
+            guard path.hasSuffix("/SKILL.md") else { return nil }
+            return String(path.dropLast("/SKILL.md".count))
+        }
+    }
+
     struct DirEntry {
         let name: String
         let path: String

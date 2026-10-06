@@ -2,9 +2,7 @@ import Foundation
 import Observation
 import AppKit
 
-/// State for the footer Insights button. Lives at the App level so the run
-/// survives popover dismissal (the user can click Insights, dismiss the popover,
-/// and still get the browser report when the subprocess finishes).
+/// App-level state lets Insights finish after Settings closes.
 @MainActor
 @Observable
 final class InsightsModel {

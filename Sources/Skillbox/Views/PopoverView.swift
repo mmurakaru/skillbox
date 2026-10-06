@@ -225,8 +225,6 @@ struct PopoverView: View {
     }
 
     private var skillsBody: some View {
-        @Bindable var store = store
-
         return VStack(spacing: 0) {
             HStack(spacing: 6) {
                 searchBar
@@ -454,19 +452,20 @@ struct PopoverView: View {
     }
 
     private var tabShortcuts: some View {
-            VStack {
-                Button("") { activeTabRaw = AppTab.skills.rawValue }
-                    .keyboardShortcut("1", modifiers: .command)
-                Button("") { activeTabRaw = AppTab.memory.rawValue }
-                    .keyboardShortcut("2", modifiers: .command)
-                Button("") { activeTabRaw = AppTab.hooks.rawValue }
-                    .keyboardShortcut("3", modifiers: .command)
-                Button("") { activeTabRaw = AppTab.env.rawValue }
-                    .keyboardShortcut("4", modifiers: .command)
-            }
-            .opacity(0)
-            .frame(width: 0, height: 0)
+        VStack {
+            Button("") { activeTabRaw = AppTab.skills.rawValue }
+                .keyboardShortcut("1", modifiers: .command)
+            Button("") { activeTabRaw = AppTab.memory.rawValue }
+                .keyboardShortcut("2", modifiers: .command)
+            Button("") { activeTabRaw = AppTab.hooks.rawValue }
+                .keyboardShortcut("3", modifiers: .command)
+            Button("") { activeTabRaw = AppTab.env.rawValue }
+                .keyboardShortcut("4", modifiers: .command)
+        }
+        .opacity(0)
+        .frame(width: 0, height: 0)
     }
+
 
     private var activeCount: Int {
         switch activeTab {

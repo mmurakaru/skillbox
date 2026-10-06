@@ -77,6 +77,11 @@ final class RemoteSkillService {
 
         let reportedNames = SkillInstallOutput.installedNames(output: result.combinedOutput)
         let names = reportedNames.isEmpty ? [installedName] : reportedNames
+        let sourceCoordinates = SkillSourceCoordinates.parse(provenance: SkillProvenance(source: source))
+        let paths: [String]
+        if let sourceCoordinates {
+            paths = (try? await registry.skillPaths(repo: sourceCoordinates.repo, branch: sourceCoordinates.branch)) ?? []
+        } else { paths = [] }
         var installedFolders: [URL] = []
         for name in names {
             let folder = try reconcileInstalledFolder(
@@ -87,7 +92,8 @@ final class RemoteSkillService {
             let now = Date()
             var provenance = SkillProvenance(
                 source: source, skill: name, ref: SkillRegistry.defaultBranch,
-                installedAt: now, lastCheckedAt: now
+                installedAt: now, lastCheckedAt: now,
+                remotePath: Self.resolveRemotePath(name: name, source: source, coordinates: sourceCoordinates, paths: paths)
             )
             if let coordinates = SkillSourceCoordinates.parse(provenance: provenance),
                let sha = try? await registry.latestSHA(repo: coordinates.repo, branch: coordinates.branch, path: coordinates.path) {
@@ -180,16 +186,31 @@ final class RemoteSkillService {
         let fm = FileManager.default
         let folderURL = sourceRootURL.appendingPathComponent(installedName)
 
+        // A fresh Claude copy wins over an older custom canonical folder; keep the old files as a backup.
+        if let mountedFolderURL, mountedFolderURL != folderURL,
+           !SkillMountSync.isSymlink(mountedFolderURL), fm.fileExists(atPath: mountedFolderURL.path) {
+            try fm.createDirectory(at: sourceRootURL, withIntermediateDirectories: true)
+            var backup: URL?
+            if fm.fileExists(atPath: folderURL.path) || SkillMountSync.isSymlink(folderURL) {
+                let destination = sourceRootURL.appendingPathComponent(".skillbox-backups/\(UUID().uuidString)/\(installedName)")
+                try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try fm.moveItem(at: folderURL, to: destination)
+                backup = destination
+            }
+            do { try fm.moveItem(at: mountedFolderURL, to: folderURL) }
+            catch {
+                if let backup { try? fm.moveItem(at: backup, to: folderURL) }
+                throw error
+            }
+            return folderURL
+        }
+
         if fileSystem.folderExists(at: folderURL) {
             return folderURL
         }
 
         guard let mountedFolderURL else {
             throw ServiceError.folderMissingAfterInstall(folderURL)
-        }
-
-        if SkillMountSync.isSymlink(mountedFolderURL), fileSystem.folderExists(at: folderURL) {
-            return folderURL
         }
 
         guard fm.fileExists(atPath: mountedFolderURL.path) else {
@@ -202,22 +223,25 @@ final class RemoteSkillService {
     }
 
     private func reconcileClaudeMount(sourceURL: URL, mountRootURL: URL) throws {
-        let fm = FileManager.default
         let mount = mountRootURL.appendingPathComponent(sourceURL.lastPathComponent)
-        var backup: URL?
-        // The CLI can create both canonical and Claude copies; preserve the latter before mounting.
-        if fm.fileExists(atPath: mount.path), !SkillMountSync.isSymlink(mount), mount != sourceURL {
-            let destination = sourceURL.deletingLastPathComponent()
-                .appendingPathComponent(".skillbox-backups/\(UUID().uuidString)/\(sourceURL.lastPathComponent)")
-            try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try fm.moveItem(at: mount, to: destination)
-            backup = destination
+        guard mount != sourceURL else { return }
+        _ = try SkillMountSync.ensureMount(sourceURL: sourceURL, mountRoot: mountRootURL)
+    }
+
+    static func resolveRemotePath(name: String, source: String, coordinates: SkillSourceCoordinates?, paths: [String]) -> SkillRemotePath {
+        let isTreeURL = URL(string: source)?.path.contains("/tree/") == true
+        let scoped = paths.filter { path in
+            guard isTreeURL, let scope = coordinates?.path else { return true }
+            return path == scope || path.hasPrefix(scope + "/")
         }
-        do { _ = try SkillMountSync.ensureMount(sourceURL: sourceURL, mountRoot: mountRootURL) }
-        catch {
-            if let backup { try? fm.moveItem(at: backup, to: mount) }
-            throw error
+        let matches = scoped.filter { ($0 as NSString).lastPathComponent == name }
+        if matches.count == 1 { return .resolved(matches[0]) }
+        if scoped.count == 1 { return .resolved(scoped[0]) }
+        // Exact folder URLs remain usable when GitHub tree lookup is unavailable.
+        if paths.isEmpty, isTreeURL, let path = coordinates?.path, (path as NSString).lastPathComponent == name {
+            return .resolved(path)
         }
+        return .unresolved
     }
 
     static func inferName(fromSource source: String) -> String {

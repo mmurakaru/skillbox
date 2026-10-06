@@ -4,20 +4,20 @@ This enhancement adds explicit Jev classification to Skillbox and replaces the t
 
 ## Acceptance checklist
 
-- [ ] Settings can save and remove a TypeSafe API key in macOS Keychain.
-- [ ] A Classify button processes all installed skills, independently of search and filters.
-- [ ] Classification assigns multiple subject categories and one primary activity.
-- [ ] Category and Activity filters combine with text search and offer an Unclassified option.
-- [ ] Results persist locally across launches. Changed skills need classification again.
-- [ ] Unchanged results are reused, with an explicit action to reclassify all skills.
-- [ ] Classification shows progress, supports cancellation, and reports failures without losing successful results.
-- [ ] Navigation uses a left icon sidebar: package, brain, bolt, lock. Existing shortcuts remain available.
-- [ ] Settings, visible item count, and Quit move into the sidebar. Insights and AGENTS.md move into Settings.
-- [ ] Refresh is removed; event-driven watching detects nested changes, atomic saves, missing roots, and linked skills without polling.
-- [ ] The + button installs remote skills. Local creation and the optional skill-name input and CLI argument are removed.
-- [ ] Install progress uses readable statuses and installed names, with bounded errors and no raw process dump.
-- [ ] A download fixture verifies installed files, provenance, mounts, and user-facing results. A render harness creates installation previews.
-- [ ] All direct app and release-tool dependencies use their latest stable versions at implementation time.
+- [x] Settings can save and remove a TypeSafe API key in macOS Keychain.
+- [x] A Classify button processes all installed skills, independently of search and filters.
+- [x] Classification assigns multiple subject categories and one primary activity.
+- [x] Category and Activity filters combine with text search and offer an Unclassified option.
+- [x] Results persist locally across launches. Changed skills need classification again.
+- [x] Unchanged results are reused, with an explicit action to reclassify all skills.
+- [x] Classification shows progress, supports cancellation, and reports failures without losing successful results.
+- [x] Navigation uses a left icon sidebar: package, brain, bolt, lock. Existing shortcuts remain available.
+- [x] Settings, visible item count, and Quit move into the sidebar. Insights and AGENTS.md move into Settings.
+- [x] Refresh is removed; event-driven watching detects nested changes, atomic saves, missing roots, and linked skills without polling.
+- [x] The + button installs remote skills. Local creation and the optional skill-name input and CLI argument are removed.
+- [x] Install progress uses readable statuses and installed names, with bounded errors and no raw process dump.
+- [x] A download fixture verifies installed files, provenance, mounts, and user-facing results. A render harness creates installation previews.
+- [x] All direct app and release-tool dependencies use their latest stable versions at implementation time.
 - [ ] Build and tests pass, code review is complete, and one PR is ready with green CI.
 
 Categories: Engineering, Productivity, Design, Writing, Research, Other. Activities: Planning, Building, Debugging, Reviewing, Researching, Writing, Learning, Setup, Other.
