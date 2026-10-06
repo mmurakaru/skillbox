@@ -14,19 +14,20 @@ struct SkillInstallProgressView: View {
                 .textSelection(.enabled)
             ForEach(SkillInstallStage.allCases, id: \.rawValue) { step in
                 HStack(spacing: 10) {
-                    if !installedNames.isEmpty || step.rawValue < stage.rawValue {
-                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                    } else if step == stage {
-                        ProgressView().controlSize(.small).frame(width: 16)
-                    } else {
-                        Image(systemName: "circle").foregroundStyle(.tertiary)
+                    Group {
+                        if !installedNames.isEmpty || step.rawValue < stage.rawValue {
+                            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                        } else if step == stage {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "circle").foregroundStyle(.tertiary)
+                        }
                     }
+                    .frame(width: 16, height: 16)
                     Text(step.label).font(.system(size: 12))
                 }
             }
             if !installedNames.isEmpty {
-                Text("Ready to use in Claude")
-                    .font(.system(size: 13, weight: .semibold))
                 Text(installedNames.joined(separator: ", "))
                     .font(.system(size: 12)).foregroundStyle(.secondary)
                     .textSelection(.enabled)

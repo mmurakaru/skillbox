@@ -57,7 +57,7 @@ enum SkillInstallStage: Int, CaseIterable {
         case .downloading: "Download repository"
         case .finding: "Find skill files"
         case .installing: "Install skills"
-        case .finishing: "Set up Claude access"
+        case .finishing: "Set up skill access"
         }
     }
 }
