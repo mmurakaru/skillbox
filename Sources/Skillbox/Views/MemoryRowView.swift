@@ -76,10 +76,6 @@ struct MemoryRowView: View {
 
     private var normalContent: some View {
         HStack(spacing: 8) {
-            Image(systemName: "brain")
-                .foregroundStyle(.secondary)
-                .frame(width: 18)
-
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
                     Text(memory.name)

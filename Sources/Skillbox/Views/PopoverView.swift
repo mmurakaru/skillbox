@@ -17,11 +17,19 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .env: "Env"
         }
     }
+
+    var symbol: String {
+        switch self {
+        case .skills: "shippingbox"
+        case .memory: "brain"
+        case .hooks: "bolt"
+        case .env: "lock"
+        }
+    }
 }
 
 enum SkillsTabRoute: Equatable {
     case list
-    case newSkill
     case installFromURL
     case adopt(Skill)
 }
@@ -31,13 +39,12 @@ struct PopoverView: View {
     @Environment(MemoryStore.self) private var memoryStore
     @Environment(HookStore.self) private var hookStore
     @Environment(EnvVarStore.self) private var envStore
-    @Environment(InsightsModel.self) private var insightsModel
     @Environment(RemoteSkillService.self) private var remoteSkillService
     @Environment(SkillOverridesStore.self) private var overridesStore
     @Environment(SkillFolderSync.self) private var skillFolderSync
+    @Environment(SkillClassificationStore.self) private var classificationStore
     @Environment(\.openSettings) private var openSettings
 
-    @AppStorage("claudeCommand") private var claudeCommand: String = ""
 
     @AppStorage("editorCommand") private var editorCommand: String = ""
     @AppStorage("openTarget") private var openTargetRaw: String = OpenTarget.folder.rawValue
@@ -69,30 +76,6 @@ struct PopoverView: View {
             switch skillsRoute {
             case .list:
                 shellContent
-            case .newSkill:
-                NewSkillForm(
-                    rootPath: (skillsRootPath as NSString).expandingTildeInPath,
-                    onCreate: { folderURL in
-                        do {
-                            _ = try SkillMountSync.ensureMount(
-                                sourceURL: folderURL,
-                                mountRoot: URL(fileURLWithPath: (claudeSkillsMountPath as NSString).expandingTildeInPath)
-                            )
-                        } catch {
-                            print("Claude skills mount creation failed for \(folderURL.lastPathComponent): \(error)")
-                        }
-                        store.rescan()
-                        let stub = Skill(
-                            name: folderURL.lastPathComponent,
-                            description: "",
-                            folderURL: folderURL,
-                            modifiedAt: Date()
-                        )
-                        skillsRoute = .list
-                        open(skill: stub)
-                    },
-                    onCancel: { skillsRoute = .list }
-                )
             case .installFromURL:
                 InstallFromURLSheet(
                     skillsRootPath: skillsRootPath,
@@ -114,7 +97,7 @@ struct PopoverView: View {
                 )
             }
         }
-        .frame(width: 360, height: 480)
+        .frame(width: 410, height: 480)
         .task {
             migrateLegacySkillsRootIfNeeded()
             store.configure(rootPath: skillsRootPath)
@@ -125,7 +108,7 @@ struct PopoverView: View {
             overridesStore.configure(claudeHomePath: hooksClaudeHomePath)
             ensureEditorDefault()
             if selectedSkillID == nil {
-                selectedSkillID = store.filteredItems.first?.id
+                selectedSkillID = visibleSkills.first?.id
             }
             try? await Task.sleep(for: .milliseconds(80))
             searchFocused = true
@@ -166,59 +149,64 @@ struct PopoverView: View {
         }
     }
 
-    private func triggerInsights() {
-        insightsModel.run(claudeOverride: claudeCommand)
-    }
-
-    private func openAgentsMd() {
-        let target = (NSHomeDirectory() as NSString).appendingPathComponent("AGENTS.md")
-        let cmd = editorCommand.isEmpty ? EditorDetector.preferredCommand : editorCommand
-        EditorLauncher.openAsWorkspace(target, command: cmd)
-        NSApp.deactivate()
-    }
-
     private var shellContent: some View {
-        VStack(spacing: 0) {
-            tabSwitcher
-                .padding(.horizontal, 10)
-                .padding(.top, 8)
-                .padding(.bottom, 6)
-
+        HStack(spacing: 0) {
+            tabSidebar
             Divider()
-
-            Group {
-                switch activeTab {
-                case .skills: skillsBody
-                case .memory: memoryBody
-                case .hooks: hooksBody
-                case .env: envBody
+            VStack(spacing: 0) {
+                Group {
+                    switch activeTab {
+                    case .skills: skillsBody
+                    case .memory: memoryBody
+                    case .hooks: hooksBody
+                    case .env: envBody
+                    }
                 }
             }
-
-            Divider()
-
-            footer
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
-    private var tabSwitcher: some View {
-        HStack(spacing: 6) {
+    private var tabSidebar: some View {
+        VStack(spacing: 10) {
             ForEach(AppTab.allCases) { tab in
                 tabButton(for: tab)
             }
+            Spacer()
+            Text("\(activeCount)")
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .help("\(activeCount) visible items")
+            Button(action: showSettings) {
+                Image(systemName: "gearshape").frame(width: 36, height: 32)
+            }
+            .help("Settings")
+            .accessibilityLabel("Settings")
+            .keyboardShortcut(",", modifiers: .command)
+            Button(action: { NSApp.terminate(nil) }) {
+                Image(systemName: "power").frame(width: 36, height: 32)
+            }
+            .help("Quit Skillbox")
+            .accessibilityLabel("Quit Skillbox")
+            .keyboardShortcut("q", modifiers: .command)
         }
+        .buttonStyle(.plain)
+        .font(.system(size: 16))
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .frame(width: 50)
+        .frame(maxHeight: .infinity)
+        .background(Color.primary.opacity(0.04))
+        .background(tabShortcuts)
     }
 
     private func tabButton(for tab: AppTab) -> some View {
         let isSelected = activeTab == tab
         return Button(action: { activeTabRaw = tab.rawValue }) {
-            Text(tab.label)
-                .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+            Image(systemName: tab.symbol)
+                .font(.system(size: 18, weight: isSelected ? .semibold : .regular))
                 .foregroundStyle(isSelected ? Color.white : Color.primary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 5)
+                .frame(width: 36, height: 36)
                 .background(
                     Group {
                         if isSelected {
@@ -229,21 +217,26 @@ struct PopoverView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .help(tab.label)
+        .accessibilityLabel(tab.label)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
         .glassEffect(.regular, in: .rect(cornerRadius: 6))
     }
 
     private var skillsBody: some View {
-        @Bindable var store = store
-
         return VStack(spacing: 0) {
             HStack(spacing: 6) {
-                searchBar
+                classificationControls
                 installButton
-                newSkillButton
             }
+            .frame(height: 26)
             .padding(.horizontal, 10)
-            .padding(.top, 8)
+            .padding(.top, 10)
             .padding(.bottom, 6)
+
+            searchBar
+                .padding(.horizontal, 10)
+                .padding(.bottom, 6)
 
             Divider()
 
@@ -260,6 +253,43 @@ struct PopoverView: View {
             if searchFocused { return .ignored }
             triggerDeleteConfirmOnSelected()
             return .handled
+        }
+    }
+
+    private var visibleSkills: [Skill] {
+        classificationStore.filteredSkills(store.filteredItems)
+    }
+
+    private var classificationControls: some View {
+        @Bindable var classifications = classificationStore
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                Picker("Category", selection: $classifications.selectedCategory) {
+                    Text("All categories").tag("all")
+                    ForEach(SkillCategory.allCases) { category in
+                        Text(category.label).tag(category.rawValue)
+                    }
+                    Text("Unclassified").tag("unclassified")
+                }
+                .labelsHidden()
+                .help("Filter by category")
+                Picker("Activity", selection: $classifications.selectedActivity) {
+                    Text("All activities").tag("all")
+                    ForEach(SkillActivity.allCases) { activity in
+                        Text(activity.label).tag(activity.rawValue)
+                    }
+                    Text("Unclassified").tag("unclassified")
+                }
+                .labelsHidden()
+                .help("Filter by activity")
+                Spacer(minLength: 0)
+
+            }
+            .controlSize(.small)
+
+        }
+        .onChange(of: visibleSkills.map(\.id)) { _, ids in
+            if !ids.contains(selectedSkillID ?? "") { selectedSkillID = ids.first }
         }
     }
 
@@ -284,8 +314,8 @@ struct PopoverView: View {
         )
     }
 
-    private var newSkillButton: some View {
-        Button(action: { skillsRoute = .newSkill }) {
+    private var installButton: some View {
+        Button(action: { skillsRoute = .installFromURL }) {
             Image(systemName: "plus")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.secondary)
@@ -293,20 +323,8 @@ struct PopoverView: View {
                 .glassEffect(.regular, in: .rect(cornerRadius: 6))
         }
         .buttonStyle(.plain)
-        .help("New skill (⌘N)")
+        .help("Install skill from URL (⌘N)")
         .keyboardShortcut("n", modifiers: .command)
-    }
-
-    private var installButton: some View {
-        Button(action: { skillsRoute = .installFromURL }) {
-            Image(systemName: "arrow.down.circle")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 28, height: 26)
-                .glassEffect(.regular, in: .rect(cornerRadius: 6))
-        }
-        .buttonStyle(.plain)
-        .help("Install skill from URL")
     }
 
     private var searchBar: some View {
@@ -335,13 +353,14 @@ struct PopoverView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
-                    if store.filteredItems.isEmpty {
+                    if visibleSkills.isEmpty {
                         skillsEmptyState
                             .frame(maxWidth: .infinity, minHeight: 200)
                     } else {
-                        ForEach(store.filteredItems) { skill in
+                        ForEach(visibleSkills) { skill in
                             SkillRowView(
                                 skill: skill,
+                                classification: classificationStore.classification(for: skill),
                                 isSelected: selectedSkillID == skill.id,
                                 overrideState: overridesStore.state(for: skill.name),
                                 isSyncing: skillFolderSync.isSyncing(skill),
@@ -382,6 +401,15 @@ struct PopoverView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 16)
+            } else if classificationStore.selectedCategory != "all" || classificationStore.selectedActivity != "all" {
+                Text("No skills match these filters")
+                    .font(.system(size: 12)).foregroundStyle(.secondary)
+                Button("Clear filters") {
+                    classificationStore.selectedCategory = "all"
+                    classificationStore.selectedActivity = "all"
+                    store.searchQuery = ""
+                }
+                .buttonStyle(.borderless)
             } else if store.searchQuery.isEmpty {
                 Text("No skills found")
                     .font(.system(size: 12))
@@ -397,92 +425,28 @@ struct PopoverView: View {
         }
     }
 
-    private var footer: some View {
-        HStack(spacing: 8) {
-            Button(action: { showSettings() }) {
-                Image(systemName: "gearshape")
-                Text("Settings")
-            }
-            .buttonStyle(.borderless)
-            .keyboardShortcut(",", modifiers: .command)
-
-            Button(action: { activeRescan() }) {
-                Image(systemName: "arrow.clockwise")
-                Text("Refresh")
-            }
-            .buttonStyle(.borderless)
-            .keyboardShortcut("r", modifiers: .command)
-
-            Button(action: triggerInsights) {
-                if insightsModel.isRunning {
-                    ProgressView()
-                        .controlSize(.small)
-                        .scaleEffect(0.7)
-                        .frame(width: 12, height: 12)
-                } else {
-                    Image(systemName: "lightbulb")
-                }
-                Text("Insights")
-            }
-            .buttonStyle(.borderless)
-            .keyboardShortcut("i", modifiers: .command)
-            .disabled(insightsModel.isRunning)
-            .help(insightsModel.isRunning ? "Generating insights…" : "Generate and open Claude Insights")
-
-            Button(action: openAgentsMd) {
-                Image(systemName: "text.book.closed")
-                Text("AGENTS.md")
-            }
-            .buttonStyle(.borderless)
-            .help("Open ~/AGENTS.md")
-
-            Spacer()
-
-            Text("\(activeCount)")
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(.secondary)
-
-            Button(action: { NSApp.terminate(nil) }) {
-                Image(systemName: "power")
-            }
-            .buttonStyle(.borderless)
-            .help("Quit Skillbox")
-            .keyboardShortcut("q", modifiers: .command)
+    private var tabShortcuts: some View {
+        VStack {
+            Button("") { activeTabRaw = AppTab.skills.rawValue }
+                .keyboardShortcut("1", modifiers: .command)
+            Button("") { activeTabRaw = AppTab.memory.rawValue }
+                .keyboardShortcut("2", modifiers: .command)
+            Button("") { activeTabRaw = AppTab.hooks.rawValue }
+                .keyboardShortcut("3", modifiers: .command)
+            Button("") { activeTabRaw = AppTab.env.rawValue }
+                .keyboardShortcut("4", modifiers: .command)
         }
-        .font(.system(size: 11))
-        .background(
-            HStack {
-                Button("") { activeTabRaw = AppTab.skills.rawValue }
-                    .keyboardShortcut("1", modifiers: .command)
-                Button("") { activeTabRaw = AppTab.memory.rawValue }
-                    .keyboardShortcut("2", modifiers: .command)
-                Button("") { activeTabRaw = AppTab.hooks.rawValue }
-                    .keyboardShortcut("3", modifiers: .command)
-                Button("") { activeTabRaw = AppTab.env.rawValue }
-                    .keyboardShortcut("4", modifiers: .command)
-            }
-            .opacity(0)
-            .frame(width: 0, height: 0)
-        )
+        .opacity(0)
+        .frame(width: 0, height: 0)
     }
+
 
     private var activeCount: Int {
         switch activeTab {
-        case .skills: store.filteredItems.count
+        case .skills: visibleSkills.count
         case .memory: memoryStore.filteredMemories.count
         case .hooks: hookStore.filteredHooks.count
         case .env: envStore.filteredEnvVars.count
-        }
-    }
-
-    private func activeRescan() {
-        switch activeTab {
-        case .skills:
-            store.rescan()
-            ensureClaudeSkillMounts()
-        case .memory: memoryStore.rescan()
-        case .hooks: hookStore.rescan()
-        case .env: envStore.rescan()
         }
     }
 
@@ -535,7 +499,7 @@ struct PopoverView: View {
             try? SkillMountSync.removeMount(named: skill.folderURL.lastPathComponent, mountRootPath: claudeSkillsMountPath)
             store.remove(skill)
             if selectedSkillID == skill.id {
-                selectedSkillID = store.filteredItems.first?.id
+                selectedSkillID = visibleSkills.first?.id
             }
         } catch {
             NSSound.beep()
@@ -586,7 +550,7 @@ struct PopoverView: View {
     }
 
     private func moveSelection(by delta: Int) {
-        let items = store.filteredItems
+        let items = visibleSkills
         guard !items.isEmpty else { return }
         searchFocused = false
         if let current = selectedSkillID, let idx = items.firstIndex(where: { $0.id == current }) {
@@ -599,7 +563,7 @@ struct PopoverView: View {
 
     private func triggerEditOnSelected() {
         guard let id = selectedSkillID,
-              let skill = store.filteredItems.first(where: { $0.id == id }) else { return }
+              let skill = visibleSkills.first(where: { $0.id == id }) else { return }
         open(skill: skill)
     }
 

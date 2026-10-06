@@ -9,8 +9,8 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/jpsim/Yams.git", from: "6.2.2"),
-        .package(url: "https://github.com/apple/swift-markdown.git", from: "0.8.0"),
-        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.9.4"),
+        .package(url: "https://github.com/apple/swift-markdown.git", from: "0.9.0"),
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.10.0"),
     ],
     targets: [
         .executableTarget(

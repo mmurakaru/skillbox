@@ -13,7 +13,7 @@ struct InstallReconciliationTests {
         try FileManager.default.createDirectory(at: claude, withIntermediateDirectories: true)
 
         let cli = ReconcileCLI { options in
-            let skillName = options.skill ?? options.source.split(separator: "/").last.map(String.init) ?? options.source
+            let skillName = options.source.split(separator: "/").last.map(String.init) ?? options.source
             let folder = claude.appendingPathComponent(skillName)
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try "---\nname: \(skillName)\ndescription: Installed by fake CLI\n---\n".write(
@@ -30,7 +30,6 @@ struct InstallReconciliationTests {
 
         let installed = try await service.install(
             source: "owner/cool-skill",
-            skill: nil,
             rootPath: agents.path,
             claudeMountPath: claude.path
         ) { _ in }

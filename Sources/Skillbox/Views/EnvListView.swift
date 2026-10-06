@@ -14,16 +14,14 @@ struct EnvListView: View {
     @FocusState private var searchFocused: Bool
 
     var body: some View {
-        @Bindable var store = store
-
         VStack(spacing: 0) {
             HStack(spacing: 6) {
                 scopePicker
-                    .fixedSize()
+                    .frame(maxWidth: 240, alignment: .leading)
                 Spacer(minLength: 0)
                 addButton
-                openFileButton
             }
+            .frame(height: 26)
             .padding(.horizontal, 10)
             .padding(.top, 10)
             .padding(.bottom, 6)
@@ -83,67 +81,18 @@ struct EnvListView: View {
 
     private var scopePicker: some View {
         @Bindable var store = store
-        return Menu {
-            Button { store.selectedScopeKey = nil } label: {
-                pickerMenuItem(
-                    text: "All scopes",
-                    isSelected: store.selectedScopeKey == nil || store.selectedScopeKey?.isEmpty == true
-                )
+        return Picker("Scope", selection: $store.selectedScopeKey) {
+            Text("All scopes").tag(String?.none)
+            Text("User Global (\(store.globalCount))").tag(Optional("global"))
+            ForEach(store.availableProjects) { project in
+                Text("\(project.displayName) (\(project.count))").tag(Optional(project.path))
             }
-            Divider()
-            Button { store.selectedScopeKey = "global" } label: {
-                pickerMenuItem(
-                    text: "User Global (\(store.globalCount))",
-                    isSelected: store.selectedScopeKey == "global"
-                )
-            }
-            if !store.availableProjects.isEmpty {
-                Divider()
-                ForEach(store.availableProjects) { project in
-                    Button { store.selectedScopeKey = project.path } label: {
-                        pickerMenuItem(
-                            text: "\(project.displayName) (\(project.count))",
-                            isSelected: store.selectedScopeKey == project.path
-                        )
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "line.3.horizontal.decrease.circle")
-                    .foregroundStyle(.secondary)
-                Text(currentScopeLabel)
-                    .font(.system(size: 12, weight: .medium))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .glassEffect(.regular, in: .rect(cornerRadius: 6))
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
+        .labelsHidden()
+        .lineLimit(1)
+        .truncationMode(.middle)
+        .controlSize(.small)
         .help(currentScopeTooltip)
-    }
-
-    private func pickerMenuItem(text: String, isSelected: Bool) -> some View {
-        Label {
-            Text(text)
-        } icon: {
-            Image(systemName: "checkmark").opacity(isSelected ? 1 : 0)
-        }
-    }
-
-    private var currentScopeLabel: String {
-        guard let key = store.selectedScopeKey, !key.isEmpty else { return "All scopes" }
-        if key == "global" { return "User Global (\(store.globalCount))" }
-        if let project = store.availableProjects.first(where: { $0.path == key }) {
-            return "\(project.displayName) (\(project.count))"
-        }
-        return "All scopes"
     }
 
     private var currentScopeTooltip: String {
@@ -165,26 +114,6 @@ struct EnvListView: View {
         .buttonStyle(.plain)
         .help("Add env var (⌘N)")
         .keyboardShortcut("n", modifiers: .command)
-    }
-
-    private var openFileButton: some View {
-        Button(action: openSelectedScopeFile) {
-            Image(systemName: "doc.badge.gearshape")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(openFileButtonEnabled ? Color.secondary : Color.secondary.opacity(0.4))
-                .frame(width: 28, height: 26)
-                .glassEffect(.regular, in: .rect(cornerRadius: 6))
-                .opacity(openFileButtonEnabled ? 1.0 : 0.5)
-        }
-        .buttonStyle(.plain)
-        .disabled(!openFileButtonEnabled)
-        .help(openFileButtonEnabled ? "Open settings.json in editor" : "Select a scope to open its settings.json")
-    }
-
-    private var openFileButtonEnabled: Bool {
-        guard let key = store.selectedScopeKey, !key.isEmpty else { return false }
-        if key == "global" { return store.globalCount > 0 }
-        return store.availableProjects.contains(where: { $0.path == key })
     }
 
     private var searchBar: some View {
@@ -326,23 +255,6 @@ struct EnvListView: View {
 
     private func open(envVar: EnvVar) {
         guard envVar.isEnabled else { return }
-        let cmd = editorCommand.isEmpty ? "code" : editorCommand
-        EditorLauncher.openPath(envVar.fileURL.path, command: cmd)
-        NSApp.deactivate()
-    }
-
-    private func openSelectedScopeFile() {
-        guard let key = store.selectedScopeKey, !key.isEmpty else { return }
-        let candidate: EnvVar? = {
-            if key == "global" {
-                return store.items.first(where: {
-                    if case .userGlobal = $0.scope { return true }
-                    return false
-                })
-            }
-            return store.items.first(where: { $0.scope.projectPath == key })
-        }()
-        guard let envVar = candidate else { return }
         let cmd = editorCommand.isEmpty ? "code" : editorCommand
         EditorLauncher.openPath(envVar.fileURL.path, command: cmd)
         NSApp.deactivate()

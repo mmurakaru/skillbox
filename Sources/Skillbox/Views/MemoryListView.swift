@@ -13,15 +13,15 @@ struct MemoryListView: View {
     @FocusState private var searchFocused: Bool
 
     var body: some View {
-        @Bindable var store = store
-
         VStack(spacing: 0) {
             HStack(spacing: 6) {
                 projectPicker
-                    .fixedSize()
+                    .frame(maxWidth: 240, alignment: .leading)
                 Spacer(minLength: 0)
-                openFolderButton
+                Color.clear.frame(width: 28, height: 26)
+                    .accessibilityHidden(true)
             }
+            .frame(height: 26)
             .padding(.horizontal, 10)
             .padding(.top, 10)
             .padding(.bottom, 6)
@@ -82,58 +82,17 @@ struct MemoryListView: View {
 
     private var projectPicker: some View {
         @Bindable var store = store
-        return Menu {
-            Button { store.selectedProjectPath = nil } label: {
-                projectMenuItemLabel(
-                    text: "All projects",
-                    isSelected: store.selectedProjectPath == nil
-                )
-            }
-            Divider()
+        return Picker("Project", selection: $store.selectedProjectPath) {
+            Text("All projects").tag(String?.none)
             ForEach(store.availableProjects) { project in
-                Button { store.selectedProjectPath = project.folderURL.path } label: {
-                    projectMenuItemLabel(
-                        text: "\(project.displayName) (\(project.count))",
-                        isSelected: store.selectedProjectPath == project.folderURL.path
-                    )
-                }
+                Text("\(project.displayName) (\(project.count))").tag(Optional(project.folderURL.path))
             }
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "folder")
-                    .foregroundStyle(.secondary)
-                Text(currentProjectLabel)
-                    .font(.system(size: 12, weight: .medium))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .glassEffect(.regular, in: .rect(cornerRadius: 6))
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
+        .labelsHidden()
+        .lineLimit(1)
+        .truncationMode(.middle)
+        .controlSize(.small)
         .help(currentProjectTooltip)
-    }
-
-    private func projectMenuItemLabel(text: String, isSelected: Bool) -> some View {
-        Label {
-            Text(text)
-        } icon: {
-            Image(systemName: "checkmark")
-                .opacity(isSelected ? 1 : 0)
-        }
-    }
-
-    private var currentProjectLabel: String {
-        guard let path = store.selectedProjectPath, !path.isEmpty,
-              let project = store.availableProjects.first(where: { $0.folderURL.path == path }) else {
-            return "All projects"
-        }
-        return "\(project.displayName) (\(project.count))"
     }
 
     private var currentProjectTooltip: String {
@@ -142,25 +101,6 @@ struct MemoryListView: View {
             return "Showing memory entries from all projects"
         }
         return project.fullPath
-    }
-
-    private var openFolderButton: some View {
-        Button(action: openSelectedProjectFolder) {
-            Image(systemName: "folder.badge.gearshape")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(folderButtonEnabled ? Color.secondary : Color.secondary.opacity(0.4))
-                .frame(width: 28, height: 26)
-                .glassEffect(.regular, in: .rect(cornerRadius: 6))
-                .opacity(folderButtonEnabled ? 1.0 : 0.5)
-        }
-        .buttonStyle(.plain)
-        .disabled(!folderButtonEnabled)
-        .help(folderButtonEnabled ? "Open memory folder in editor" : "Select a project to open its memory folder")
-    }
-
-    private var folderButtonEnabled: Bool {
-        guard let path = store.selectedProjectPath, !path.isEmpty else { return false }
-        return store.availableProjects.contains(where: { $0.folderURL.path == path })
     }
 
     private var searchBar: some View {
@@ -271,15 +211,6 @@ struct MemoryListView: View {
     private func open(memory: Memory) {
         let cmd = editorCommand.isEmpty ? "code" : editorCommand
         EditorLauncher.openPath(memory.fileURL.path, command: cmd)
-        NSApp.deactivate()
-    }
-
-    private func openSelectedProjectFolder() {
-        guard let path = store.selectedProjectPath, !path.isEmpty,
-              let project = store.availableProjects.first(where: { $0.folderURL.path == path }) else { return }
-        let memoryDir = project.folderURL.appendingPathComponent("memory")
-        let cmd = editorCommand.isEmpty ? "code" : editorCommand
-        EditorLauncher.openPath(memoryDir.path, command: cmd)
         NSApp.deactivate()
     }
 

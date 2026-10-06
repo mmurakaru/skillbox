@@ -1,6 +1,5 @@
 .build/
 .swiftpm/
-Package.resolved
 Skillbox.app/
 Skillbox-*.zip
 DerivedData/

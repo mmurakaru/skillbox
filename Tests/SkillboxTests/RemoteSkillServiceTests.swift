@@ -14,14 +14,13 @@ struct RemoteSkillServiceTests {
         let service = RemoteSkillService(cli: cli, registry: registry, fileSystem: fs)
 
         _ = try await service.install(
-            source: "vercel-labs/agent-skills",
-            skill: "find-skills",
+            source: "https://github.com/vercel-labs/agent-skills/tree/main/skills/find-skills",
             rootPath: "/Users/test/skills"
         ) { _ in }
 
         let folder = URL(fileURLWithPath: "/Users/test/skills/find-skills")
         let stored = try #require(fs.readProvenance(at: folder))
-        #expect(stored.source == "vercel-labs/agent-skills")
+        #expect(stored.source == "https://github.com/vercel-labs/agent-skills/tree/main/skills/find-skills")
         #expect(stored.skill == "find-skills")
         #expect(stored.sha == "sha-abc")
         #expect(stored.latestKnownSHA == "sha-abc")
@@ -33,8 +32,7 @@ struct RemoteSkillServiceTests {
 
         var captured = ""
         _ = try await service.install(
-            source: "owner/repo",
-            skill: "frontend-design",
+            source: "https://github.com/owner/repo/tree/main/skills/frontend-design",
             rootPath: "/tmp/skills"
         ) { chunk in
             captured += chunk
@@ -50,7 +48,6 @@ struct RemoteSkillServiceTests {
 
         let installed = try await service.install(
             source: "https://github.com/owner/cool-skill.git",
-            skill: nil,
             rootPath: "/tmp/skills"
         ) { _ in }
 
@@ -65,8 +62,7 @@ struct RemoteSkillServiceTests {
 
         await #expect(throws: RemoteSkillService.ServiceError.self) {
             _ = try await service.install(
-                source: "owner/repo",
-                skill: "x",
+                source: "https://github.com/owner/repo/tree/main/skills/x",
                 rootPath: "/tmp/skills"
             ) { _ in }
         }
@@ -81,8 +77,7 @@ struct RemoteSkillServiceTests {
 
         await #expect(throws: RemoteSkillService.ServiceError.self) {
             _ = try await service.install(
-                source: "owner/repo",
-                skill: "x",
+                source: "https://github.com/owner/repo/tree/main/skills/x",
                 rootPath: "/tmp/skills"
             ) { _ in }
         }
@@ -95,8 +90,7 @@ struct RemoteSkillServiceTests {
         let service = RemoteSkillService(cli: cli, registry: registry, fileSystem: fs)
 
         _ = try await service.install(
-            source: "owner/repo",
-            skill: "x",
+            source: "https://github.com/owner/repo/tree/main/skills/x",
             rootPath: "/tmp/skills"
         ) { _ in }
 

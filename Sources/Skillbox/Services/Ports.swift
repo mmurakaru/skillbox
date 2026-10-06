@@ -16,6 +16,11 @@ protocol SkillsCLIRunning: Sendable {
 /// Production: wraps `SkillRegistry`. Tests: in-memory adapter with canned SHAs.
 protocol SkillRegistryFetching: Sendable {
     func latestSHA(repo: String, branch: String, path: String) async throws -> String?
+    func skillPaths(repo: String, branch: String) async throws -> [String]
+}
+
+extension SkillRegistryFetching {
+    func skillPaths(repo: String, branch: String) async throws -> [String] { [] }
 }
 
 /// Production: wraps `SkillProvenanceStore`. Tests: in-memory dictionary.
@@ -44,6 +49,10 @@ struct SystemSkillsCLI: SkillsCLIRunning {
 }
 
 struct GitHubSkillRegistry: SkillRegistryFetching {
+    func skillPaths(repo: String, branch: String) async throws -> [String] {
+        try await SkillRegistry.skillPaths(repo: repo, branch: branch)
+    }
+
     func latestSHA(repo: String, branch: String, path: String) async throws -> String? {
         try await SkillRegistry.latestSHA(repo: repo, branch: branch, path: path)
     }

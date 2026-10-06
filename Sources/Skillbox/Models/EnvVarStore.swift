@@ -35,7 +35,8 @@ final class EnvVarStore {
     /// nil/empty = all scopes, "global" = user global, otherwise = a project path.
     var selectedScopeKey: String?
 
-    private var watchers: [DirectoryWatcher] = []
+    private var watcher: DirectoryWatcher?
+    private var watchedPaths: [String] = []
     private var claudeHomePath: String = ""
 
     init() {}
@@ -49,7 +50,6 @@ final class EnvVarStore {
         if expanded == self.claudeHomePath { return }
         self.claudeHomePath = expanded
         rescan()
-        startWatching()
     }
 
     func rescan() {
@@ -66,6 +66,7 @@ final class EnvVarStore {
         }
         self.items = Self.sort(collected)
         ensureValidSelection()
+        startWatching()
     }
 
     var availableProjects: [EnvProjectSummary] {
@@ -325,28 +326,13 @@ final class EnvVarStore {
     }
 
     private func startWatching() {
-        watchers.removeAll()
-        let onChange: () -> Void = { [weak self] in
+        guard !claudeHomePath.isEmpty else { return }
+        let urls = ClaudeSettingsWatchRoots.watchURLs(claudeHomePath: claudeHomePath)
+        let paths = urls.map(\.path).sorted()
+        guard paths != watchedPaths else { return }
+        watchedPaths = paths
+        watcher = DirectoryWatcher(urls: urls, acceptsPath: ClaudeSettingsWatchRoots.acceptsWatchPath) { [weak self] in
             Task { @MainActor in self?.rescan() }
-        }
-
-        let home = URL(fileURLWithPath: claudeHomePath)
-        if let w = DirectoryWatcher(url: home, onChange: onChange) {
-            watchers.append(w)
-        }
-        let projectsRoot = home.appendingPathComponent("projects")
-        if FileManager.default.fileExists(atPath: projectsRoot.path),
-           let w = DirectoryWatcher(url: projectsRoot, onChange: onChange) {
-            watchers.append(w)
-        }
-        for source in discoverSources() {
-            if let w = DirectoryWatcher(url: source.fileURL, onChange: onChange) {
-                watchers.append(w)
-            }
-        }
-        if FileManager.default.fileExists(atPath: stashURL.path),
-           let w = DirectoryWatcher(url: stashURL, onChange: onChange) {
-            watchers.append(w)
         }
     }
 

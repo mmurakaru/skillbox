@@ -1,5 +1,10 @@
 import Foundation
 
+enum SkillRemotePath: Codable, Hashable {
+    case resolved(String)
+    case unresolved
+}
+
 struct SkillProvenance: Codable, Hashable {
     static let sidecarFilename = ".skillbox.json"
 
@@ -10,6 +15,7 @@ struct SkillProvenance: Codable, Hashable {
     var installedAt: Date
     var lastCheckedAt: Date?
     var latestKnownSHA: String?
+    var remotePath: SkillRemotePath?
 
     init(
         source: String,
@@ -18,7 +24,8 @@ struct SkillProvenance: Codable, Hashable {
         sha: String? = nil,
         installedAt: Date = Date(),
         lastCheckedAt: Date? = nil,
-        latestKnownSHA: String? = nil
+        latestKnownSHA: String? = nil,
+        remotePath: SkillRemotePath? = nil
     ) {
         self.source = source
         self.skill = skill
@@ -27,6 +34,7 @@ struct SkillProvenance: Codable, Hashable {
         self.installedAt = installedAt
         self.lastCheckedAt = lastCheckedAt
         self.latestKnownSHA = latestKnownSHA
+        self.remotePath = remotePath
     }
 
     var hasUpdate: Bool {
@@ -69,7 +77,9 @@ struct Skill: Identifiable, Hashable {
 
     /// GitHub-style `@owner` derived from `provenance.source`, or `nil` for non-remote skills.
     var authorHandle: String? {
-        guard let provenance,
+        guard var provenance else { return nil }
+        provenance.remotePath = nil
+        guard
               let coords = SkillSourceCoordinates.parse(provenance: provenance) else { return nil }
         return coords.repo.split(separator: "/").first.map(String.init)
     }
