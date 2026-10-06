@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SkillRowView: View {
     let skill: Skill
+    let classification: SkillClassification?
     let isSelected: Bool
     let overrideState: SkillOverride
     let isSyncing: Bool
@@ -23,6 +24,7 @@ struct SkillRowView: View {
 
     init(
         skill: Skill,
+        classification: SkillClassification? = nil,
         isSelected: Bool,
         overrideState: SkillOverride = .on,
         isSyncing: Bool = false,
@@ -34,6 +36,7 @@ struct SkillRowView: View {
         rowState: Binding<RowState>
     ) {
         self.skill = skill
+        self.classification = classification
         self.isSelected = isSelected
         self.overrideState = overrideState
         self.isSyncing = isSyncing
@@ -107,6 +110,16 @@ struct SkillRowView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
+                if let classification {
+                    let labels = classification.categories.map(\.label) + [classification.activity?.label].compactMap { $0 }
+                    if !labels.isEmpty {
+                        Text(labels.joined(separator: " · "))
+                            .font(.system(size: 9))
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .help(labels.joined(separator: ", "))
+                    }
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .help(skill.description)

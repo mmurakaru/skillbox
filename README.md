@@ -13,16 +13,20 @@ Skillbox treats `~/.agents/skills` as the canonical skill source of truth. Claud
 ~/.claude/skills/<skill>          # symlink -> ~/.agents/skills/<skill>
 ```
 
-New skills, deletes, remote sync, and backup tooling should operate on `.agents`; `.claude/skills` is only the Claude-facing mount.
+Installs, deletes, remote sync, and backup tooling operate on `.agents`; `.claude/skills` is the Claude-facing mount.
 
 ## Features
 
 - Skills tab: browse, search, open, and trash skills under `~/.agents/skills/` by default; Skillbox keeps `~/.claude/skills/<skill>` mounted as symlinks for Claude Code compatibility.
+- Classify skills with Jev, then combine Category and Activity filters with search. Save your TypeSafe API key in Settings. The key lives in macOS Keychain; classification results live in `~/Library/Application Support/Skillbox/classifications.json`. Classification sends SKILL.md contents to TypeSafe only when you click Classify. Right-click Classify to rerun all skills.
+- The + button installs remote skills from a repository or folder URL, with readable progress and completion messages. For one skill from a collection, paste its folder URL. Repository installs show every installed skill. Duplicate Claude copies are preserved under `.skillbox-backups` before creating mounts.
+- Navigate with the left icon sidebar: package for Skills, brain for Memory, bolt for Hooks, lock for Env. Settings and Quit sit at the bottom.
+- Local file changes refresh automatically through debounced FSEvents notifications, including nested edits, atomic saves, and linked skill directories. There is no refresh timer or manual Refresh button.
 - Memory tab: browse Claude auto-memory entries (`~/.claude/projects/<project>/memory/*.md`) per project, with type badges and edit/delete.
 - Hooks tab: browse hooks across `~/.claude/settings.json` and per-project `.claude/settings.json` / `settings.local.json`, with scope filter and edit/delete.
 - Env tab: toggle individual env vars on/off without losing values (disabled vars stash in `~/.claude/skillbox-env-stash.json`); add new vars with autocomplete from a built-in catalog of well-known Claude Code env vars.
-- Insights button (⌘I): starts `claude --bg "/insights"`, shows a spinner while Claude generates `~/.claude/usage-data/report.html`, opens the report, then stops the temporary background session.
-- AGENTS.md footer button: opens `~/AGENTS.md`, the shared instruction file used across agent harnesses.
+- Settings → Agent tools → Insights (⌘I): generates and opens Claude's usage report, then stops the temporary background session.
+- Settings → Agent tools → Open AGENTS.md: opens `~/AGENTS.md`, the shared instruction file used across agent harnesses.
 - Toggle tabs with ⌘1 / ⌘2 / ⌘3 / ⌘4.
 - Auto-updates: powered by [Sparkle](https://sparkle-project.org). Skillbox checks `https://mmurakaru.github.io/skillbox/appcast.xml` every 24 hours and prompts when a new signed release is available. Manual check via Settings → Updates → "Check for Updates…".
 
@@ -38,7 +42,7 @@ xattr -dr com.apple.quarantine /Applications/Skillbox.app
 
 ## Build & run
 
-Requires macOS 14+, Swift 6 toolchain (Command Line Tools is enough).
+Requires macOS 26+, Swift 6.2 toolchain (Command Line Tools is enough).
 
 ```sh
 make bundle    # produces ./Skillbox.app, ad-hoc signed
@@ -48,6 +52,8 @@ make clean
 ```
 
 Run tests with `swift test`.
+
+Render the installation progress UI for inspection with `SKILLBOX_RENDER_DIR=/tmp/skillbox-render swift test --filter SkillInstallTests/renderInstallProgressHarness`. This creates PNGs for downloading, installing, and completion states using the production SwiftUI view.
 
 ## Architecture
 

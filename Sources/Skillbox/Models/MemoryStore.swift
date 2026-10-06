@@ -24,7 +24,8 @@ final class MemoryStore {
         self.backing = FileBackedItemStore<Memory>(
             scan: { try MemoryScanner.scan(rootURL: $0) },
             matchesQuery: Self.matches,
-            sort: { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            sort: { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending },
+            acceptsWatchPath: { URL(fileURLWithPath: $0).pathExtension.lowercased() == "md" || URL(fileURLWithPath: $0).pathExtension.isEmpty }
         )
     }
 

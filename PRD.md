@@ -49,7 +49,7 @@ Developers who maintain user-level Claude skills on their Mac and want a fast me
 └── ...
 ```
 
-No nested categories, no multi-root scanning. The list is flat. Power users with skills elsewhere can change the root in Settings.
+The list is flat, with Category and Activity filters. No multi-root scanning. Power users with skills elsewhere can change the root in Settings.
 
 ### Metadata Extraction
 
@@ -76,7 +76,7 @@ From each `SKILL.md`, Skillbox parses YAML frontmatter via Yams:
 | Settings window  | SwiftUI `Settings { ... }` scene| Standard pattern, integrates with @AppStorage|
 | Prefs storage    | `UserDefaults` via `@AppStorage`| Native, reactive, zero serialisation code   |
 | YAML parsing     | Yams (SwiftPM)                  | Robust, handles quoted/multiline edge cases  |
-| File watching    | `DispatchSource` on root FD     | ~15 lines, sufficient (rescan on event)      |
+| File watching    | `FSEvents` on directory trees   | Event-driven nested changes with no polling      |
 | Trash deletion   | `FileManager.trashItem(at:)`    | Canonical macOS API                          |
 | Editor launch    | `Process.run` with detected CLI | code / cursor / zed / subl / nova / bbedit / mate |
 | Launch at login  | `SMAppService` (macOS 13+)      | Modern replacement for SMLoginItemSetEnabled |
@@ -105,7 +105,7 @@ From each `SKILL.md`, Skillbox parses YAML frontmatter via Yams:
 │  │     Interview the user...          │ │
 │  │  ... (scrollable)                  │ │
 │  ├────────────────────────────────────┤ │
-│  │  ⚙️ Settings   🔄 Refresh   38     │ │
+│  │  Sidebar: Settings, count, Quit   │ │
 │  └────────────────────────────────────┘ │
 └─────────────────────────────────────────┘
 ```
@@ -127,12 +127,12 @@ No `ConfigManager` - replaced by `@AppStorage`.
 
 ### 8.1 Skill List
 
-- Flat, scrollable list (single root, no categorisation).
+- Flat, scrollable list with Category and Activity filters.
 - Each row: skill name, single-line truncated description, edit icon, delete icon.
 - Hover on row shows full description as tooltip (`.help()`).
-- Footer shows total count.
+- Sidebar shows the visible item count, Settings, and Quit.
 
-Sections, collapsibility, badge counts, and category grouping are removed - they don't add value for a single flat root.
+Jev classifies skill definitions on request. Category and Activity filters combine with search. Results persist locally and become stale when a skill changes. See [the enhancement checklist](docs/skill-classification.md).
 
 ### 8.2 Search / Filter
 
@@ -168,11 +168,10 @@ Removed from earlier draft: refresh interval (always live-watching), multiple ro
 
 ### 8.6 File Watching
 
-- `DispatchSource.makeFileSystemObjectSource` on the root dir's FD.
-- Listens for `.write / .delete / .rename`.
-- Debounced 200ms then triggers a full rescan.
-- Detects skill add / remove / rename of direct children.
-- Description-edit-inside-SKILL.md is *not* watched recursively - picked up at next popover open or manual refresh.
+- FSEvents watches directory trees without polling.
+- Batched events are debounced for 200ms before rescanning.
+- Detects nested edits, atomic replacements, additions, removals, and linked skill targets.
+- Filters unrelated conversation-log events. No manual Refresh button.
 
 ## 9. UX Specifications
 
@@ -185,7 +184,7 @@ Removed from earlier draft: refresh interval (always live-watching), multiple ro
 
 ### 9.2 Popover Window
 
-- Fixed width: 360pt. Max height: 480pt (List handles scroll beyond).
+- Fixed width: 410pt, including a 50pt icon sidebar. Max height: 480pt (List handles scroll beyond).
 - Anchored below the menu bar icon (default `MenuBarExtra(.window)`).
 - Dismisses on click-outside or Esc.
 - Respects system dark/light mode automatically.
@@ -206,7 +205,7 @@ Removed from earlier draft: refresh interval (always live-watching), multiple ro
 
 ## 10. Configuration
 
-Stored in `UserDefaults` (`~/Library/Preferences/com.skillbox.app.plist`) via `@AppStorage`. No hand-editable config file in v1.
+The TypeSafe API key is stored in macOS Keychain. Other preferences are stored in `UserDefaults` (`~/Library/Preferences/com.skillbox.app.plist`) via `@AppStorage`. No hand-editable config file in v1.
 
 | Key                | Type    | Default                               |
 |--------------------|---------|---------------------------------------|

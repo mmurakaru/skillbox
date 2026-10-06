@@ -1,198 +1,77 @@
 import SwiftUI
-import AppKit
 
 struct InstallFromURLSheet: View {
     @Environment(RemoteSkillService.self) private var service
-
     let skillsRootPath: String
     let claudeSkillsMountPath: String
     let onInstalled: (String) -> Void
     let onCancel: () -> Void
 
-    @State private var rawSource: String = ""
-    @State private var skillName: String = ""
-    @State private var phase: Phase = .input
-    @State private var logText: String = ""
-    @State private var errorText: String?
+    @State private var rawSource = ""
+    @State private var model = SkillInstallModel()
     @FocusState private var sourceFocused: Bool
 
-    enum Phase: Equatable {
-        case input
-        case running
-        case done(installedSkill: String)
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            header
-
-            switch phase {
-            case .input:
-                inputForm
-            case .running:
-                runningView
-            case .done(let name):
-                doneView(name: name)
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text(model.phase == .done ? "Skills installed" : "Install remote skills")
+                    .font(.system(size: 14, weight: .semibold))
+                Spacer()
+                Button(action: onCancel) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16)).foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .disabled(model.phase == .running)
+                .help("Close")
+                .accessibilityLabel("Close installation")
+            }
+            if model.phase == .input {
+                TextField("Repository or skill folder URL", text: $rawSource)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($sourceFocused)
+                    .onSubmit { runInstall() }
+                Text("Paste owner/repo or a GitHub URL. For one skill from a collection, paste its folder URL.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                if let error = model.errorMessage {
+                    Text(error).font(.system(size: 12)).foregroundStyle(.red)
+                        .textSelection(.enabled)
+                }
+            } else {
+                SkillInstallProgressView(source: model.source, stage: model.output.stage, installedNames: model.installedNames)
+            }
+            Spacer()
+            HStack {
+                Spacer()
+                switch model.phase {
+                case .input:
+                    Button("Cancel", action: onCancel)
+                    Button("Install", action: runInstall)
+                        .buttonStyle(.borderedProminent)
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(rawSource.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                case .running:
+                    Text("Installation is in progress…")
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                case .done:
+                    Button("Done") { onInstalled(model.installedNames.first ?? "") }
+                        .buttonStyle(.borderedProminent)
+                        .keyboardShortcut(.defaultAction)
+                }
             }
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .task {
-            try? await Task.sleep(for: .milliseconds(80))
-            sourceFocused = true
-        }
-    }
-
-    private var header: some View {
-        HStack {
-            Text(headerTitle)
-                .font(.system(size: 14, weight: .semibold))
-            Spacer()
-            Button(action: onCancel) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help("Close")
-        }
-    }
-
-    private var headerTitle: String {
-        switch phase {
-        case .input: "Install skill from URL"
-        case .running: "Installing…"
-        case .done: "Installed"
-        }
-    }
-
-    private var inputForm: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            VStack(alignment: .leading, spacing: 4) {
-                TextField("owner/repo, GitHub URL, or git URL", text: $rawSource)
-                    .textFieldStyle(.roundedBorder)
-                    .focused($sourceFocused)
-                    .onSubmit { runInstall() }
-                    .onChange(of: rawSource) { _, _ in errorText = nil }
-
-                Text("e.g. vercel-labs/agent-skills or https://github.com/owner/repo/tree/main/skills/foo")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                TextField("Skill name in repo (optional)", text: $skillName)
-                    .textFieldStyle(.roundedBorder)
-                Text("For multi-skill repos: pick one. Leave blank to use the repo name.")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-            }
-
-            if let err = errorText {
-                Text(err)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
-
-            Spacer()
-
-            HStack {
-                Spacer()
-                Button("Cancel", action: onCancel)
-                    .keyboardShortcut(.cancelAction)
-                Button("Install") { runInstall() }
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(rawSource.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
-        }
-    }
-
-    private var runningView: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                ProgressView()
-                    .controlSize(.small)
-                Text("Running skills add…")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-            logScroll
-            Spacer()
-            HStack {
-                Spacer()
-                Button("Cancel", action: onCancel)
-                    .disabled(true)
-                    .help("Cancellation not supported yet")
-            }
-        }
-    }
-
-    private func doneView(name: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-                Text("Installed \(name.isEmpty ? "skill" : name)")
-                    .font(.system(size: 12, weight: .medium))
-            }
-            logScroll
-            Spacer()
-            HStack {
-                Spacer()
-                Button("Done") { onInstalled(name) }
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(.defaultAction)
-            }
-        }
-    }
-
-    private var logScroll: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                Text(logText.isEmpty ? "(no output yet)" : logText)
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .textSelection(.enabled)
-                    .padding(8)
-                    .id("logEnd")
-            }
-            .frame(maxHeight: 220)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.secondary.opacity(0.08))
-            )
-            .onChange(of: logText) { _, _ in
-                withAnimation(.linear(duration: 0.1)) {
-                    proxy.scrollTo("logEnd", anchor: .bottom)
-                }
-            }
+        .task { sourceFocused = true }
+        .onKeyPress(.escape) {
+            if model.phase != .running { onCancel() }
+            return .handled
         }
     }
 
     private func runInstall() {
-        let trimmed = rawSource.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
-        let trimmedSkill = skillName.trimmingCharacters(in: .whitespaces)
-        phase = .running
-        logText = ""
-
         Task { @MainActor in
-            do {
-                let installed = try await service.install(
-                    source: trimmed,
-                    skill: trimmedSkill.isEmpty ? nil : trimmedSkill,
-                    rootPath: skillsRootPath,
-                    claudeMountPath: claudeSkillsMountPath
-                ) { chunk in
-                    logText += chunk
-                }
-                phase = .done(installedSkill: installed.name)
-            } catch {
-                errorText = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-                phase = .input
-            }
+            await model.installSkill(source: rawSource, rootPath: skillsRootPath, mountPath: claudeSkillsMountPath, service: service)
         }
     }
 }

@@ -8,7 +8,6 @@ enum SkillsCLI {
 
     struct InstallOptions {
         var source: String
-        var skill: String?
         var agent: String = "claude-code"
         var global: Bool = true
         var copyMode: Bool = true
@@ -117,9 +116,6 @@ enum SkillsCLI {
 
     static func addArgs(for options: InstallOptions) -> [String] {
         var argv: [String] = ["add", options.source]
-        if let skill = options.skill, !skill.isEmpty {
-            argv.append(contentsOf: ["--skill", skill])
-        }
         argv.append(contentsOf: ["-a", options.agent])
         if options.global { argv.append("-g") }
         if options.copyMode { argv.append("--copy") }

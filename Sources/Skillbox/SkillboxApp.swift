@@ -11,6 +11,8 @@ struct SkillboxApp: App {
     @State private var remoteSkillService = RemoteSkillService()
     @State private var overridesStore = SkillOverridesStore()
     @State private var skillFolderSync = SkillFolderSync()
+    @State private var classificationStore = SkillClassificationStore()
+    @State private var typeSafeSettings = TypeSafeSettings()
 
     private let updaterController: SPUStandardUpdaterController
 
@@ -45,6 +47,8 @@ struct SkillboxApp: App {
                 .environment(remoteSkillService)
                 .environment(overridesStore)
                 .environment(skillFolderSync)
+                .environment(classificationStore)
+                .environment(typeSafeSettings)
                 .environment(\.sparkleUpdater, updaterController.updater)
         } label: {
             Image(nsImage: MenuBarIcon.nsImage)
@@ -55,6 +59,8 @@ struct SkillboxApp: App {
             SettingsView()
                 .environment(store)
                 .environment(skillFolderSync)
+                .environment(typeSafeSettings)
+                .environment(insightsModel)
                 .environment(\.sparkleUpdater, updaterController.updater)
         }
     }

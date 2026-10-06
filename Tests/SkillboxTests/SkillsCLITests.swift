@@ -11,19 +11,6 @@ struct SkillsCLITests {
         ])
     }
 
-    @Test func addArgs_withSkill() {
-        let opts = SkillsCLI.InstallOptions(
-            source: "vercel-labs/agent-skills",
-            skill: "frontend-design"
-        )
-        #expect(SkillsCLI.addArgs(for: opts) == [
-            "add", "vercel-labs/agent-skills",
-            "--skill", "frontend-design",
-            "-a", "claude-code",
-            "-g", "--copy", "-y"
-        ])
-    }
-
     @Test func addArgs_skipsCopyWhenDisabled() {
         let opts = SkillsCLI.InstallOptions(
             source: "owner/repo",

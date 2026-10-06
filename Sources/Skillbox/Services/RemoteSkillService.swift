@@ -22,6 +22,8 @@ final class RemoteSkillService {
     struct InstalledSkill: Equatable {
         let folderURL: URL
         let name: String
+        var additionalNames: [String] = []
+        var names: [String] { [name] + additionalNames }
     }
 
     enum ServiceError: LocalizedError {
@@ -33,7 +35,7 @@ final class RemoteSkillService {
         var errorDescription: String? {
             switch self {
             case .installFailed(let code, let out):
-                return "skills add failed (exit \(code)). \(out.trimmingCharacters(in: .whitespacesAndNewlines))"
+                return SkillInstallOutput.failureMessage(output: out, exitCode: code)
             case .updateFailed(let code, let out):
                 return "skills update failed (exit \(code)). \(out.trimmingCharacters(in: .whitespacesAndNewlines))"
             case .folderMissingAfterInstall(let url):
@@ -48,17 +50,15 @@ final class RemoteSkillService {
 
     func install(
         source: String,
-        skill: String?,
         rootPath: String,
         claudeMountPath: String? = nil,
         stream: @escaping @MainActor (String) -> Void
     ) async throws -> InstalledSkill {
-        let installedName = skill ?? Self.inferName(fromSource: source)
+        let installedName = Self.inferName(fromSource: source)
         let rootURL = URL(fileURLWithPath: (rootPath as NSString).expandingTildeInPath)
         let mountRootURL = claudeMountPath.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
-        let mountedFolderURL = mountRootURL?.appendingPathComponent(installedName)
 
-        let options = SkillsCLI.InstallOptions(source: source, skill: skill)
+        let options = SkillsCLI.InstallOptions(source: source)
 
         let bridgedStream: @Sendable (String) -> Void = { chunk in
             Task { @MainActor in stream(chunk) }
@@ -75,43 +75,34 @@ final class RemoteSkillService {
             throw ServiceError.installFailed(exitCode: result.exitCode, output: result.combinedOutput)
         }
 
-        let realFolderURL = try reconcileInstalledFolder(
-            installedName: installedName,
-            sourceRootURL: rootURL,
-            mountedFolderURL: mountedFolderURL
-        )
-
-        let now = Date()
-        var provenance = SkillProvenance(
-            source: source,
-            skill: installedName,
-            ref: SkillRegistry.defaultBranch,
-            sha: nil,
-            installedAt: now,
-            lastCheckedAt: now,
-            latestKnownSHA: nil
-        )
-
-        if let coordinates = SkillSourceCoordinates.parse(provenance: provenance),
-           let sha = try? await registry.latestSHA(
-               repo: coordinates.repo,
-               branch: coordinates.branch,
-               path: coordinates.path
-           ) {
-            provenance.sha = sha
-            provenance.latestKnownSHA = sha
-        }
-
-        do {
-            try fileSystem.writeProvenance(provenance, to: realFolderURL)
-            if let mountRootURL {
-                _ = try SkillMountSync.ensureMount(sourceURL: realFolderURL, mountRoot: mountRootURL)
+        let reportedNames = SkillInstallOutput.installedNames(output: result.combinedOutput)
+        let names = reportedNames.isEmpty ? [installedName] : reportedNames
+        var installedFolders: [URL] = []
+        for name in names {
+            let folder = try reconcileInstalledFolder(
+                installedName: name,
+                sourceRootURL: rootURL,
+                mountedFolderURL: mountRootURL?.appendingPathComponent(name)
+            )
+            let now = Date()
+            var provenance = SkillProvenance(
+                source: source, skill: name, ref: SkillRegistry.defaultBranch,
+                installedAt: now, lastCheckedAt: now
+            )
+            if let coordinates = SkillSourceCoordinates.parse(provenance: provenance),
+               let sha = try? await registry.latestSHA(repo: coordinates.repo, branch: coordinates.branch, path: coordinates.path) {
+                provenance.sha = sha
+                provenance.latestKnownSHA = sha
             }
-        } catch {
-            throw ServiceError.underlying(error)
+            do {
+                try fileSystem.writeProvenance(provenance, to: folder)
+                if let mountRootURL {
+                    try reconcileClaudeMount(sourceURL: folder, mountRootURL: mountRootURL)
+                }
+            } catch { throw ServiceError.underlying(error) }
+            installedFolders.append(folder)
         }
-
-        return InstalledSkill(folderURL: realFolderURL, name: installedName)
+        return InstalledSkill(folderURL: installedFolders[0], name: names[0], additionalNames: Array(names.dropFirst()))
     }
 
     // MARK: - Update
@@ -208,6 +199,25 @@ final class RemoteSkillService {
         try fm.createDirectory(at: sourceRootURL, withIntermediateDirectories: true)
         try fm.moveItem(at: mountedFolderURL, to: folderURL)
         return folderURL
+    }
+
+    private func reconcileClaudeMount(sourceURL: URL, mountRootURL: URL) throws {
+        let fm = FileManager.default
+        let mount = mountRootURL.appendingPathComponent(sourceURL.lastPathComponent)
+        var backup: URL?
+        // The CLI can create both canonical and Claude copies; preserve the latter before mounting.
+        if fm.fileExists(atPath: mount.path), !SkillMountSync.isSymlink(mount), mount != sourceURL {
+            let destination = sourceURL.deletingLastPathComponent()
+                .appendingPathComponent(".skillbox-backups/\(UUID().uuidString)/\(sourceURL.lastPathComponent)")
+            try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try fm.moveItem(at: mount, to: destination)
+            backup = destination
+        }
+        do { _ = try SkillMountSync.ensureMount(sourceURL: sourceURL, mountRoot: mountRootURL) }
+        catch {
+            if let backup { try? fm.moveItem(at: backup, to: mount) }
+            throw error
+        }
     }
 
     static func inferName(fromSource source: String) -> String {

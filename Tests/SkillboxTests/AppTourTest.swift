@@ -22,8 +22,7 @@ struct AppTourTest {
         registry.setSHA(repo: "vercel-labs/agent-skills", path: "skills/find-skills", sha: "v1")
 
         let installed = try await service.install(
-            source: "vercel-labs/agent-skills",
-            skill: "find-skills",
+            source: "https://github.com/vercel-labs/agent-skills/tree/main/skills/find-skills",
             rootPath: "/Users/test/skills"
         ) { _ in }
 
@@ -33,7 +32,7 @@ struct AppTourTest {
         // 2) After install, a sidecar exists recording where the skill came from
         //    and the SHA at install time.
         let sidecar = try #require(fs.readProvenance(at: installed.folderURL))
-        #expect(sidecar.source == "vercel-labs/agent-skills")
+        #expect(sidecar.source == "https://github.com/vercel-labs/agent-skills/tree/main/skills/find-skills")
         #expect(sidecar.sha == "v1")
         #expect(sidecar.latestKnownSHA == "v1")
         #expect(sidecar.hasUpdate == false) // freshly installed, nothing to update

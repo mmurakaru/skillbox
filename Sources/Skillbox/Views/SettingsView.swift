@@ -6,6 +6,8 @@ import Sparkle
 struct SettingsView: View {
     @Environment(SkillStore.self) private var skillStore
     @Environment(SkillFolderSync.self) private var skillFolderSync
+    @Environment(TypeSafeSettings.self) private var typeSafeSettings
+    @Environment(InsightsModel.self) private var insightsModel
     @Environment(\.sparkleUpdater) private var sparkleUpdater
 
     @AppStorage("skillsRootPath") private var skillsRootPath: String = "~/.agents/skills"
@@ -19,10 +21,51 @@ struct SettingsView: View {
 
     @State private var detectedEditors: [DetectedEditor] = []
     @State private var isSyncingAll = false
+    @State private var typeSafeAPIKey = ""
 
     var body: some View {
         Form {
             updatesSection
+
+            Section("Agent tools") {
+                Button(action: { insightsModel.run(claudeOverride: claudeCommand) }) {
+                    HStack {
+                        if insightsModel.isRunning { ProgressView().controlSize(.small) }
+                        Label(insightsModel.isRunning ? "Generating insights…" : "Generate and open Insights", systemImage: "lightbulb")
+                    }
+                }
+                .disabled(insightsModel.isRunning)
+                .keyboardShortcut("i", modifiers: .command)
+                Button(action: openAgentsMd) {
+                    Label("Open AGENTS.md", systemImage: "text.book.closed")
+                }
+            }
+
+            Section("Skill classification") {
+                SecureField("TypeSafe API key", text: $typeSafeAPIKey)
+                    .textFieldStyle(.roundedBorder)
+                HStack {
+                    Button("Save key") { typeSafeSettings.saveAPIKey(typeSafeAPIKey) }
+                        .disabled(typeSafeAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    if !typeSafeSettings.apiKey.isEmpty {
+                        Button("Remove key") {
+                            typeSafeSettings.saveAPIKey("")
+                            if typeSafeSettings.lastError == nil { typeSafeAPIKey = "" }
+                        }
+                    }
+                    Spacer()
+                    Link("Get an API key", destination: URL(string: "https://console.typesafe.ai")!)
+                }
+                Text(typeSafeSettings.apiKey.isEmpty ? "No API key saved." : "API key saved in macOS Keychain.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Text("Classify in the Skills tab sends your SKILL.md files to TypeSafe and saves category and activity labels locally.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                if let error = typeSafeSettings.lastError {
+                    Text(error).font(.system(size: 11)).foregroundStyle(.red)
+                }
+            }
 
             Section {
                 VStack(alignment: .leading, spacing: 6) {
@@ -143,6 +186,7 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .frame(width: 460, height: 460)
         .task {
+            typeSafeAPIKey = typeSafeSettings.apiKey
             detectedEditors = EditorDetector.detect()
             syncLaunchAtLoginFromSystem()
         }
@@ -157,6 +201,12 @@ struct SettingsView: View {
         if panel.runModal() == .OK, let url = panel.url {
             binding.wrappedValue = url.path
         }
+    }
+
+    private func openAgentsMd() {
+        let target = (NSHomeDirectory() as NSString).appendingPathComponent("AGENTS.md")
+        let command = editorCommand.isEmpty ? EditorDetector.preferredCommand : editorCommand
+        EditorLauncher.openAsWorkspace(target, command: command)
     }
 
     private func browseForFile(binding: Binding<String>) {

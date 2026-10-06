@@ -36,7 +36,8 @@ final class HookStore {
     /// nil/empty = all scopes, "global" = user global, otherwise = a project path.
     var selectedScopeKey: String?
 
-    private var watchers: [DirectoryWatcher] = []
+    private var watcher: DirectoryWatcher?
+    private var watchedPaths: [String] = []
     private var claudeHomePath: String = ""
 
     init() {}
@@ -50,7 +51,6 @@ final class HookStore {
         if expanded == self.claudeHomePath { return }
         self.claudeHomePath = expanded
         rescan()
-        startWatching()
     }
 
     func rescan() {
@@ -70,6 +70,7 @@ final class HookStore {
         self.items = Self.sort(collected)
         self.lastError = firstError
         ensureValidSelection()
+        startWatching()
     }
 
     var availableProjects: [HookProjectSummary] {
@@ -231,25 +232,26 @@ final class HookStore {
     }
 
     private func startWatching() {
-        watchers.removeAll()
-        let onChange: () -> Void = { [weak self] in
-            Task { @MainActor in self?.rescan() }
-        }
-
+        guard !claudeHomePath.isEmpty else { return }
         let home = URL(fileURLWithPath: claudeHomePath)
-        if let w = DirectoryWatcher(url: home, onChange: onChange) {
-            watchers.append(w)
+        let projects = (try? FileManager.default.contentsOfDirectory(
+            at: home.appendingPathComponent("projects"),
+            includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]
+        )) ?? []
+        let projectSettings = projects.filter {
+            (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+        }.map {
+            URL(fileURLWithPath: Memory.decodeProjectPath($0.lastPathComponent).full).appendingPathComponent(".claude")
         }
-        let projectsRoot = home.appendingPathComponent("projects")
-        if FileManager.default.fileExists(atPath: projectsRoot.path),
-           let w = DirectoryWatcher(url: projectsRoot, onChange: onChange) {
-            watchers.append(w)
-        }
-        // Also watch each known settings.json so in-place edits trigger rescan.
-        for source in discoverSources() {
-            if let w = DirectoryWatcher(url: source.fileURL, onChange: onChange) {
-                watchers.append(w)
-            }
+        let urls = [home] + projectSettings
+        let paths = urls.map(\.path).sorted()
+        guard paths != watchedPaths else { return }
+        watchedPaths = paths
+        watcher = DirectoryWatcher(urls: urls, acceptsPath: { path in
+            let url = URL(fileURLWithPath: path)
+            return ["settings.json", "settings.local.json", "skillbox-env-stash.json"].contains(url.lastPathComponent) || url.pathExtension.isEmpty
+        }) { [weak self] in
+            Task { @MainActor in self?.rescan() }
         }
     }
 

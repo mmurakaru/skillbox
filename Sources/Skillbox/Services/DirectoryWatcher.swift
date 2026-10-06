@@ -1,38 +1,80 @@
 import Foundation
+import CoreServices
 
-/// Fires `onChange` (debounced ~200ms) when files inside the watched directory change.
+/// FSEvents watches descendants and atomic file replacements without polling or one descriptor per file.
 final class DirectoryWatcher {
-    private let fd: Int32
-    private let source: DispatchSourceFileSystemObject
-    private let queue = DispatchQueue(label: "com.skillbox.watcher")
+    private var stream: FSEventStreamRef?
     private var debounceWorkItem: DispatchWorkItem?
-    private let debounceInterval: TimeInterval = 0.2
+    private let watchedPaths: [String]
+    private let onChange: () -> Void
+    private let acceptsPath: (String) -> Bool
 
-    init?(url: URL, onChange: @escaping () -> Void) {
-        fd = open(url.path, O_EVTONLY)
-        guard fd >= 0 else { return nil }
+    convenience init?(url: URL, acceptsPath: @escaping (String) -> Bool = { _ in true }, onChange: @escaping () -> Void) {
+        self.init(urls: [url], acceptsPath: acceptsPath, onChange: onChange)
+    }
 
-        source = DispatchSource.makeFileSystemObjectSource(
-            fileDescriptor: fd,
-            eventMask: [.write, .delete, .rename, .extend, .attrib],
-            queue: queue
+    init?(urls: [URL], acceptsPath: @escaping (String) -> Bool = { _ in true }, onChange: @escaping () -> Void) {
+        watchedPaths = urls.map { $0.resolvingSymlinksInPath().standardizedFileURL.path }
+        self.onChange = onChange
+        self.acceptsPath = acceptsPath
+        let roots = Set(watchedPaths.map { path in
+            var root = URL(fileURLWithPath: path)
+            var directory: ObjCBool = false
+            if FileManager.default.fileExists(atPath: path, isDirectory: &directory), !directory.boolValue {
+                root.deleteLastPathComponent()
+            }
+            // Watch an existing ancestor so missing roots and files can appear later.
+            while !FileManager.default.fileExists(atPath: root.path), root.path != "/" {
+                root.deleteLastPathComponent()
+            }
+            return root.path
+        })
+        var context = FSEventStreamContext(
+            version: 0, info: Unmanaged.passUnretained(self).toOpaque(),
+            retain: nil, release: nil, copyDescription: nil
         )
-
-        source.setEventHandler { [weak self] in
-            guard let self else { return }
-            self.debounceWorkItem?.cancel()
-            let work = DispatchWorkItem { onChange() }
-            self.debounceWorkItem = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + self.debounceInterval, execute: work)
+        let flags = FSEventStreamCreateFlags(kFSEventStreamCreateFlagUseCFTypes | kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagWatchRoot)
+        stream = FSEventStreamCreate(nil, { _, info, count, paths, eventFlags, _ in
+            guard let info else { return }
+            let watcher = Unmanaged<DirectoryWatcher>.fromOpaque(info).takeUnretainedValue()
+            let changedPaths = Unmanaged<CFArray>.fromOpaque(paths).takeUnretainedValue() as! [String]
+            let needsFullScan = (0..<count).contains {
+                eventFlags[$0] & FSEventStreamEventFlags(kFSEventStreamEventFlagMustScanSubDirs | kFSEventStreamEventFlagRootChanged) != 0
+            }
+            if needsFullScan || changedPaths.contains(where: watcher.isRelevantPath) {
+                watcher.scheduleChange()
+            }
+        }, &context, Array(roots) as CFArray, FSEventStreamEventId(kFSEventStreamEventIdSinceNow), 0.2, flags)
+        guard let stream else { return nil }
+        FSEventStreamSetDispatchQueue(stream, .main)
+        guard FSEventStreamStart(stream) else {
+            FSEventStreamInvalidate(stream)
+            FSEventStreamRelease(stream)
+            self.stream = nil
+            return nil
         }
+    }
 
-        let capturedFd = fd
-        source.setCancelHandler { close(capturedFd) }
-        source.resume()
+    private func isRelevantPath(_ eventPath: String) -> Bool {
+        let path = URL(fileURLWithPath: eventPath).resolvingSymlinksInPath().standardizedFileURL.path
+        return acceptsPath(path) && watchedPaths.contains { watched in
+            path == watched || path.hasPrefix(watched + "/") || watched.hasPrefix(path + "/")
+        }
+    }
+
+    private func scheduleChange() {
+        debounceWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.onChange() }
+        debounceWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: work)
     }
 
     deinit {
         debounceWorkItem?.cancel()
-        source.cancel()
+        if let stream {
+            FSEventStreamStop(stream)
+            FSEventStreamInvalidate(stream)
+            FSEventStreamRelease(stream)
+        }
     }
 }
