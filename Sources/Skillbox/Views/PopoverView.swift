@@ -229,6 +229,7 @@ struct PopoverView: View {
                 classificationControls
                 installButton
             }
+            .frame(height: 26)
             .padding(.horizontal, 10)
             .padding(.top, 10)
             .padding(.bottom, 6)

@@ -18,7 +18,10 @@ struct HookListView: View {
                 scopePicker
                     .frame(maxWidth: 240, alignment: .leading)
                 Spacer(minLength: 0)
+                Color.clear.frame(width: 28, height: 26)
+                    .accessibilityHidden(true)
             }
+            .frame(height: 26)
             .padding(.horizontal, 10)
             .padding(.top, 10)
             .padding(.bottom, 6)

@@ -21,6 +21,7 @@ struct EnvListView: View {
                 Spacer(minLength: 0)
                 addButton
             }
+            .frame(height: 26)
             .padding(.horizontal, 10)
             .padding(.top, 10)
             .padding(.bottom, 6)
