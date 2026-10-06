@@ -156,6 +156,8 @@ enum SkillsCLI {
             let task = Process()
             task.executableURL = URL(fileURLWithPath: "/bin/zsh")
             task.arguments = ["-i", "-l", "-c", command]
+            // GUI launches can reuse descriptor zero for an event queue, which cannot be inherited.
+            task.standardInput = FileHandle.nullDevice
 
             let pipe = Pipe()
             task.standardOutput = pipe
