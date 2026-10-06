@@ -11,6 +11,8 @@ This enhancement adds explicit Jev classification to Skillbox and replaces the t
 - [x] Results persist locally across launches. Changed skills need classification again.
 - [x] Unchanged results are reused, with an explicit action to reclassify all skills.
 - [x] Classification shows progress, supports cancellation, and reports failures without losing successful results.
+- [x] Rows omit repeated section icons; Env retains its enable switch.
+- [x] Classification failures show a red Retry button without adding status rows.
 - [x] Navigation uses a left icon sidebar: package, brain, bolt, lock. Existing shortcuts remain available.
 - [x] Settings, visible item count, and Quit move into the sidebar. Insights and AGENTS.md move into Settings.
 - [x] Memory, Hooks, and Env headers omit redundant folder/settings-file buttons and their actions.

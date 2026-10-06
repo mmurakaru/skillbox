@@ -7,6 +7,7 @@ import Observation
 final class SkillClassificationStore {
     private(set) var classifications: [String: SkillClassification] = [:]
     private(set) var isClassifying = false
+    private(set) var hasClassificationFailure = false
     private(set) var completedCount = 0
     private(set) var totalCount = 0
     private(set) var statusMessage: String?
@@ -53,9 +54,11 @@ final class SkillClassificationStore {
     func startClassification(skills: [Skill], apiKey: String, force: Bool = false) {
         guard !isClassifying else { return }
         guard !apiKey.isEmpty else {
+            hasClassificationFailure = true
             statusMessage = SkillClassificationError.missingAPIKey.localizedDescription
             return
         }
+        hasClassificationFailure = false
         isClassifying = true
         completedCount = 0
         totalCount = skills.count
@@ -91,6 +94,8 @@ final class SkillClassificationStore {
                     }
                 } catch is CancellationError { break }
                 catch {
+                    if Task.isCancelled { break }
+                    hasClassificationFailure = true
                     failed += 1
                     firstError = firstError ?? error.localizedDescription
                     // Stop on API-wide failures instead of repeating rejected requests for every skill.

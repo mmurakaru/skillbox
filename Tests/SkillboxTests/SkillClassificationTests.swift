@@ -154,6 +154,11 @@ struct SkillClassificationTests {
         #expect(store.classification(for: items[0]) != nil)
         #expect(store.classification(for: items[1]) == nil)
         #expect(store.statusMessage?.contains("Check it in Settings") == true)
+        #expect(store.hasClassificationFailure)
+        store.startClassification(skills: [items[0]], apiKey: "test-key")
+        #expect(!store.hasClassificationFailure)
+        try await waitForClassification(store)
+        #expect(!store.hasClassificationFailure)
     }
 
     @Test func cancellationKeepsPreviousResultsAndNeverStartsRemainingRequests() async throws {
@@ -165,7 +170,10 @@ struct SkillClassificationTests {
         let data = try response()
         let store = SkillClassificationStore(cacheURL: root.appendingPathComponent("cache.json")) { skill, content, _ in
             calls += 1
-            if calls == 2 { try await Task.sleep(for: .seconds(30)) }
+            if calls == 2 {
+                do { try await Task.sleep(for: .seconds(30)) }
+                catch { throw URLError(.cancelled) }
+            }
             return try SkillClassificationService.parseClassification(data, skill: skill, content: content)
         }
         store.startClassification(skills: items, apiKey: "test-key")
@@ -176,6 +184,7 @@ struct SkillClassificationTests {
         #expect(store.classification(for: items[0]) != nil)
         #expect(store.classification(for: items[1]) == nil)
         #expect(store.statusMessage?.contains("Cancelled") == true)
+        #expect(!store.hasClassificationFailure)
     }
 }
 

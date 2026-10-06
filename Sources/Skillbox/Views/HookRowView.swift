@@ -72,10 +72,6 @@ struct HookRowView: View {
 
     private var normalContent: some View {
         HStack(spacing: 8) {
-            Image(systemName: "bolt.fill")
-                .foregroundStyle(.secondary)
-                .frame(width: 18)
-
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
                     Text(hook.titleLine)

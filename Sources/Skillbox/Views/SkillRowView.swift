@@ -86,10 +86,6 @@ struct SkillRowView: View {
 
     private var normalContent: some View {
         HStack(spacing: 8) {
-            Image(systemName: "shippingbox")
-                .foregroundStyle(.secondary)
-                .frame(width: 18)
-
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 4) {
                     Text(skill.name)

@@ -291,7 +291,10 @@ struct PopoverView: View {
                     .help("Cancel classification")
                     .accessibilityLabel("Cancel classification")
                 } else {
-                    Button("Classify") { classifySkills() }
+                    Button(classifications.hasClassificationFailure ? "Retry" : "Classify") { classifySkills() }
+                        .buttonStyle(.borderedProminent)
+                        .tint(classifications.hasClassificationFailure ? .red : .gray)
+                        .frame(width: 62)
                         .disabled(store.items.isEmpty)
                         .help(typeSafeSettings.apiKey.isEmpty ? "Set your TypeSafe API key in Settings" : "Classify new or changed skills with Jev")
                         .contextMenu {
@@ -300,14 +303,7 @@ struct PopoverView: View {
                 }
             }
             .controlSize(.small)
-            if classifications.isClassifying {
-                Text("Classifying \(classifications.completedCount) / \(classifications.totalCount)")
-                    .font(.system(size: 10)).foregroundStyle(.secondary)
-            } else if let message = classifications.statusMessage {
-                Text(message)
-                    .font(.system(size: 10)).foregroundStyle(.secondary)
-                    .lineLimit(2).help(message)
-            }
+
         }
         .onChange(of: visibleSkills.map(\.id)) { _, ids in
             if !ids.contains(selectedSkillID ?? "") { selectedSkillID = ids.first }
