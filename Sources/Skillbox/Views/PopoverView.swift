@@ -226,14 +226,14 @@ struct PopoverView: View {
     private var skillsBody: some View {
         return VStack(spacing: 0) {
             HStack(spacing: 6) {
-                searchBar
+                classificationControls
                 installButton
             }
             .padding(.horizontal, 10)
-            .padding(.top, 8)
+            .padding(.top, 10)
             .padding(.bottom, 6)
 
-            classificationControls
+            searchBar
                 .padding(.horizontal, 10)
                 .padding(.bottom, 6)
 
