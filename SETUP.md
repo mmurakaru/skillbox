@@ -1,6 +1,6 @@
 # One-time Skillbox setup (maintainer)
 
-Most of the project works out of the box. These three steps are needed **once** for the auto-update + automated-release pipeline to function.
+Most of the project works out of the box. Ad-hoc signed releases work without an Apple Developer account. The key and Pages setup below enables automatic updates; without it, releases remain available for manual installation.
 
 ## 1. Generate Sparkle EdDSA keys
 
@@ -9,7 +9,7 @@ Sparkle signs every released zip with an EdDSA private key. The matching public 
 Download Sparkle's tools (matches the version in `.github/workflows/release.yml`):
 
 ```sh
-SPARKLE_VERSION=2.6.4
+SPARKLE_VERSION=2.10.0
 curl -sL "https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VERSION/Sparkle-$SPARKLE_VERSION.tar.xz" \
   | tar -xJ -C /tmp/
 ```
@@ -64,7 +64,7 @@ Pick `skillbox`, choose a bump type, write a summary. Commit the resulting `.cha
 
 1. PR ships with a changeset → merge to `main`.
 2. `.github/workflows/changesets.yml` opens a "Version Packages" PR that bumps `package.json` + `Info.plist.template` and rebuilds `CHANGELOG.md`.
-3. Maintainer merges the Version PR → changesets creates `vX.Y.Z` tag.
+3. Maintainer merges the Version PR and pushes the `vX.Y.Z` tag at the merged commit.
 4. Tag push fires `.github/workflows/release.yml`:
    - `make bundle` produces `Skillbox.app`
    - Sparkle-signs the zip with `SPARKLE_ED_PRIVATE_KEY`

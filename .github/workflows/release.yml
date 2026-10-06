@@ -19,6 +19,7 @@ jobs:
     if: github.repository == 'mmurakaru/skillbox'
     env:
       SPARKLE_VERSION: "2.10.0"
+      SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -47,6 +48,7 @@ jobs:
         run: ditto -c -k --keepParent Skillbox.app "${{ steps.meta.outputs.zip }}"
 
       - name: Download Sparkle tools
+        if: env.SPARKLE_ED_PRIVATE_KEY != ''
         run: |
           mkdir -p .sparkle
           curl -sL "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz" -o .sparkle/sparkle.tar.xz
@@ -55,8 +57,7 @@ jobs:
 
       - name: Sparkle-sign the zip
         id: sign
-        env:
-          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        if: env.SPARKLE_ED_PRIVATE_KEY != ''
         run: |
           if [ -z "$SPARKLE_ED_PRIVATE_KEY" ]; then
             echo "SPARKLE_ED_PRIVATE_KEY secret is missing. See SETUP.md."
@@ -72,16 +73,22 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          FLAGS=""
+          FLAGS=()
           if [ "${{ steps.meta.outputs.prerelease }}" = "true" ]; then
-            FLAGS="--prerelease"
+            FLAGS+=(--prerelease)
           fi
-          gh release create "${{ steps.meta.outputs.tag }}" $FLAGS \
+          if [ -z "$SPARKLE_ED_PRIVATE_KEY" ]; then
+            printf '%s\n' 'This build is ad-hoc signed and not notarized. No Apple Developer account is required to build from source. Sparkle update signing is not configured, so download and install updates manually.' > /tmp/release-notes.md
+            FLAGS+=(--notes-file /tmp/release-notes.md)
+          fi
+          gh release create "${{ steps.meta.outputs.tag }}" "${FLAGS[@]}" \
+            --verify-tag \
             --title "${{ steps.meta.outputs.tag }}" \
-            --notes-from-tag \
+            --generate-notes \
             "${{ steps.meta.outputs.zip }}"
 
       - name: Regenerate appcast.xml
+        if: steps.sign.outcome == 'success'
         env:
           ZIP: ${{ steps.meta.outputs.zip }}
           TAG: ${{ steps.meta.outputs.tag }}
@@ -90,6 +97,7 @@ jobs:
           node scripts/append-appcast.mjs
 
       - name: Commit appcast back to main
+        if: steps.sign.outcome == 'success'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
