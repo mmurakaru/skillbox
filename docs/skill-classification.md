@@ -13,6 +13,7 @@ This enhancement adds explicit Jev classification to Skillbox and replaces the t
 - [x] Classification shows progress, supports cancellation, and reports failures without losing successful results.
 - [x] Navigation uses a left icon sidebar: package, brain, bolt, lock. Existing shortcuts remain available.
 - [x] Settings, visible item count, and Quit move into the sidebar. Insights and AGENTS.md move into Settings.
+- [x] Memory, Hooks, and Env headers omit redundant folder/settings-file buttons and their actions.
 - [x] Refresh is removed; event-driven watching detects nested changes, atomic saves, missing roots, and linked skills without polling.
 - [x] The + button installs remote skills. Local creation and the optional skill-name input and CLI argument are removed.
 - [x] Install progress uses readable statuses and installed names, with bounded errors and no raw process dump.

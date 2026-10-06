@@ -13,14 +13,11 @@ struct HookListView: View {
     @FocusState private var searchFocused: Bool
 
     var body: some View {
-        @Bindable var store = store
-
         VStack(spacing: 0) {
             HStack(spacing: 6) {
                 scopePicker
                     .fixedSize()
                 Spacer(minLength: 0)
-                openFileButton
             }
             .padding(.horizontal, 10)
             .padding(.top, 10)
@@ -134,26 +131,6 @@ struct HookListView: View {
         }
         if key == "global" { return "~/.claude/settings.json" }
         return key
-    }
-
-    private var openFileButton: some View {
-        Button(action: openSelectedScopeFile) {
-            Image(systemName: "doc.badge.gearshape")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(openFileButtonEnabled ? Color.secondary : Color.secondary.opacity(0.4))
-                .frame(width: 28, height: 26)
-                .glassEffect(.regular, in: .rect(cornerRadius: 6))
-                .opacity(openFileButtonEnabled ? 1.0 : 0.5)
-        }
-        .buttonStyle(.plain)
-        .disabled(!openFileButtonEnabled)
-        .help(openFileButtonEnabled ? "Open settings.json in editor" : "Select a scope to open its settings.json")
-    }
-
-    private var openFileButtonEnabled: Bool {
-        guard let key = store.selectedScopeKey, !key.isEmpty else { return false }
-        if key == "global" { return store.globalHookCount > 0 }
-        return store.availableProjects.contains(where: { $0.path == key })
     }
 
     private var searchBar: some View {
@@ -287,23 +264,6 @@ struct HookListView: View {
     }
 
     private func open(hook: Hook) {
-        let cmd = editorCommand.isEmpty ? "code" : editorCommand
-        EditorLauncher.openPath(hook.fileURL.path, command: cmd)
-        NSApp.deactivate()
-    }
-
-    private func openSelectedScopeFile() {
-        guard let key = store.selectedScopeKey, !key.isEmpty else { return }
-        let candidate: Hook? = {
-            if key == "global" {
-                return store.items.first(where: {
-                    if case .userGlobal = $0.scope { return true }
-                    return false
-                })
-            }
-            return store.items.first(where: { $0.scope.projectPath == key })
-        }()
-        guard let hook = candidate else { return }
         let cmd = editorCommand.isEmpty ? "code" : editorCommand
         EditorLauncher.openPath(hook.fileURL.path, command: cmd)
         NSApp.deactivate()

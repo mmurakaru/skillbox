@@ -13,14 +13,11 @@ struct MemoryListView: View {
     @FocusState private var searchFocused: Bool
 
     var body: some View {
-        @Bindable var store = store
-
         VStack(spacing: 0) {
             HStack(spacing: 6) {
                 projectPicker
                     .fixedSize()
                 Spacer(minLength: 0)
-                openFolderButton
             }
             .padding(.horizontal, 10)
             .padding(.top, 10)
@@ -144,25 +141,6 @@ struct MemoryListView: View {
         return project.fullPath
     }
 
-    private var openFolderButton: some View {
-        Button(action: openSelectedProjectFolder) {
-            Image(systemName: "folder.badge.gearshape")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(folderButtonEnabled ? Color.secondary : Color.secondary.opacity(0.4))
-                .frame(width: 28, height: 26)
-                .glassEffect(.regular, in: .rect(cornerRadius: 6))
-                .opacity(folderButtonEnabled ? 1.0 : 0.5)
-        }
-        .buttonStyle(.plain)
-        .disabled(!folderButtonEnabled)
-        .help(folderButtonEnabled ? "Open memory folder in editor" : "Select a project to open its memory folder")
-    }
-
-    private var folderButtonEnabled: Bool {
-        guard let path = store.selectedProjectPath, !path.isEmpty else { return false }
-        return store.availableProjects.contains(where: { $0.folderURL.path == path })
-    }
-
     private var searchBar: some View {
         @Bindable var store = store
         return HStack(spacing: 6) {
@@ -271,15 +249,6 @@ struct MemoryListView: View {
     private func open(memory: Memory) {
         let cmd = editorCommand.isEmpty ? "code" : editorCommand
         EditorLauncher.openPath(memory.fileURL.path, command: cmd)
-        NSApp.deactivate()
-    }
-
-    private func openSelectedProjectFolder() {
-        guard let path = store.selectedProjectPath, !path.isEmpty,
-              let project = store.availableProjects.first(where: { $0.folderURL.path == path }) else { return }
-        let memoryDir = project.folderURL.appendingPathComponent("memory")
-        let cmd = editorCommand.isEmpty ? "code" : editorCommand
-        EditorLauncher.openPath(memoryDir.path, command: cmd)
         NSApp.deactivate()
     }
 
