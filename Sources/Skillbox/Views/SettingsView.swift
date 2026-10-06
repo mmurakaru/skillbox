@@ -32,13 +32,13 @@ struct SettingsView: View {
                 Button(action: { insightsModel.run(claudeOverride: claudeCommand) }) {
                     HStack {
                         if insightsModel.isRunning { ProgressView().controlSize(.small) }
-                        Label(insightsModel.isRunning ? "Generating insights…" : "Generate and open Insights", systemImage: "lightbulb")
+                        Label("Insights", systemImage: "lightbulb")
                     }
                 }
                 .disabled(insightsModel.isRunning)
                 .keyboardShortcut("i", modifiers: .command)
                 Button(action: openAgentsMd) {
-                    Label("Open AGENTS.md", systemImage: "text.book.closed")
+                    Label("Agents.md", systemImage: "text.book.closed")
                 }
             }
 
