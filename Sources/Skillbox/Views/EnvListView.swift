@@ -17,7 +17,7 @@ struct EnvListView: View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
                 scopePicker
-                    .fixedSize()
+                    .frame(maxWidth: 240, alignment: .leading)
                 Spacer(minLength: 0)
                 addButton
             }
@@ -80,67 +80,18 @@ struct EnvListView: View {
 
     private var scopePicker: some View {
         @Bindable var store = store
-        return Menu {
-            Button { store.selectedScopeKey = nil } label: {
-                pickerMenuItem(
-                    text: "All scopes",
-                    isSelected: store.selectedScopeKey == nil || store.selectedScopeKey?.isEmpty == true
-                )
+        return Picker("Scope", selection: $store.selectedScopeKey) {
+            Text("All scopes").tag(String?.none)
+            Text("User Global (\(store.globalCount))").tag(Optional("global"))
+            ForEach(store.availableProjects) { project in
+                Text("\(project.displayName) (\(project.count))").tag(Optional(project.path))
             }
-            Divider()
-            Button { store.selectedScopeKey = "global" } label: {
-                pickerMenuItem(
-                    text: "User Global (\(store.globalCount))",
-                    isSelected: store.selectedScopeKey == "global"
-                )
-            }
-            if !store.availableProjects.isEmpty {
-                Divider()
-                ForEach(store.availableProjects) { project in
-                    Button { store.selectedScopeKey = project.path } label: {
-                        pickerMenuItem(
-                            text: "\(project.displayName) (\(project.count))",
-                            isSelected: store.selectedScopeKey == project.path
-                        )
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "line.3.horizontal.decrease.circle")
-                    .foregroundStyle(.secondary)
-                Text(currentScopeLabel)
-                    .font(.system(size: 12, weight: .medium))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .glassEffect(.regular, in: .rect(cornerRadius: 6))
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
+        .labelsHidden()
+        .lineLimit(1)
+        .truncationMode(.middle)
+        .controlSize(.small)
         .help(currentScopeTooltip)
-    }
-
-    private func pickerMenuItem(text: String, isSelected: Bool) -> some View {
-        Label {
-            Text(text)
-        } icon: {
-            Image(systemName: "checkmark").opacity(isSelected ? 1 : 0)
-        }
-    }
-
-    private var currentScopeLabel: String {
-        guard let key = store.selectedScopeKey, !key.isEmpty else { return "All scopes" }
-        if key == "global" { return "User Global (\(store.globalCount))" }
-        if let project = store.availableProjects.first(where: { $0.path == key }) {
-            return "\(project.displayName) (\(project.count))"
-        }
-        return "All scopes"
     }
 
     private var currentScopeTooltip: String {

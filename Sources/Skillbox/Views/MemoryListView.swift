@@ -16,7 +16,7 @@ struct MemoryListView: View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
                 projectPicker
-                    .fixedSize()
+                    .frame(maxWidth: 240, alignment: .leading)
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 10)
@@ -79,58 +79,17 @@ struct MemoryListView: View {
 
     private var projectPicker: some View {
         @Bindable var store = store
-        return Menu {
-            Button { store.selectedProjectPath = nil } label: {
-                projectMenuItemLabel(
-                    text: "All projects",
-                    isSelected: store.selectedProjectPath == nil
-                )
-            }
-            Divider()
+        return Picker("Project", selection: $store.selectedProjectPath) {
+            Text("All projects").tag(String?.none)
             ForEach(store.availableProjects) { project in
-                Button { store.selectedProjectPath = project.folderURL.path } label: {
-                    projectMenuItemLabel(
-                        text: "\(project.displayName) (\(project.count))",
-                        isSelected: store.selectedProjectPath == project.folderURL.path
-                    )
-                }
+                Text("\(project.displayName) (\(project.count))").tag(Optional(project.folderURL.path))
             }
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "folder")
-                    .foregroundStyle(.secondary)
-                Text(currentProjectLabel)
-                    .font(.system(size: 12, weight: .medium))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .glassEffect(.regular, in: .rect(cornerRadius: 6))
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
+        .labelsHidden()
+        .lineLimit(1)
+        .truncationMode(.middle)
+        .controlSize(.small)
         .help(currentProjectTooltip)
-    }
-
-    private func projectMenuItemLabel(text: String, isSelected: Bool) -> some View {
-        Label {
-            Text(text)
-        } icon: {
-            Image(systemName: "checkmark")
-                .opacity(isSelected ? 1 : 0)
-        }
-    }
-
-    private var currentProjectLabel: String {
-        guard let path = store.selectedProjectPath, !path.isEmpty,
-              let project = store.availableProjects.first(where: { $0.folderURL.path == path }) else {
-            return "All projects"
-        }
-        return "\(project.displayName) (\(project.count))"
     }
 
     private var currentProjectTooltip: String {
