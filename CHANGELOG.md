@@ -1,5 +1,13 @@
 # skillbox
 
+## 0.4.0
+
+### Minor Changes
+
+- [#10](https://github.com/mmurakaru/skillbox/pull/10) [`a5b2ba1`](https://github.com/mmurakaru/skillbox/commit/a5b2ba1dca40f1e9f6dec64a91525a11e54cfd54) Thanks [@mmurakaru](https://github.com/mmurakaru)! - Add automatic Jev skill classification with a TypeSafe API key in Settings, cached category and activity filters, and an icon sidebar for navigation. Update app and release-tool dependencies to their latest stable versions.
+  
+  Simplify remote installation with stable progress indicators, fix GUI subprocess launching, and publish ad-hoc signed releases when update signing is not configured.
+
 ## 0.3.2
 
 ### Patch Changes
