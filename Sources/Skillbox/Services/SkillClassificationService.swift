@@ -8,9 +8,9 @@ enum SkillClassificationError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .missingAPIKey: "Set your TypeSafe API key in Settings before classifying skills."
+        case .missingAPIKey: "Set your TypeSafe API key in Settings to enable automatic classification."
         case .httpStatus(401), .httpStatus(403): "TypeSafe rejected the API key. Check it in Settings."
-        case .httpStatus(429): "TypeSafe rate limit reached. Try Classify again later."
+        case .httpStatus(429): "TypeSafe rate limit reached. Retry classification in Settings later."
         case .httpStatus(let status): "TypeSafe classification failed with HTTP \(status)."
         case .invalidResponse: "TypeSafe returned an invalid classification response."
         }

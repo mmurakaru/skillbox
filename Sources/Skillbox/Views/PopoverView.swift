@@ -43,7 +43,6 @@ struct PopoverView: View {
     @Environment(SkillOverridesStore.self) private var overridesStore
     @Environment(SkillFolderSync.self) private var skillFolderSync
     @Environment(SkillClassificationStore.self) private var classificationStore
-    @Environment(TypeSafeSettings.self) private var typeSafeSettings
     @Environment(\.openSettings) private var openSettings
 
 
@@ -283,24 +282,7 @@ struct PopoverView: View {
                 .labelsHidden()
                 .help("Filter by activity")
                 Spacer(minLength: 0)
-                if classifications.isClassifying {
-                    ProgressView().controlSize(.small)
-                    Button(action: { classifications.cancelClassification() }) {
-                        Image(systemName: "xmark")
-                    }
-                    .help("Cancel classification")
-                    .accessibilityLabel("Cancel classification")
-                } else {
-                    Button(classifications.hasClassificationFailure ? "Retry" : "Classify") { classifySkills() }
-                        .buttonStyle(.borderedProminent)
-                        .tint(classifications.hasClassificationFailure ? .red : .gray)
-                        .frame(width: 62)
-                        .disabled(store.items.isEmpty)
-                        .help(typeSafeSettings.apiKey.isEmpty ? "Set your TypeSafe API key in Settings" : "Classify new or changed skills with Jev")
-                        .contextMenu {
-                            Button("Reclassify all skills") { classifySkills(force: true) }
-                        }
-                }
+
             }
             .controlSize(.small)
 
@@ -308,11 +290,6 @@ struct PopoverView: View {
         .onChange(of: visibleSkills.map(\.id)) { _, ids in
             if !ids.contains(selectedSkillID ?? "") { selectedSkillID = ids.first }
         }
-    }
-
-    private func classifySkills(force: Bool = false) {
-        guard !typeSafeSettings.apiKey.isEmpty else { showSettings(); return }
-        classificationStore.startClassification(skills: store.items, apiKey: typeSafeSettings.apiKey, force: force)
     }
 
     private var memoryBody: some View {

@@ -6,6 +6,7 @@ import Sparkle
 struct SettingsView: View {
     @Environment(SkillStore.self) private var skillStore
     @Environment(SkillFolderSync.self) private var skillFolderSync
+    @Environment(SkillClassificationStore.self) private var classifications
     @Environment(TypeSafeSettings.self) private var typeSafeSettings
     @Environment(InsightsModel.self) private var insightsModel
     @Environment(\.sparkleUpdater) private var sparkleUpdater
@@ -59,9 +60,23 @@ struct SettingsView: View {
                 Text(typeSafeSettings.apiKey.isEmpty ? "No API key saved." : "API key saved in macOS Keychain.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-                Text("Classify in the Skills tab sends your SKILL.md files to TypeSafe and saves category and activity labels locally.")
+                Text("Skills are classified automatically on launch and when added or changed. Their SKILL.md contents are sent to TypeSafe; unchanged results are reused.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
+                HStack {
+                    Button("Retry classification") {
+                        classifications.startClassification(skills: skillStore.items, apiKey: typeSafeSettings.apiKey)
+                    }
+                    .disabled(typeSafeSettings.apiKey.isEmpty || skillStore.items.isEmpty || classifications.isClassifying)
+                    .tint(classifications.hasClassificationFailure ? .red : nil)
+                    if classifications.isClassifying {
+                        ProgressView().controlSize(.small)
+                        Button("Cancel") { classifications.cancelClassification() }
+                    }
+                }
+                if let message = classifications.statusMessage {
+                    Text(message).font(.system(size: 11)).foregroundStyle(.secondary)
+                }
                 if let error = typeSafeSettings.lastError {
                     Text(error).font(.system(size: 11)).foregroundStyle(.red)
                 }

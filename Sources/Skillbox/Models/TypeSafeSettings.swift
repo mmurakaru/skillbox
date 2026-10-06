@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// Shares the saved TypeSafe API key between Settings and the Classify button.
+/// Shares the saved TypeSafe API key between Settings and automatic classification.
 @MainActor
 @Observable
 final class TypeSafeSettings {

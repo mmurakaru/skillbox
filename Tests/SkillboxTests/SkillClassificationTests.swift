@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import Observation
 @testable import Skillbox
 
 @MainActor
@@ -136,6 +137,40 @@ struct SkillClassificationTests {
         #expect(calls == 3)
     }
 
+    @Test func automaticClassificationStartsAfterKeyAndSkillChangesWithoutRepeatingFailures() async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let first = skill("first", root: root)
+        let second = skill("second", root: root)
+        try writeSkill(first)
+        try writeSkill(second)
+        let skills = SkillStore(seedSkills: [first])
+        let key = AutomaticClassificationTestKey()
+        var calls = 0
+        let data = try response()
+        let classifications = SkillClassificationStore(cacheURL: root.appendingPathComponent("cache.json")) { skill, content, _ in
+            calls += 1
+            if skill.name == "second" { throw SkillClassificationError.httpStatus(401) }
+            return try SkillClassificationService.parseClassification(data, skill: skill, content: content)
+        }
+        let automation = SkillClassificationAutomation(store: skills, classifications: classifications, apiKey: { key.value })
+        try await Task.sleep(for: .milliseconds(20))
+        #expect(calls == 0)
+        key.value = "fixture-key"
+        for _ in 0..<100 where calls < 1 { try await Task.sleep(for: .milliseconds(5)) }
+        try await waitForClassification(classifications)
+        #expect(calls == 1)
+        skills._seedForTesting([first, second])
+        for _ in 0..<100 where calls < 2 { try await Task.sleep(for: .milliseconds(5)) }
+        try await waitForClassification(classifications)
+        #expect(calls == 2)
+        #expect(classifications.hasClassificationFailure)
+        skills._seedForTesting([first, second])
+        try await Task.sleep(for: .milliseconds(30))
+        #expect(calls == 2)
+        withExtendedLifetime(automation) {}
+    }
+
     @Test func failurePreservesSuccessfulResultsAndAuthenticationFailureStopsBatch() async throws {
         let root = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -201,3 +236,7 @@ private final class RejectedTypeSafeRequest: URLProtocol, @unchecked Sendable {
     }
     override func stopLoading() {}
 }
+
+@MainActor
+@Observable
+private final class AutomaticClassificationTestKey { var value = "" }

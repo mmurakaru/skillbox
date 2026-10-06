@@ -83,7 +83,7 @@ final class SkillClassificationStore {
                         let current = try String(contentsOf: skill.skillFileURL, encoding: .utf8)
                         guard SkillClassificationService.contentDigest(current) == result.contentDigest else {
                             throw NSError(domain: "SkillClassificationStore", code: 1, userInfo: [
-                                NSLocalizedDescriptionKey: "\(skill.name) changed during classification. Run Classify again.",
+                                NSLocalizedDescriptionKey: "\(skill.name) changed during classification. Retry classification in Settings.",
                             ])
                         }
                         var updated = classifications

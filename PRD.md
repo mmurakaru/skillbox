@@ -132,7 +132,7 @@ No `ConfigManager` - replaced by `@AppStorage`.
 - Hover on row shows full description as tooltip (`.help()`).
 - Sidebar shows the visible item count, Settings, and Quit.
 
-Jev classifies skill definitions on request. Category and Activity filters combine with search. Results persist locally and become stale when a skill changes. See [the enhancement checklist](docs/skill-classification.md).
+Jev automatically classifies skill definitions on launch and when added or changed, when an API key is configured. Retry is available in Settings. Category and Activity filters combine with search. Results persist locally and become stale when a skill changes. See [the enhancement checklist](docs/skill-classification.md).
 
 ### 8.2 Search / Filter
 
