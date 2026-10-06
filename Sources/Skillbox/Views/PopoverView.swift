@@ -174,7 +174,7 @@ struct PopoverView: View {
             }
             Spacer()
             Text("\(activeCount)")
-                .font(.system(size: 10, design: .monospaced))
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .help("\(activeCount) visible items")
             Button(action: showSettings) {
