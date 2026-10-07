@@ -15,21 +15,6 @@ Skillbox treats `~/.agents/skills` as the canonical skill source of truth. Claud
 
 Installs, deletes, remote sync, and backup tooling operate on `.agents`; `.claude/skills` is the Claude-facing mount.
 
-## Features
-
-- Skills tab: browse, search, open, and trash skills under `~/.agents/skills/` by default; Skillbox keeps `~/.claude/skills/<skill>` mounted as symlinks for Claude Code compatibility.
-- Skills are automatically classified with Jev on launch and when added or changed. Combine Category and Activity filters with search. Save your TypeSafe API key in Settings. The key lives in macOS Keychain; classification results live in `~/Library/Application Support/Skillbox/classifications.json`. Saving a key enables sending SKILL.md contents to TypeSafe. Unchanged results are reused. Retry failed classification from Settings.
-- The + button installs remote skills from a repository or folder URL, with readable progress and completion messages. For one skill from a collection, paste its folder URL. Repository installs show every installed skill. Fresh downloads replace older canonical copies, which are preserved under `.skillbox-backups` before creating mounts.
-- Navigate with the left icon sidebar: package for Skills, brain for Memory, bolt for Hooks, lock for Env. Settings and Quit sit at the bottom.
-- Local file changes refresh automatically through debounced FSEvents notifications, including nested edits, atomic saves, and linked skill directories. There is no refresh timer or manual Refresh button.
-- Memory tab: browse Claude auto-memory entries (`~/.claude/projects/<project>/memory/*.md`) per project, with type badges and edit/delete.
-- Hooks tab: browse hooks across `~/.claude/settings.json` and per-project `.claude/settings.json` / `settings.local.json`, with scope filter and edit/delete.
-- Env tab: toggle individual env vars on/off without losing values (disabled vars stash in `~/.claude/skillbox-env-stash.json`); add new vars with autocomplete from a built-in catalog of well-known Claude Code env vars.
-- Settings → Agent tools → Insights (⌘I): generates and opens Claude's usage report, then stops the temporary background session.
-- Settings → Agent tools → Open AGENTS.md: opens `~/AGENTS.md`, the shared instruction file used across agent harnesses.
-- Toggle tabs with ⌘1 / ⌘2 / ⌘3 / ⌘4.
-- Auto-updates: powered by [Sparkle](https://sparkle-project.org). Skillbox checks `https://mmurakaru.github.io/skillbox/appcast.xml` every 24 hours and prompts when a new signed release is available. Manual check via Settings → Updates → "Check for Updates…".
-
 ## Install
 
 Grab the latest `Skillbox-vX.Y.Z.zip` from [Releases](https://github.com/mmurakaru/skillbox/releases), unzip, and drag `Skillbox.app` to `/Applications`.
@@ -55,19 +40,9 @@ Run tests with `swift test`.
 
 Render the installation progress UI for inspection with `SKILLBOX_RENDER_DIR=/tmp/skillbox-render swift test --filter SkillInstallTests/renderInstallProgressHarness`. This creates PNGs for downloading, installing, and completion states using the production SwiftUI view.
 
-## Architecture
-
-The app has three layers under `Sources/Skillbox/`:
-
-- **Models** - `Skill`, `Memory`, `Hook`, `EnvVar`. `FileBackedItemStore<Item>` is the generic single-root store powering `SkillStore` and `MemoryStore`; `HookStore` and `EnvVarStore` are bespoke because they aggregate from multiple `settings.json` files across scopes (and `EnvVarStore` also manages a private stash file for disabled values).
-- **Services** - leaf utilities (`SkillScanner`, `SkillsCLI`, `SkillRegistry`, `EditorLauncher`, `DirectoryWatcher`) and one deep module: `RemoteSkillService` owns the install / update / check-for-updates lifecycle behind a small interface. `Ports.swift` defines the protocols views talk to so tests can substitute in-memory adapters.
-- **Views** - SwiftUI views. `PopoverView` is the menu-bar entry point; sheets like `InstallFromURLSheet` and `RegistryView` route through a `SkillsTabRoute` enum.
-
-For the quickest tour of what the app does, read `Tests/SkillboxTests/AppTourTest.swift`.
-
 ## Release
 
-Releases are driven by [Changesets](https://github.com/changesets/changesets) + two GitHub Actions workflows. Day-to-day, the only thing a contributor does is **add a changeset to their PR**.
+Releases are driven by [Changesets](https://github.com/changesets/changesets) + two GitHub Actions workflows.
 
 ### Contributor flow
 
