@@ -1,6 +1,6 @@
 # One-time Skillbox setup (maintainer)
 
-Most of the project works out of the box. Ad-hoc signed releases work without an Apple Developer account. The key and Pages setup below enables automatic updates; without it, releases remain available for manual installation.
+Source releases work without an Apple Developer account or repository secrets. The setup below is optional and enables Sparkle updates when binary distribution is enabled.
 
 ## 1. Generate Sparkle EdDSA keys
 
@@ -60,16 +60,14 @@ Pick `skillbox`, choose a bump type, write a summary. Commit the resulting `.cha
 
 ---
 
-## How the pipeline runs end-to-end
+## Automatic releases
 
-1. PR ships with a changeset → merge to `main`.
-2. `.github/workflows/changesets.yml` opens a "Version Packages" PR that bumps `package.json` + `Info.plist.template` and rebuilds `CHANGELOG.md`.
-3. Maintainer merges the Version PR and pushes the `vX.Y.Z` tag at the merged commit.
-4. Tag push fires `.github/workflows/release.yml`:
-   - `make bundle` produces `Skillbox.app`
-   - Sparkle-signs the zip with `SPARKLE_ED_PRIVATE_KEY`
-   - `gh release create` uploads the signed zip
-   - `scripts/append-appcast.mjs` adds a new `<item>` to `docs/appcast.xml`
-   - Commits the appcast back to `main`
-5. Pages serves the new appcast within ~30 seconds.
-6. Installed apps see the new version on their next daily check, or via Settings → Updates → "Check for Updates…".
+The release workflow runs on pushes to `main`. It consumes pending changesets, updates `package.json`, the lockfile, `Info.plist.template`, and `CHANGELOG.md`, then commits the version and creates a `vX.Y.Z` tag and GitHub source release. There is no version PR or manual tagging step. Tags with a prerelease suffix publish as GitHub prereleases.
+
+The default release contains source archives. Users build with `make run` or `make install`; no signing secrets, Pages setup, or Apple Developer account are required.
+
+## Optional binary distribution
+
+Set the repository Actions variable `RELEASE_BINARIES` to `true` to enable the macOS bundle job. It uploads an ad-hoc signed zip to the same release. The Sparkle key setup above enables update signatures and appcast publishing; Sparkle signatures do not provide Apple code signing or notarization.
+
+A future Apple Developer account can add Developer ID signing and notarization to the binary job. The source release workflow does not depend on that account.

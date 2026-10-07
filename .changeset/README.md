@@ -16,17 +16,12 @@ The CLI will ask:
 
 The command writes a randomly-named `.md` file in this directory. Commit it as part of your PR.
 
-## What happens after merge
+## Automatic releases
 
-The `changesets` GitHub Action sees the new `.changeset/*.md` files on `main` and opens a "Version Packages" PR that:
+On pushes to `main`, `.github/workflows/release.yml` consumes pending changesets, updates the version and changelog, commits those changes, and publishes a tagged source release. No version PR or manual tag is required. Pushes without a version bump reuse the current release. Rerun the workflow to recover a failed release.
 
-- Bumps `package.json#version` according to the highest pending bump type
-- Runs `scripts/sync-version.mjs` to propagate the new version into `Sources/Skillbox/Resources/Info.plist.template` (`CFBundleShortVersionString`) and increment `CFBundleVersion`
-- Regenerates `CHANGELOG.md` from the changeset summaries
-- Deletes the consumed `.changeset/*.md` files
+Binary releases are opt-in. See [SETUP.md](../SETUP.md) for signing and update configuration.
 
-When that PR is merged, the same action tags the new commit `vX.Y.Z`, which triggers `.github/workflows/release.yml` to build, Sparkle-sign, and publish the release + appcast.
+## Why a Swift app has package.json
 
-## Why we have a `package.json` for a Swift app
-
-Changesets is npm-native, and the official `changesets/action` GitHub Action expects a `package.json`. We don't publish to npm (`"access": "restricted"`). The Node devDependency lets us reuse the canonical changesets workflow rather than reinvent it in Swift.
+Changesets uses `package.json` for versioning. Skillbox is private and never published to npm.

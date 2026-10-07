@@ -2,21 +2,84 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+# Serialize version commits and appcast updates without cancelling a release.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-main
   cancel-in-progress: false
 
 jobs:
+  publish-source:
+    name: Version, tag, and publish source
+    runs-on: ubuntu-latest
+    if: github.repository == 'mmurakaru/skillbox' && github.ref == 'refs/heads/main'
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Version pending changesets
+        run: |
+          npx changeset status --output "$RUNNER_TEMP/changeset-status.json"
+          if node -e 'process.exit(JSON.parse(require("fs").readFileSync(process.argv[1])).releases.length ? 0 : 1)' "$RUNNER_TEMP/changeset-status.json"; then
+            npm run version-bump
+            npm install --package-lock-only --ignore-scripts
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .changeset package.json package-lock.json CHANGELOG.md Sources/Skillbox/Resources/Info.plist.template
+            git commit -m "chore: release v$(node -p 'require("./package.json").version')"
+            # A concurrent main push rejects this commit; never overwrite it.
+            git push origin HEAD:main
+          fi
+
+      - name: Tag and publish source release
+        id: release
+        run: |
+          TAG="v$(node -p 'require("./package.json").version')"
+          if ! git show-ref --verify --quiet "refs/tags/$TAG"; then
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Release $TAG already exists."
+            exit 0
+          fi
+          FLAGS=()
+          if [[ "$TAG" == *-* ]]; then
+            FLAGS+=(--prerelease)
+          fi
+          # shellcheck disable=SC2016
+          printf '%s\n' 'Build from source with macOS 26+ and Swift 6.2. Download a source archive below, then run `make run` or `make install`. No Apple Developer account is required. Local builds are ad-hoc signed.' > "$RUNNER_TEMP/release-notes.md"
+          gh release create "$TAG" "${FLAGS[@]}" --verify-tag --title "$TAG" \
+            --generate-notes --notes-file "$RUNNER_TEMP/release-notes.md"
+
   build-and-release:
     name: Build, sign, and publish
     runs-on: macos-26
-    if: github.repository == 'mmurakaru/skillbox'
+    needs: publish-source
+    if: vars.RELEASE_BINARIES == 'true'
     env:
       SPARKLE_VERSION: "2.10.0"
       SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
@@ -24,6 +87,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          ref: ${{ needs.publish-source.outputs.tag }}
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -32,17 +96,13 @@ jobs:
 
       - name: Resolve version + zip name
         id: meta
+        env:
+          RELEASE_TAG: ${{ needs.publish-source.outputs.tag }}
         run: |
-          TAG="${GITHUB_REF##*/}"
+          TAG="$RELEASE_TAG"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           ZIP="Skillbox-$TAG.zip"
           echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
-          # Pre-release if tag has a pre-release suffix (e.g. -beta.1, -rc.2).
-          if [[ "$TAG" =~ -[a-zA-Z] ]]; then
-            echo "prerelease=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Zip the bundle
         run: ditto -c -k --keepParent Skillbox.app "${{ steps.meta.outputs.zip }}"
@@ -65,44 +125,32 @@ jobs:
           fi
           SIG_LINE=$(echo "$SPARKLE_ED_PRIVATE_KEY" | .sparkle/bin/sign_update --ed-key-file - "${{ steps.meta.outputs.zip }}")
           # sign_update prints: sparkle:edSignature="..." length="..."
-          echo "ed_line<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$SIG_LINE" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          {
+            echo "ed_line<<EOF"
+            echo "$SIG_LINE"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: Create GitHub Release
+      - name: Upload binary to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          FLAGS=()
-          if [ "${{ steps.meta.outputs.prerelease }}" = "true" ]; then
-            FLAGS+=(--prerelease)
-          fi
-          if [ -z "$SPARKLE_ED_PRIVATE_KEY" ]; then
-            printf '%s\n' 'This build is ad-hoc signed and not notarized. No Apple Developer account is required to build from source. Sparkle update signing is not configured, so download and install updates manually.' > /tmp/release-notes.md
-            FLAGS+=(--notes-file /tmp/release-notes.md)
-          fi
-          gh release create "${{ steps.meta.outputs.tag }}" "${FLAGS[@]}" \
-            --verify-tag \
-            --title "${{ steps.meta.outputs.tag }}" \
-            --generate-notes \
-            "${{ steps.meta.outputs.zip }}"
+          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
+          RELEASE_ZIP: ${{ steps.meta.outputs.zip }}
+        run: gh release upload "$RELEASE_TAG" "$RELEASE_ZIP" --clobber
 
-      - name: Regenerate appcast.xml
+      - name: Commit appcast back to main
         if: steps.sign.outcome == 'success'
         env:
           ZIP: ${{ steps.meta.outputs.zip }}
           TAG: ${{ steps.meta.outputs.tag }}
           ED_LINE: ${{ steps.sign.outputs.ed_line }}
         run: |
-          node scripts/append-appcast.mjs
-
-      - name: Commit appcast back to main
-        if: steps.sign.outcome == 'success'
-        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout main
-          git pull --ff-only
+          git pull --ff-only origin main
+          node scripts/append-appcast.mjs
+
           git add docs/appcast.xml
           if git diff --cached --quiet; then
             echo "appcast.xml unchanged; skipping commit."

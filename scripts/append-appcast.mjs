@@ -70,6 +70,12 @@ const itemXML = `        <item>
 const appcastPath = resolve(repoRoot, "docs/appcast.xml");
 const existing = readFileSync(appcastPath, "utf8");
 
+// Workflow reruns must not advertise the same release twice.
+if (existing.includes(`url="${releaseURL}"`)) {
+  console.log(`[append-appcast] ${tag} already exists; skipping`);
+  process.exit(0);
+}
+
 // Insert the new item right after the opening <channel>'s metadata block,
 // before any existing <item>. If no <item> exists yet, insert before </channel>.
 let updated;
