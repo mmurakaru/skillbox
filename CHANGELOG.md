@@ -1,5 +1,11 @@
 # skillbox
 
+## 0.4.1
+
+### Patch Changes
+
+- [`121abd8`](https://github.com/mmurakaru/skillbox/commit/121abd82dfb49998d23c63cab68af95f7a1ab79f) Thanks [@mmurakaru](https://github.com/mmurakaru)! - Publish source releases automatically on main, without a manual version PR or tag. Keep binary releases optional and simplify source installation instructions.
+
 ## 0.4.0
 
 ### Minor Changes
