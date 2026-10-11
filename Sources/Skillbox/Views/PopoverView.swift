@@ -6,6 +6,7 @@ enum AppTab: String, CaseIterable, Identifiable {
     case memory
     case hooks
     case env
+    case usage
 
     var id: String { rawValue }
 
@@ -15,6 +16,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .memory: "Memory"
         case .hooks: "Hooks"
         case .env: "Env"
+        case .usage: "Usage"
         }
     }
 
@@ -24,6 +26,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .memory: "brain"
         case .hooks: "bolt"
         case .env: "lock"
+        case .usage: "chart.bar"
         }
     }
 }
@@ -160,6 +163,7 @@ struct PopoverView: View {
                     case .memory: memoryBody
                     case .hooks: hooksBody
                     case .env: envBody
+                    case .usage: UsageOverviewView()
                     }
                 }
             }
@@ -176,7 +180,7 @@ struct PopoverView: View {
             Text("\(activeCount)")
                 .font(.system(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.secondary)
-                .help("\(activeCount) visible items")
+                .help(activeTab == .usage ? "3 providers" : "\(activeCount) visible items")
             Button(action: showSettings) {
                 Image(systemName: "gearshape").frame(width: 36, height: 32)
             }
@@ -435,6 +439,8 @@ struct PopoverView: View {
                 .keyboardShortcut("3", modifiers: .command)
             Button("") { activeTabRaw = AppTab.env.rawValue }
                 .keyboardShortcut("4", modifiers: .command)
+            Button("") { activeTabRaw = AppTab.usage.rawValue }
+                .keyboardShortcut("5", modifiers: .command)
         }
         .opacity(0)
         .frame(width: 0, height: 0)
@@ -447,6 +453,7 @@ struct PopoverView: View {
         case .memory: memoryStore.filteredMemories.count
         case .hooks: hookStore.filteredHooks.count
         case .env: envStore.filteredEnvVars.count
+        case .usage: UsageProvider.allCases.count
         }
     }
 

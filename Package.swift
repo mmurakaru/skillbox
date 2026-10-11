@@ -21,7 +21,8 @@ let package = Package(
                 .product(name: "Sparkle", package: "Sparkle"),
             ],
             path: "Sources/Skillbox",
-            exclude: ["Resources/Info.plist.template", "Resources/AppIcon.svg"]
+            exclude: ["Resources/Info.plist.template", "Resources/AppIcon.svg"],
+            resources: [.copy("Resources/ProviderLogos")]
         ),
         .testTarget(
             name: "SkillboxTests",
