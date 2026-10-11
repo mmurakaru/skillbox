@@ -100,7 +100,7 @@ struct PopoverView: View {
                 )
             }
         }
-        .frame(width: activeTab == .usage ? 530 : 410, height: activeTab == .usage ? 640 : 480)
+        .frame(width: 410, height: 480)
         .task {
             migrateLegacySkillsRootIfNeeded()
             store.configure(rootPath: skillsRootPath)

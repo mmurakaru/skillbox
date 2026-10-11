@@ -9,13 +9,14 @@ if arguments.count == 4, arguments[1] == "type", let pid = Int32(arguments[2]) {
     let source = CGEventSource(stateID: .hidSystemState)
     for down in [true, false] {
         guard let event = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: down) else { exit(4) }
-        event.flags = .maskCommand
+        event.flags = down ? .maskCommand : []
         event.postToPid(pid)
     }
     usleep(50_000)
     let text = Array(arguments[3].utf16)
     for down in [true, false] {
         guard let event = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: down) else { exit(4) }
+        event.flags = []
         text.withUnsafeBufferPointer { buffer in
             event.keyboardSetUnicodeString(stringLength: buffer.count, unicodeString: buffer.baseAddress)
         }
@@ -42,6 +43,7 @@ let point = CGPoint(x: x, y: y)
 let source = CGEventSource(stateID: .hidSystemState)
 for type in [CGEventType.mouseMoved, .leftMouseDown, .leftMouseUp] {
     guard let event = CGEvent(mouseEventSource: source, mouseType: type, mouseCursorPosition: point, mouseButton: .left) else { exit(4) }
+    event.flags = []
     event.setIntegerValueField(.mouseEventClickState, value: 1)
     event.post(tap: .cghidEventTap)
     usleep(50_000)

@@ -22,7 +22,7 @@ import Foundation
     }
     var body: some Scene {
         MenuBarExtra("Skillbox Usage QA", systemImage: "testtube.2") {
-            UsageOverviewView().environment(store).frame(width: 530, height: 640)
+            UsageOverviewView().environment(store).frame(width: 360, height: 480)
                 .task { store.startAutoRefresh(interval: .seconds(2)) }
         }
         .menuBarExtraStyle(.window)

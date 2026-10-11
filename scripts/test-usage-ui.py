@@ -2,6 +2,7 @@
 """Native macOS click/focus tests using production views and isolated, offline fixtures."""
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -60,13 +61,26 @@ repeat with candidate in allElements
         end if
     end try
 end repeat
+if targetElement is missing value then
+    repeat with candidate in (entire contents of {window})
+        try
+            if value of attribute "AXIdentifier" of candidate is "{identifier}" then
+                set targetElement to candidate
+                exit repeat
+            end if
+        end try
+    end repeat
+end if
 if targetElement is missing value then error "Missing accessibility element: {identifier}"
 '''
 
 
 def click(identifier, window='window 1'):
+    if window == "window 1":
+        open_usage()
     # Keep the owned harness in front before native events; never send typing globally.
     ui('set frontmost to true')
+    time.sleep(0.15)
     # Actual mouse events expose focus/dismissal bugs that AXPress alone can miss.
     coordinates = ui(element(identifier, window) + '''set p to position of targetElement
 set s to size of targetElement
@@ -79,16 +93,20 @@ def native_click(coordinates):
     subprocess.run([str(Path(sys.argv[1]).resolve().parent / "native-ui-click"), x, y], check=True)
 
 
+def usage_is_visible():
+    state = json.loads((Path(sys.argv[1]).resolve().parent / "window-state.json").read_text())
+    return any(w["visible"] == "true" and w["title"] == "" and 0 < int(w["number"]) < 2**32 for w in state["windows"])
+
+
 def open_usage():
-    # AXPress can open a status item even when a menu bar organizer has hidden its icon.
-    ui('click menu bar item 1 of menu bar 2')
-    def visible_popover():
-        state = json.loads((Path(sys.argv[1]).resolve().parent / "window-state.json").read_text())
-        return any(w["visible"] == "true" and w["title"] == "" and 0 < int(w["number"]) < 2**32 for w in state["windows"])
-    wait_for(visible_popover, "Usage popover did not open visibly")
+    # Menu bar windows may dismiss while the driver waits; reopening must preserve stored state.
+    if not usage_is_visible():
+        ui('click menu bar item 1 of menu bar 2')
+    wait_for(usage_is_visible, "Usage popover did not open visibly")
 
 
 def percent():
+    open_usage()
     return ui('get value of first static text of scroll area 1 of group 1 of window 1 whose value ends with "% used"')
 
 
@@ -110,10 +128,13 @@ def main():
     app_log = (output / "app.log").open("w")
     state_path = output / "window-state.json"
     state_path.unlink(missing_ok=True)
-    environment = dict(os.environ, SKILLBOX_UI_HARNESS_STATE=str(state_path))
-    process = subprocess.Popen([str(app / "Contents/MacOS" / APP), "-ApplePersistenceIgnoreState", "YES"], stdout=app_log, stderr=app_log, env=environment)
+    harness_pid = None
+    process = subprocess.Popen(["open", "-W", "-n", "-a", str(app), "--stdout", str(output / "app.log"), "--stderr", str(output / "app.log"),
+                                "--env", "SKILLBOX_UI_HARNESS_STATE=" + str(state_path), "--args", "-ApplePersistenceIgnoreState", "YES"])
     try:
         wait_for(lambda: apple(f'tell application "System Events" to exists process "{APP}"') == "true", "Harness did not launch")
+        harness_pid = int(ui("get unix id"))
+        wait_for(lambda: state_path.exists(), "Native window reporter did not start")
         open_usage()
         wait_for(lambda: "codex@example.com" in ui('get entire contents of window 1'), "Fixture usage did not load")
         content = ui('get entire contents of window 1')
@@ -123,7 +144,7 @@ def main():
         check("Dashboard" not in content, "Usage contains no dashboard links")
         # Scheduling is covered with a controlled clock in ProviderUsageRefreshTests.
         # The click harness focuses on editor lifetime and actual input delivery.
-        ui(element("usage-codex-edit") + "click targetElement")
+        wait_for(lambda: ui(element("usage-codex-edit") + "click targetElement") or True, "Codex editor action did not become available")
         window = 'window "Usage snapshot"'
         wait_for(lambda: ui(f'exists {window}') == "true", "Usage editor did not open")
         wait_for(lambda: ui('get name of (value of attribute "AXFocusedWindow")') == "Usage snapshot", "Editor did not become the focused window", timeout=3)
@@ -131,14 +152,14 @@ def main():
         for identifier in ["usage-editor-email", "usage-editor-plan", "usage-editor-price", "usage-editor-renewal"]:
             click(identifier, window)
             check(ui(element(identifier, window) + 'get value of attribute "AXFocused" of targetElement') == "true", f"{identifier} receives mouse focus")
-            subprocess.run([str(output / "native-ui-click"), "type", str(process.pid), "focus-test"], check=True)
+            subprocess.run([str(output / "native-ui-click"), "type", str(harness_pid), "focus-test"], check=True)
             check(ui(f'exists {window}') == "true", f"Mouse click and typing keep {identifier} open")
             check(ui(element(identifier, window) + 'get value of targetElement') == "focus-test", f"{identifier} accepts keyboard input")
         ui(f'click checkbox 1 of scroll area 1 of group 1 of {window}')
         check(ui(f'exists {window}') == "true", "Reset checkbox keeps editor open")
         # Open a real native picker menu, the other common popover-focus failure.
         ui(f'click pop up button 1 of scroll area 1 of group 1 of {window}')
-        subprocess.run([str(output / "native-ui-click"), "escape", str(process.pid)], check=True)
+        subprocess.run([str(output / "native-ui-click"), "escape", str(harness_pid)], check=True)
         check(ui(f'exists {window}') == "true", "Native picker menu keeps editor open")
         screenshot(output / "usage-editor.png", window)
         click("usage-editor-cancel", window)
@@ -168,7 +189,11 @@ def main():
         except Exception:
             pass
     finally:
-        process.terminate()
+        if harness_pid:
+            try:
+                os.kill(harness_pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
         try:
             process.wait(timeout=5)
         except subprocess.TimeoutExpired:

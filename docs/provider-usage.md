@@ -3,6 +3,7 @@
 ## Implementation checklist
 
 - [x] Add a Usage tab with stacked Codex, Grok, and Claude Code cards.
+- [x] Keep the menu bar window at the same size across tabs.
 - [x] Bundle local white provider marks with attribution.
 - [x] Read provider usage from existing CLI sign-ins.
 - [x] Show the connected account email and reported plan.
