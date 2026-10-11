@@ -129,7 +129,7 @@ private struct ProviderUsageCard: View {
                     .accessibilityIdentifier("usage-\(provider.rawValue)-refresh")
                 Button(snapshot == nil ? "Add snapshot" : "Edit", action: onEdit)
                     .accessibilityIdentifier("usage-\(provider.rawValue)-edit")
-                if provider == .claude, snapshot == nil {
+                if provider == .claude, snapshot == nil || error != nil {
                     Button("Connect Claude Code", action: onUseLive).disabled(isRefreshing)
                 }
             }
