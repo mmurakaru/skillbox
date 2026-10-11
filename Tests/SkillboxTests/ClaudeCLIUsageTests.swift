@@ -48,7 +48,7 @@ struct ClaudeCLIUsageTests {
             .init(provider: .claude, plan: "Team", windows: [.init(label: "Weekly limit", usedPercent: 75, resetsAt: nil)], updatedAt: Date(), source: .live, accountEmail: "work@example.com")
         }, claudeCredentialsReader: { _ in
             Issue.record("The CLI connection must not request foreign Keychain access")
-            return [:]
+            return .init(values: [:], source: .file)
         })
         let snapshot = try await service.fetchUsage(for: .claude)
         #expect(snapshot.plan == "Team")

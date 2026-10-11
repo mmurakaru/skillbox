@@ -29,7 +29,7 @@ def wait_for(check, message, timeout=10):
             result = check()
             if result:
                 return result
-        except RuntimeError:
+        except (RuntimeError, OSError, json.JSONDecodeError):
             pass
         time.sleep(0.1)
     raise AssertionError(message)
@@ -65,6 +65,8 @@ if targetElement is missing value then error "Missing accessibility element: {id
 
 
 def click(identifier, window='window 1'):
+    # Keep the owned harness in front before native events; never send typing globally.
+    ui('set frontmost to true')
     # Actual mouse events expose focus/dismissal bugs that AXPress alone can miss.
     coordinates = ui(element(identifier, window) + '''set p to position of targetElement
 set s to size of targetElement
@@ -80,7 +82,10 @@ def native_click(coordinates):
 def open_usage():
     # AXPress can open a status item even when a menu bar organizer has hidden its icon.
     ui('click menu bar item 1 of menu bar 2')
-    wait_for(lambda: int(ui('count windows')) > 0, "Usage popover did not open")
+    def visible_popover():
+        state = json.loads((Path(sys.argv[1]).resolve().parent / "window-state.json").read_text())
+        return any(w["visible"] == "true" and w["title"] == "" and 0 < int(w["number"]) < 2**32 for w in state["windows"])
+    wait_for(visible_popover, "Usage popover did not open visibly")
 
 
 def percent():
@@ -126,15 +131,14 @@ def main():
         for identifier in ["usage-editor-email", "usage-editor-plan", "usage-editor-price", "usage-editor-renewal"]:
             click(identifier, window)
             check(ui(element(identifier, window) + 'get value of attribute "AXFocused" of targetElement') == "true", f"{identifier} receives mouse focus")
-            ui('keystroke "a" using command down')
-            ui('keystroke "focus-test"')
+            subprocess.run([str(output / "native-ui-click"), "type", str(process.pid), "focus-test"], check=True)
             check(ui(f'exists {window}') == "true", f"Mouse click and typing keep {identifier} open")
             check(ui(element(identifier, window) + 'get value of targetElement') == "focus-test", f"{identifier} accepts keyboard input")
         ui(f'click checkbox 1 of scroll area 1 of group 1 of {window}')
         check(ui(f'exists {window}') == "true", "Reset checkbox keeps editor open")
         # Open a real native picker menu, the other common popover-focus failure.
         ui(f'click pop up button 1 of scroll area 1 of group 1 of {window}')
-        ui('key code 53')
+        subprocess.run([str(output / "native-ui-click"), "escape", str(process.pid)], check=True)
         check(ui(f'exists {window}') == "true", "Native picker menu keeps editor open")
         screenshot(output / "usage-editor.png", window)
         click("usage-editor-cancel", window)

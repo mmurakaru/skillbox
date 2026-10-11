@@ -105,7 +105,7 @@ struct ProviderUsageConnectionTests {
         }
         let service = ProviderUsageService(session: session, claudeCLIReader: nil, claudeCredentialsReader: { allowPrompt in
             #expect(!allowPrompt)
-            return ["claudeAiOauth": ["accessToken": "fixture-access-token", "subscriptionType": "pro"]]
+            return .init(values: ["claudeAiOauth": ["accessToken": "fixture-access-token", "subscriptionType": "pro"]], source: .keychain)
         })
         let snapshot = try await service.fetchUsage(for: .claude)
         #expect(snapshot.accountEmail == email)
@@ -126,13 +126,44 @@ struct ProviderUsageConnectionTests {
             return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, data)
         }
         let service = ProviderUsageService(session: session, claudeCLIReader: nil, claudeCredentialsReader: { allowPrompt in
-            // The second, automatic read must use memory, not call this reader again.
-            #expect(allowPrompt)
-            return ["claudeAiOauth": ["accessToken": "fixture-access-token", "subscriptionType": "pro"]]
+            if !allowPrompt { throw UsageFetchError.claudeKeychainPermissionRequired }
+            return .init(values: ["claudeAiOauth": ["accessToken": "fixture-access-token", "subscriptionType": "pro"]], source: .keychain)
         })
         _ = try await service.fetchUsage(for: .claude, allowKeychainPrompt: true)
         let automatic = try await service.fetchUsage(for: .claude)
         #expect(automatic.accountEmail == "connected@example.com")
+    }
+
+    @Test func claudeFileFallbackRechecksActiveAccount() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("ClaudeAccountFixture-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let path = directory.appendingPathComponent(".credentials.json")
+        func writeCredentials(_ token: String) throws {
+            try JSONSerialization.data(withJSONObject: ["claudeAiOauth": ["accessToken": token, "subscriptionType": "pro"]]).write(to: path)
+        }
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [UsageFixtureURLProtocol.self]
+        let session = URLSession(configuration: config)
+        defer { session.invalidateAndCancel(); UsageFixtureURLProtocol.handler = nil }
+        UsageFixtureURLProtocol.handler = { request in
+            let email = request.value(forHTTPHeaderField: "Authorization") == "Bearer personal-fixture" ? "personal@example.com" : "work@example.com"
+            let data = request.url?.path == "/api/oauth/profile"
+                ? try JSONSerialization.data(withJSONObject: ["account": ["email": email]])
+                : Data(#"{"seven_day":{"utilization":3}}"#.utf8)
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, data)
+        }
+        let service = ProviderUsageService(session: session, claudeCLIReader: nil, claudeCredentialsReader: { allowPrompt in
+            try ClaudeUsageCredentials.readCredentials(defaultHome: directory.path, allowPrompt: allowPrompt)
+        })
+        try writeCredentials("personal-fixture")
+        #expect(try await service.fetchUsage(for: .claude).accountEmail == "personal@example.com")
+        try writeCredentials("work-fixture")
+        #expect(try await service.fetchUsage(for: .claude).accountEmail == "work@example.com")
+        try FileManager.default.removeItem(at: path)
+        await #expect(throws: (any Error).self) { try await service.fetchUsage(for: .claude) }
+        try Data("invalid".utf8).write(to: path)
+        await #expect(throws: (any Error).self) { try await service.fetchUsage(for: .claude) }
     }
 
     @Test func failedProfileDoesNotHideQuotaOrInventAccountIdentity() async throws {
@@ -146,7 +177,7 @@ struct ProviderUsageConnectionTests {
                     Data(#"{"seven_day":{"utilization":3}}"#.utf8))
         }
         let service = ProviderUsageService(session: session, claudeCLIReader: nil, claudeCredentialsReader: { _ in
-            ["claudeAiOauth": ["accessToken": "fixture-access-token", "subscriptionType": "max"]]
+             .init(values: ["claudeAiOauth": ["accessToken": "fixture-access-token", "subscriptionType": "max"]], source: .file)
         })
         let snapshot = try await service.fetchUsage(for: .claude)
         #expect(snapshot.accountEmail == nil)

@@ -8,14 +8,14 @@ protocol ProviderUsageFetching: Sendable {
 
 /// Reads existing CLI sign-ins and sends credentials only to the matching provider endpoint.
 actor ProviderUsageService: ProviderUsageFetching {
-    private var cachedClaudeCredentials: [String: Any]?
+    private var cachedClaudeCredentials: ClaudeUsageCredentials.ReadResult?
     private let session: URLSession
     private let claudeCLIReader: (@Sendable () async throws -> ProviderUsageSnapshot?)?
-    private let claudeCredentialsReader: @Sendable (Bool) throws -> [String: Any]
+    private let claudeCredentialsReader: @Sendable (Bool) throws -> ClaudeUsageCredentials.ReadResult
     private let grokCredentialsReader: @Sendable () throws -> GrokUsageCredentials
     init(session: URLSession? = nil,
          claudeCLIReader: (@Sendable () async throws -> ProviderUsageSnapshot?)? = { try await ClaudeCLIUsageReader.fetchInstalledCLIUsage() },
-         claudeCredentialsReader: @escaping @Sendable (Bool) throws -> [String: Any] = { try ClaudeUsageCredentials.loadCredentials(allowPrompt: $0) },
+         claudeCredentialsReader: @escaping @Sendable (Bool) throws -> ClaudeUsageCredentials.ReadResult = { try ClaudeUsageCredentials.readCredentials(allowPrompt: $0) },
          grokCredentialsReader: @escaping @Sendable () throws -> GrokUsageCredentials = { try GrokUsageCredentials.load() }) {
         self.claudeCredentialsReader = claudeCredentialsReader
         self.grokCredentialsReader = grokCredentialsReader
@@ -32,6 +32,7 @@ actor ProviderUsageService: ProviderUsageFetching {
         }
         let credentials: [String: Any]
         let token: String
+        var claudeRead: ClaudeUsageCredentials.ReadResult?
         var accountEmail: String?
         var request: URLRequest
         switch provider {
@@ -59,10 +60,14 @@ actor ProviderUsageService: ProviderUsageFetching {
             request.setValue("codex-cli", forHTTPHeaderField: "User-Agent")
         case .claude:
             if !allowKeychainPrompt, let cachedClaudeCredentials {
-                credentials = cachedClaudeCredentials
+                do { claudeRead = try claudeCredentialsReader(false) }
+                catch UsageFetchError.claudeKeychainPermissionRequired { claudeRead = cachedClaudeCredentials }
             } else {
-                credentials = try claudeCredentialsReader(allowKeychainPrompt)
+                claudeRead = try claudeCredentialsReader(allowKeychainPrompt)
             }
+            guard let read = claudeRead else { throw UsageFetchError.invalidResponse }
+            if read.source == .file { cachedClaudeCredentials = nil }
+            credentials = read.values
             guard let oauth = credentials["claudeAiOauth"] as? [String: Any],
                   let accessToken = oauth["accessToken"] as? String, !accessToken.isEmpty else {
                 throw UsageFetchError.unavailable("Sign in with Claude Code, then refresh usage.")
@@ -101,7 +106,7 @@ actor ProviderUsageService: ProviderUsageFetching {
             }
         }
         if provider == .claude, let oauth = credentials["claudeAiOauth"] as? [String: Any] {
-            cachedClaudeCredentials = credentials
+            cachedClaudeCredentials = claudeRead?.source == .keychain ? claudeRead : nil
             snapshot.plan = ProviderUsageIdentity.planLabel(oauth["subscriptionType"] as? String)
             // Profile and usage use the same captured token even if the CLI switches accounts mid-request.
             var profileRequest = URLRequest(url: URL(string: "https://api.anthropic.com/api/oauth/profile")!)
@@ -180,8 +185,7 @@ actor ProviderUsageService: ProviderUsageFetching {
             if let start, let end, (6...8).contains(end.timeIntervalSince(start) / 86400) { label = "Weekly limit" }
             else if let start, let end, (27...32).contains(end.timeIntervalSince(start) / 86400) { label = "Monthly limit" }
             else { label = "Subscription credits limit" }
-            // The official CLI treats an omitted percentage as zero in unified credits responses.
-            // Require the unified-billing marker; older or malformed payloads remain unknown.
+            // Grok omits zero usage in unified billing; other missing percentages remain unknown.
             let percent = validUsagePercent(config["creditUsagePercent"])
                 ?? (config["creditUsagePercent"] == nil && config["isUnifiedBillingUser"] as? Bool == true ? 0 : nil)
             windows.append(.init(label: label, usedPercent: percent, resetsAt: end))
@@ -224,10 +228,12 @@ actor ProviderUsageService: ProviderUsageFetching {
 enum UsageFetchError: LocalizedError {
     case unavailable(String)
     case invalidResponse
+    case claudeKeychainPermissionRequired
     var errorDescription: String? {
         switch self {
         case .unavailable(let message): message
         case .invalidResponse: "The provider returned an unreadable usage response."
+        case .claudeKeychainPermissionRequired: "Click Connect Claude Code to use your current sign-in. Automatic refresh does not access Claude Code's Keychain entry."
         }
     }
 }
