@@ -1,5 +1,11 @@
 # skillbox
 
+## 0.5.0
+
+### Minor Changes
+
+- [#12](https://github.com/mmurakaru/skillbox/pull/12) [`950aeb0`](https://github.com/mmurakaru/skillbox/commit/950aeb075f9dd2f529295e4ef7b7eb68d258855e) Thanks [@mmurakaru](https://github.com/mmurakaru)! - Add a Usage tab with live Codex, Grok, and Claude Code quota cards, account and plan labels, periodic refresh, and persistent manual snapshots. Open snapshot editors in independent windows and suppress automatic Keychain permission dialogs.
+
 ## 0.4.1
 
 ### Patch Changes
