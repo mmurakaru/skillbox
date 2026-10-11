@@ -46,6 +46,9 @@ struct SettingsView: View {
                 SecureField("TypeSafe API key", text: $typeSafeAPIKey)
                     .textFieldStyle(.roundedBorder)
                 HStack {
+                    if typeSafeSettings.needsUnlock {
+                        Button("Unlock saved key") { typeSafeSettings.unlockSavedAPIKey() }
+                    }
                     Button("Save key") { typeSafeSettings.saveAPIKey(typeSafeAPIKey) }
                         .disabled(typeSafeAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     if !typeSafeSettings.apiKey.isEmpty {
@@ -57,7 +60,7 @@ struct SettingsView: View {
                     Spacer()
                     Link("Get an API key", destination: URL(string: "https://console.typesafe.ai")!)
                 }
-                Text(typeSafeSettings.apiKey.isEmpty ? "No API key saved." : "API key saved in macOS Keychain.")
+                Text(typeSafeSettings.needsUnlock ? "Saved key is locked for this build." : typeSafeSettings.apiKey.isEmpty ? "No API key saved." : "API key saved in macOS Keychain.")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 Text("Skills are classified automatically on launch and when added or changed. Their SKILL.md contents are sent to TypeSafe; unchanged results are reused.")

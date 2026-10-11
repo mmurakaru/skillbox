@@ -3,6 +3,7 @@ import Sparkle
 
 @main
 struct SkillboxApp: App {
+    @State private var usageStore: ProviderUsageStore
     @State private var store: SkillStore
     @State private var memoryStore = MemoryStore()
     @State private var hookStore = HookStore()
@@ -18,6 +19,8 @@ struct SkillboxApp: App {
     private let updaterController: SPUStandardUpdaterController
 
     init() {
+        let usageStore = ProviderUsageStore()
+        self._usageStore = State(initialValue: usageStore)
         let store = SkillStore()
         let classifications = SkillClassificationStore()
         let credentials = TypeSafeSettings()
@@ -50,6 +53,8 @@ struct SkillboxApp: App {
     var body: some Scene {
         MenuBarExtra {
             PopoverView()
+                .environment(usageStore)
+                .task { usageStore.startAutoRefresh() }
                 .environment(store)
                 .environment(memoryStore)
                 .environment(hookStore)
@@ -65,6 +70,8 @@ struct SkillboxApp: App {
             Image(nsImage: MenuBarIcon.nsImage)
         }
         .menuBarExtraStyle(.window)
+
+        UsageSnapshotScene(store: usageStore)
 
         Settings {
             SettingsView()

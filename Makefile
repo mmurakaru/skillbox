@@ -7,7 +7,7 @@ FRAMEWORKS_DIR = $(BUNDLE)/Contents/Frameworks
 SPARKLE_DST    = $(FRAMEWORKS_DIR)/Sparkle.framework
 SIGN_IDENTITY  = -
 
-.PHONY: build bundle run install clean
+.PHONY: build bundle run install clean test test-ui
 
 build:
 	swift build -c release
@@ -16,6 +16,7 @@ bundle: build
 	rm -rf $(BUNDLE)
 	mkdir -p $(BUNDLE)/Contents/MacOS $(BUNDLE)/Contents/Resources $(FRAMEWORKS_DIR)
 	cp $(BIN_DIR)/$(APP_NAME) $(BUNDLE)/Contents/MacOS/
+	cp -R $(BIN_DIR)/Skillbox_Skillbox.bundle $(BUNDLE)/Contents/Resources/
 	cp Sources/Skillbox/Resources/Info.plist.template $(BUNDLE)/Contents/Info.plist
 	@# SPM links with rpath=@loader_path; add @executable_path/../Frameworks
 	@# so dyld finds Sparkle.framework after we move it into Contents/Frameworks.
@@ -46,3 +47,9 @@ run: bundle
 
 clean:
 	rm -rf .build $(BUNDLE)
+
+test:
+	swift test
+
+test-ui:
+	scripts/test-usage-ui.sh
