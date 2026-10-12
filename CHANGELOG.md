@@ -1,5 +1,15 @@
 # skillbox
 
+## 0.6.0
+
+### Minor Changes
+
+- [#20](https://github.com/mmurakaru/skillbox/pull/20) [`ca6329e`](https://github.com/mmurakaru/skillbox/commit/ca6329ec099b5127a295fdc7dfe16a7df5c3b5d9) Thanks [@mmurakaru](https://github.com/mmurakaru)! - Recognize secrets in the Env tab by name or an explicit mark. Mask their values with reveal and copy actions, use secure entry, refuse the shared project scope, and remove a disabled secret's value instead of stashing it in plaintext.
+
+### Patch Changes
+
+- [#22](https://github.com/mmurakaru/skillbox/pull/22) [`3bc05e5`](https://github.com/mmurakaru/skillbox/commit/3bc05e5eccd462e73187ceac65304c58f897c4ff) Thanks [@mmurakaru](https://github.com/mmurakaru)! - Describe Skillbox as a toolbox for AI coding agents, and add a header to every sidebar tab that names the harness it applies to.
+
 ## 0.5.0
 
 ### Minor Changes
