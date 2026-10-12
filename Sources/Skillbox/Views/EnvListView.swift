@@ -14,6 +14,7 @@ struct EnvListView: View {
     @State private var showingAddSheet = false
     /// Row awaiting confirmation before an enabled secret is disabled (its value is removed).
     @State private var secretDisableConfirmationID: String?
+    @State private var mcpConnectionTarget: MCPConnectionTarget?
     @FocusState private var searchFocused: Bool
 
     var body: some View {
@@ -92,6 +93,18 @@ struct EnvListView: View {
                 onCancel: { showingAddSheet = false }
             )
         }
+        .sheet(item: $mcpConnectionTarget) { target in
+            MCPSecretConnectionSheet(
+                secretName: target.secretName,
+                connector: MCPSecretConnector(),
+                onClose: { mcpConnectionTarget = nil }
+            )
+        }
+    }
+
+    private struct MCPConnectionTarget: Identifiable {
+        let secretName: String
+        var id: String { secretName }
     }
 
     private var scopePicker: some View {
@@ -168,6 +181,7 @@ struct EnvListView: View {
                                 secretName: secretName,
                                 readValue: { try keychainSecrets.readSecretValue(named: secretName) },
                                 onDelete: { performDeleteKeychainSecret(named: secretName) },
+                                onConnectToMCPServer: { mcpConnectionTarget = MCPConnectionTarget(secretName: secretName) },
                                 onError: { keychainSecrets.reportError($0) }
                             )
                         }

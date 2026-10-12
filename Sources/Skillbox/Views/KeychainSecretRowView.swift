@@ -5,6 +5,7 @@ struct KeychainSecretRowView: View {
     let secretName: String
     let readValue: () throws -> String
     let onDelete: () -> Void
+    let onConnectToMCPServer: () -> Void
     let onError: (Error) -> Void
 
     @State private var revealedValue: String?
@@ -12,6 +13,7 @@ struct KeychainSecretRowView: View {
     @State private var isHoveringRow = false
     @State private var isHoveringReveal = false
     @State private var isHoveringCopy = false
+    @State private var isHoveringConnect = false
     @State private var isHoveringDelete = false
 
     var body: some View {
@@ -71,8 +73,14 @@ struct KeychainSecretRowView: View {
                 help: "Copy value",
                 action: copyValue
             )
+            rowButton(
+                systemName: "point.3.connected.trianglepath.dotted",
+                isHovering: $isHoveringConnect,
+                tint: .accentColor,
+                help: "Connect to an MCP server",
+                action: onConnectToMCPServer
+            )
             // Keeps buttons in the same columns as settings-backed secret rows.
-            Color.clear.frame(width: 22, height: 22)
             Color.clear.frame(width: 22, height: 22)
             rowButton(
                 systemName: "trash",
