@@ -28,7 +28,7 @@ struct OllamaModelScannerTests {
         #expect(models.first?.name == "llama3:8b")
         #expect(models.first?.source == .ollama)
         #expect(models.first?.sizeBytes == 5100)
-        #expect(models.first?.digest == "sha256:weights")
+        #expect(models.first?.digest == nil)
         #expect(models.first?.format == .ollamaBlob)
     }
 

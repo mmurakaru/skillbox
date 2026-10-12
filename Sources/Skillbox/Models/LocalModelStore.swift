@@ -23,7 +23,7 @@ final class LocalModelStore {
     private static let rootAppearanceCheckInterval: Duration = .seconds(300)
     private let duplicateDetector = DuplicateModelDetector()
     private let makeScanners: (LocalModelScanConfiguration) -> [any LocalModelScanner]
-    // Bumped per scan so a slow, older scan or duplicate search cannot overwrite newer results.
+    // Bumped per scan so a slow, older scan cannot overwrite newer results.
     private var inventoryGeneration = 0
 
     init(
@@ -75,7 +75,7 @@ final class LocalModelStore {
             let found = await scan.value
             guard generation == inventoryGeneration else { return }
             models = found
-            duplicateGroups = []
+            duplicateGroups = Self.groups(duplicateGroups, keepingMembersUnchangedIn: found)
             isScanning = false
         }
     }
@@ -85,13 +85,25 @@ final class LocalModelStore {
     func findDuplicates() -> Task<Void, Never>? {
         guard !isDetectingDuplicates else { return nil }
         isDetectingDuplicates = true
-        let generation = inventoryGeneration
         let snapshot = models
         return Task {
             let groups = await duplicateDetector.findDuplicates(in: snapshot)
             isDetectingDuplicates = false
-            guard generation == inventoryGeneration else { return }
-            duplicateGroups = groups
+            duplicateGroups = Self.groups(groups, keepingMembersUnchangedIn: models)
+        }
+    }
+
+    /// Keeps hash results for files that did not change, so a slow duplicate search survives unrelated folder events.
+    private static func groups(_ groups: [DuplicateModelGroup], keepingMembersUnchangedIn models: [LocalModel]) -> [DuplicateModelGroup] {
+        let currentModels = Dictionary(models.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return groups.compactMap { group in
+            let unchangedMembers = group.models.compactMap { member -> LocalModel? in
+                guard let current = currentModels[member.id],
+                      current.sizeBytes == member.sizeBytes,
+                      current.modifiedAt == member.modifiedAt else { return nil }
+                return current
+            }
+            return unchangedMembers.count > 1 ? DuplicateModelGroup(id: group.id, models: unchangedMembers) : nil
         }
     }
 

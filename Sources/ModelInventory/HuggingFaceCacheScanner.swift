@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 /// Scans the Hugging Face Hub cache; size sums the blobs because snapshots only symlink into them.
 public struct HuggingFaceCacheScanner: LocalModelScanner {
@@ -53,15 +54,15 @@ public struct HuggingFaceCacheScanner: LocalModelScanner {
                 path: repositoryDirectory,
                 format: detectFormat(in: repositoryDirectory.appending(path: "snapshots")),
                 sizeBytes: totals.size,
-                digest: totals.largestBlobName,
+                digest: totals.contentIdentity,
                 modifiedAt: modified?.contentModificationDate
             ))
         }
         return results
     }
 
-    /// The largest blob name is a stable duplicate key across caches.
-    private func blobTotals(in blobsDirectory: URL) -> (size: Int64, largestBlobName: String?) {
+    /// Blob names are content hashes, so the full set of names and sizes identifies byte-identical repos.
+    private func blobTotals(in blobsDirectory: URL) -> (size: Int64, contentIdentity: String?) {
         guard let blobs = try? FileManager.default.contentsOfDirectory(
             at: blobsDirectory,
             includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey],
@@ -69,19 +70,18 @@ public struct HuggingFaceCacheScanner: LocalModelScanner {
         ) else { return (0, nil) }
 
         var total: Int64 = 0
-        var largestSize: Int64 = -1
-        var largestName: String?
+        var blobEntries: [String] = []
         for blob in blobs {
             let values = try? blob.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
             guard values?.isRegularFile == true else { continue }
             let size = Int64(values?.fileSize ?? 0)
             total += size
-            if size > largestSize {
-                largestSize = size
-                largestName = blob.lastPathComponent
-            }
+            blobEntries.append("\(blob.lastPathComponent):\(size)")
         }
-        return (total, largestName)
+        guard !blobEntries.isEmpty else { return (0, nil) }
+        let identity = SHA256.hash(data: Data(blobEntries.sorted().joined(separator: "\n").utf8))
+            .map { String(format: "%02x", $0) }.joined()
+        return (total, "blobs:\(identity)")
     }
 
     private func detectFormat(in snapshotsDirectory: URL) -> LocalModelFormat {
