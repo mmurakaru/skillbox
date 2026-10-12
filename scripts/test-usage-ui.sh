@@ -16,6 +16,7 @@ xcrun swiftc -parse-as-library \
   Sources/Skillbox/Services/ClaudeBinaryLocator.swift \
   Sources/Skillbox/Services/GrokUsageCredentials.swift \
   Sources/Skillbox/Views/ProviderUsageLogo.swift \
+  Sources/Skillbox/Views/TabHeaderView.swift \
   Sources/Skillbox/Views/UsageOverviewView.swift \
   Sources/Skillbox/Views/UsageSnapshotEditor.swift \
   Sources/Skillbox/Views/UsageSnapshotScene.swift \
