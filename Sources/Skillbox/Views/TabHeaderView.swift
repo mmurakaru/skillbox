@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Title row shown above a sidebar tab's content.
 struct TabHeaderView<Trailing: View>: View {
     let title: String
     let subtitle: String
