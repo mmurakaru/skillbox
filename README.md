@@ -37,34 +37,22 @@ make lint      # the same checks CI runs
 
 `swift format` comes with the Swift toolchain and reads `.swift-format`. SwiftLint is a pinned, checksum-verified binary that `make` downloads into `.build/tools`, so nothing is installed system-wide. `.swiftlint.yml` holds the type-safety rules: no force casts, tries, or unwraps without a `SAFETY:` reason, no `Any` parameters, returns, or aliases, and untyped JSON dictionaries only in files that state they parse external JSON. `Tools/StatementPadding` adds blank lines around `if` statements, after declaration groups, and before `return`.
 
-## Usage overview
+## Tabs
 
-Open the Usage tab with ⌘5 to see stacked Codex, Grok, and Claude Code cards. Live cards refresh every five minutes, including while the panel is closed. Each card has a **Refresh** text button; explicitly refreshing a manual card resumes live data on success. Snapshot editors open in regular windows and keep unsaved edits when the menu bar panel loses focus. All bars show **percent used**; each provider keeps its own quota windows, reset times, credit units, and snapshot timestamp.
+- **Skills** (⌘1): list, open, classify, install, and sync skills in the shared store.
+- **Memory** (⌘2), **Hooks** (⌘3): browse and edit Claude Code auto-memory and hooks.
+- **Env** (⌘4): edit Claude Code env vars. Secrets are masked, kept out of shared project files, and can move to the login Keychain. A Keychain secret can authenticate a Claude Code HTTP MCP server through `headersHelper`, so the value leaves `settings.json`.
+- **Usage** (⌘5): live Codex, Grok, and Claude Code quota cards with manual snapshots. Provider connections and credential handling are in [docs/provider-usage.md](docs/provider-usage.md).
+- **Models** (⌘6): local models from Ollama, the Hugging Face cache, LM Studio, and other folders, with size, an estimated RAM fit (size × 1.2), duplicates, loaded state, unload, and Move to Trash.
+- **Explore** (⌘7): search the Hugging Face Hub without a token, filter by lab, format, and size, and copy an `ollama pull` or `hf download` command.
 
-Codex reads the existing CLI sign-in from `$CODEX_HOME/auth.json` or `~/.codex/auth.json`. Claude Code uses the installed CLI’s read-only `auth status` and `/usage` commands, with hooks, tools, MCP startup, and session persistence disabled for the probe. The CLI handles its own credentials; Skillbox does not request its Keychain password. Identity is checked before and after the quota read; an account switch discards that result. If no CLI is installed, the reader can use `$CLAUDE_CONFIG_DIR/.credentials.json` or the default credentials file. Foreign Keychain access in that fallback requires an explicit **Connect Claude Code** action and lasts only for the app session. Automatic refresh never reads that foreign Keychain entry. Skillbox never rotates provider credentials. Reauthenticate in the provider CLI if access expires.
+Keychain secrets are readable by processes running as you through the `security` tool; the benefit is keeping values out of files, agent environments, version control, and screenshots.
 
-Grok reads the consumer CLI sign-in from `$GROK_HOME/auth.json` or `~/.grok/auth.json`. Use **Connect Grok** for the official CLI installation guide, then run `grok login` before refreshing; a grok.com browser session is separate. Add or edit a snapshot from the provider dashboard to record percentages, reset times, credits, auto-reload or extra usage, and reset passes. Manual snapshots persist locally and stay manual until an explicit **Refresh** succeeds for a supported provider. Failed refreshes retain the last successful snapshot. Live readers show the connected email and plan when available, quota windows, Codex and Grok credits, and Claude model-specific weekly windows. The Claude OAuth fallback also reports monthly extra spending. Claude automatically reads the currently active CLI account on refresh. Exact subscription price and renewal date are not returned by these usage connections. Record those fields manually from the billing page; usage reset dates are not subscription renewal dates.
+Provider marks come from [Lobe Icons](https://github.com/lobehub/lobe-icons) (MIT, see `Sources/Skillbox/Resources/ProviderLogos`).
 
-Provider marks are bundled from [Lobe Icons](https://github.com/lobehub/lobe-icons), with source links and the MIT license in `Sources/Skillbox/Resources/ProviderLogos`.
+## Tests
 
-The read-only endpoint formats follow the provider integrations documented by [CodexBar for Codex](https://github.com/steipete/CodexBar/blob/main/docs/codex-oauth.md) and [Claude](https://github.com/steipete/CodexBar/blob/main/docs/claude.md).
-
-## Local models
-
-Open the Models tab with ⌘6 to see the AI models stored on this Mac: Ollama, the Hugging Face cache (honoring `HF_HOME` and `HF_HUB_CACHE`), LM Studio, OpenWhispr, `models` folders under Application Support, and any extra folders you add. Each row shows the source, on-disk size, and an estimated RAM need of size × 1.2, with a badge comparing it to physical memory: **Fits** at 70% or less, **Tight** up to 100%, **Too big** beyond that. The estimate covers typical context lengths; long contexts need more memory.
-
-**Find duplicate copies** groups byte-identical models and shows the space a single copy would reclaim. Models that share a content digest group immediately; other files are hashed only when another model has the same size. The inventory scans at launch and again when a scanned folder changes. Choose sources and extra folders under **Local models** in Settings. Scanning code lives in the `ModelInventory` library target.
-
-While the panel is visible, the tab checks every five seconds which models are **Loaded** in memory: Ollama's running models through its local API, and other weight files through one `lsof` call. Hover a row to unload a model, reveal it in Finder, or move it to the Trash, each after confirmation. Unload is offered only when it cannot quit another app: Ollama unloads through its API, and a dedicated `llama-server` process gets `SIGTERM` after Skillbox confirms that it still holds the file. Ollama models never go to the Trash, because tags share content-addressed blobs.
-
-## Explore models
-
-Open the Explore tab with ⌘7 to browse the Hugging Face Hub. It queries the public models API without a token and filters by search text, lab, format (GGUF or MLX), and sort order; the parameter size filter works on the size parsed from each model name. The tab runs one live search per app session and caches the last results under `~/Library/Caches/Skillbox`, so they stay visible offline with a notice. A check mark shows models whose name matches one in the Models tab. Hover a result to open its model page or copy a download command: `ollama pull hf.co/<id>` for GGUF repos, `hf download <id>` otherwise.
-
-## Native Usage UI checks
-
-Run `make test-ui` on a logged-in macOS desktop. The harness compiles the production Usage views into a separate menu bar app with synthetic provider data and isolated persistence. It never accesses accounts, Keychain, or the network. macOS must allow the invoking terminal to automate System Events and use Accessibility.
-
-The driver checks quota/plan labels, periodic and explicit refresh, editor activation, real mouse clicks and typing in fields, native reset/picker controls, save/cancel, and preserving manual snapshots. It fails with a nonzero status and saves screenshots, app output, and `results.json` under `.build/usage-ui`. Run `swift test` for quota parsing, account switching, refresh scheduling/cancellation, persistence, and the existing feature regression suite.
-
-TypeSafe reads its saved API key at startup without allowing Keychain dialogs. Already authorized builds classify automatically. If rebuilding changes Keychain trust, classification waits for **Unlock saved key** in Settings; the saved key stays in Keychain. The reader temporarily disables legacy Keychain interaction as well as per-request UI, then restores the prior policy (the modern flags alone do not suppress file-based Keychain ACL prompts; see Chromium FB16959400).
+```sh
+swift test     # unit and integration tests
+make test-ui   # native Usage UI harness, needs a logged-in desktop
+```
