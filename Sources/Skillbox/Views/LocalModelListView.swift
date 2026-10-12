@@ -5,6 +5,7 @@ import ModelInventory
 /// Models tab: the AI models stored on this Mac, with size, RAM fit, and duplicate copies.
 struct LocalModelListView: View {
     @Environment(LocalModelStore.self) private var store
+    @State private var trashErrorMessage: String?
 
     @State private var isWindowVisible = false
 
@@ -27,6 +28,10 @@ struct LocalModelListView: View {
 
             Divider()
 
+            if let trashErrorMessage {
+                trashErrorBanner(trashErrorMessage)
+            }
+
             list
         }
         .background(WindowVisibilityReader { isWindowVisible = $0 })
@@ -43,10 +48,30 @@ struct LocalModelListView: View {
     private func moveToTrash(_ model: LocalModel) {
         do {
             try store.moveToTrash(model)
+            trashErrorMessage = nil
         } catch {
-            NSSound.beep()
-            print("Move to Trash failed: \(error)")
+            trashErrorMessage = "Could not move \(model.name) to the Trash: \(error.localizedDescription)"
         }
+    }
+
+    private func trashErrorBanner(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text(message)
+                .font(.system(size: 11))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            Button(action: { trashErrorMessage = nil }) {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("Dismiss")
+            .accessibilityLabel("Dismiss")
+        }
+        .padding(8)
+        .background(Color.orange.opacity(0.08))
     }
 
     private var summary: some View {

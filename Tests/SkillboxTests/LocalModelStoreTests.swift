@@ -33,7 +33,7 @@ struct LocalModelStoreTests {
 
         func runtimeStates(for models: [LocalModel]) async -> [String: ModelRuntimeState] { states }
 
-        func stop(_ target: ModelStopTarget, modelPath: URL) async {
+        func stop(_ target: ModelStopTarget, weightFileURLs: [URL]) async {
             stopRequests.append(target)
             states = [:]
         }

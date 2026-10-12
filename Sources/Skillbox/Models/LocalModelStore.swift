@@ -121,7 +121,7 @@ final class LocalModelStore {
     /// Unloads a cleanly stoppable model, then refreshes runtime state.
     func stop(_ model: LocalModel) async {
         guard let target = runtimeStates[model.id]?.stopTarget else { return }
-        await runtimeMonitor.stop(target, modelPath: model.path)
+        await runtimeMonitor.stop(target, weightFileURLs: model.weightFileURLs)
         await refreshRuntimeStates()
     }
 
