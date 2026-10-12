@@ -1,5 +1,5 @@
-import SwiftUI
 import Sparkle
+import SwiftUI
 
 /// View-model wraps Sparkle's KVO-published `canCheckForUpdates` so SwiftUI can react.
 /// See https://sparkle-project.org/documentation/programmatic-setup/

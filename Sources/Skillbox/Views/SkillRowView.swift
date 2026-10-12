@@ -58,6 +58,7 @@ struct SkillRowView: View {
             if rowState != .normal {
                 normalContent.hidden()
             }
+
             if rowState == .confirmingDelete {
                 confirmContent
             } else {
@@ -80,7 +81,9 @@ struct SkillRowView: View {
 
     private var rowBackground: Color {
         if isSelected { return Color.accentColor.opacity(0.18) }
+
         if isHoveringRow { return Color.primary.opacity(0.06) }
+
         return .clear
     }
 
@@ -91,12 +94,14 @@ struct SkillRowView: View {
                     Text(skill.name)
                         .font(.system(size: 13, weight: .semibold))
                         .lineLimit(1)
+
                     if claudeBlocked {
                         Image(systemName: "lock.fill")
                             .font(.system(size: 9, weight: .semibold))
                             .foregroundStyle(.orange)
                             .help(claudeBlockedTooltip)
                     }
+
                     if let handle = skill.authorHandle {
                         authorChip(handle: handle)
                     }
@@ -106,8 +111,10 @@ struct SkillRowView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
+
                 if let classification {
                     let labels = classification.categories.map(\.label) + [classification.activity?.label].compactMap { $0 }
+
                     if !labels.isEmpty {
                         Text(labels.joined(separator: " · "))
                             .font(.system(size: 9))
@@ -162,6 +169,7 @@ struct SkillRowView: View {
     private var authorChipTooltip: String {
         guard let p = skill.provenance else { return "" }
         let suffix = p.skill.map { " (\($0))" } ?? ""
+
         return "Tracked from \(p.source)\(suffix)"
     }
 
@@ -217,15 +225,18 @@ struct SkillRowView: View {
     }
 
     private var overrideMenuTooltip: String {
-        let base = "Listing visibility: \(overrideState.displayLabel) — \(overrideState.helpText)"
+        let base = "Listing visibility: \(overrideState.displayLabel) - \(overrideState.helpText)"
+
         if skill.authorLocked {
             return base + " (Also locked by author in the skill file.)"
         }
+
         return base
     }
 
     private var overrideForeground: Color {
         if overrideState != .on { return .accentColor }
+
         return isHoveringOverride ? .accentColor : .secondary
     }
 
@@ -258,6 +269,7 @@ struct SkillRowView: View {
                             RoundedRectangle(cornerRadius: 5)
                                 .fill(isHoveringSync ? Color.accentColor.opacity(0.15) : Color.clear)
                         )
+
                     if skill.provenance?.hasUpdate == true {
                         Circle()
                             .fill(Color.orange)
@@ -298,9 +310,11 @@ struct SkillRowView: View {
 
     private var syncTooltip: String {
         guard let p = skill.provenance else { return "Sync" }
+
         if p.hasUpdate {
-            return "Sync from \(p.source) — upstream has changes"
+            return "Sync from \(p.source) - upstream has changes"
         }
+
         return "Sync from \(p.source)"
     }
 
@@ -338,10 +352,10 @@ struct SkillRowView: View {
                 .frame(width: 18)
 
             Text("Delete ")
-                .font(.system(size: 12)) +
-            Text(skill.name)
-                .font(.system(size: 12, weight: .semibold)) +
-            Text("?")
+                .font(.system(size: 12))
+                + Text(skill.name)
+                .font(.system(size: 12, weight: .semibold))
+                + Text("?")
                 .font(.system(size: 12))
 
             Spacer()

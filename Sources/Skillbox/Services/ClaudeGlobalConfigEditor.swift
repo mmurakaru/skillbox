@@ -1,5 +1,7 @@
 import Foundation
 
+// swiftlint:disable no_untyped_dictionaries - JSON trust boundary: edits the Claude Code global config, which must round-trip keys it does not model.
+
 enum ClaudeGlobalConfigError: Error, LocalizedError, Equatable {
     case configLocked
     case configUnreadable
@@ -42,6 +44,7 @@ struct ClaudeGlobalConfigEditor: Sendable {
         if let configDirectory = environment["CLAUDE_CONFIG_DIR"], !configDirectory.isEmpty {
             return URL(fileURLWithPath: (configDirectory as NSString).expandingTildeInPath).appendingPathComponent(".claude.json")
         }
+
         return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude.json")
     }
 
@@ -56,8 +59,10 @@ struct ClaudeGlobalConfigEditor: Sendable {
     func userScopeHTTPServers() throws -> [ClaudeHTTPMCPServer] {
         let root = try readConfigRoot()
         let servers = root["mcpServers"] as? [String: Any] ?? [:]
+
         return servers.compactMap { name, value in
             guard let server = value as? [String: Any], server["type"] as? String == "http" else { return nil }
+
             return ClaudeHTTPMCPServer(
                 name: name,
                 url: server["url"] as? String ?? "",
@@ -74,12 +79,14 @@ struct ClaudeGlobalConfigEditor: Sendable {
             let text = try readConfigText()
             let root = try parseConfigRoot(text)
             let servers = root["mcpServers"] as? [String: Any] ?? [:]
+
             guard var server = servers[serverName] as? [String: Any] else {
                 throw ClaudeGlobalConfigError.serverNotFound(serverName)
             }
             guard server["type"] as? String == "http" else { throw ClaudeGlobalConfigError.serverIsNotHTTP(serverName) }
             mutate(&server)
             let updatedText = try JSONMemberTextEditor.replacingMember(at: ["mcpServers", serverName], in: text, with: server)
+
             guard (try? parseConfigRoot(updatedText)) != nil else { throw ClaudeGlobalConfigError.configUnreadable }
             try replaceConfigAtomically(with: Data(updatedText.utf8))
         }
@@ -93,6 +100,7 @@ struct ClaudeGlobalConfigEditor: Sendable {
         guard let data = try? Data(contentsOf: resolvedConfigURL), let text = String(data: data, encoding: .utf8) else {
             throw ClaudeGlobalConfigError.configUnreadable
         }
+
         return text
     }
 
@@ -100,6 +108,7 @@ struct ClaudeGlobalConfigEditor: Sendable {
         guard let root = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any] else {
             throw ClaudeGlobalConfigError.configUnreadable
         }
+
         return root
     }
 
@@ -110,11 +119,13 @@ struct ClaudeGlobalConfigEditor: Sendable {
         let permissions = (try fileManager.attributesOfItem(atPath: targetURL.path)[.posixPermissions] as? NSNumber) ?? 0o600
         let temporaryURL = targetURL.deletingLastPathComponent()
             .appendingPathComponent(".\(targetURL.lastPathComponent).skillbox-\(UUID().uuidString).tmp")
+
         guard fileManager.createFile(atPath: temporaryURL.path, contents: data, attributes: [.posixPermissions: permissions]) else {
             throw CocoaError(.fileWriteUnknown)
         }
         guard rename(temporaryURL.path, targetURL.path) == 0 else {
             let renameError = POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+
             try? fileManager.removeItem(at: temporaryURL)
             throw renameError
         }
@@ -123,16 +134,20 @@ struct ClaudeGlobalConfigEditor: Sendable {
     /// `mkdir` is atomic, so the lock directory works across processes the same way the CLI's lock does.
     private func withConfigLock<Result>(_ body: () throws -> Result) throws -> Result {
         let deadline = Date().addingTimeInterval(lockWaitLimit)
+
         while mkdir(lockDirectoryURL.path, 0o755) != 0 {
             guard errno == EEXIST else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+
             if isLockStale() {
                 rmdir(lockDirectoryURL.path)
                 continue
             }
+
             guard Date() < deadline else { throw ClaudeGlobalConfigError.configLocked }
             Thread.sleep(forTimeInterval: 0.05)
         }
         defer { rmdir(lockDirectoryURL.path) }
+
         return try body()
     }
 
@@ -140,6 +155,7 @@ struct ClaudeGlobalConfigEditor: Sendable {
         guard let modified = try? FileManager.default.attributesOfItem(atPath: lockDirectoryURL.path)[.modificationDate] as? Date else {
             return false
         }
+
         return Date().timeIntervalSince(modified) > staleLockAge
     }
 }

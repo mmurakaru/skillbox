@@ -27,6 +27,7 @@ struct SkillInstallProgressView: View {
                     Text(step.label).font(.system(size: 12))
                 }
             }
+
             if !installedNames.isEmpty {
                 Text(installedNames.joined(separator: ", "))
                     .font(.system(size: 12)).foregroundStyle(.secondary)

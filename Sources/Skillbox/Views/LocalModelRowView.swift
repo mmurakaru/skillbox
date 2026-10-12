@@ -1,5 +1,5 @@
-import SwiftUI
 import ModelInventory
+import SwiftUI
 
 /// One local model row: name, source, estimated RAM, size, RAM fit badge, and loaded state.
 struct LocalModelRowView: View {
@@ -35,10 +35,12 @@ struct LocalModelRowView: View {
                 HStack(spacing: 6) {
                     Text(model.source.displayName)
                     Text("~\(estimatedRAMBytes.formattedFileSize) RAM")
+
                     if copyCount > 1 {
                         Text("\(copyCount) copies")
                             .foregroundStyle(.orange)
                     }
+
                     if let runtimeState {
                         Text("Loaded")
                             .foregroundStyle(.blue)
@@ -102,10 +104,14 @@ struct LocalModelRowView: View {
                     isConfirmingStop = true
                 }
             }
-            RowHoverActionButton(systemImage: "folder", help: "Reveal in Finder", accessibilityLabel: "Reveal \(model.name) in Finder", action: onReveal)
+
+            RowHoverActionButton(
+                systemImage: "folder", help: "Reveal in Finder", accessibilityLabel: "Reveal \(model.name) in Finder", action: onReveal)
+
             if canMoveToTrash {
                 if runtimeState == nil {
-                    RowHoverActionButton(systemImage: "trash", help: "Move to Trash", accessibilityLabel: "Move \(model.name) to the Trash") {
+                    RowHoverActionButton(systemImage: "trash", help: "Move to Trash", accessibilityLabel: "Move \(model.name) to the Trash")
+                    {
                         isConfirmingTrash = true
                     }
                 } else {

@@ -39,6 +39,7 @@ struct SkillProvenance: Codable, Hashable {
 
     var hasUpdate: Bool {
         guard let latest = latestKnownSHA, !latest.isEmpty else { return false }
+
         return latest != sha
     }
 }
@@ -80,7 +81,9 @@ struct Skill: Identifiable, Hashable {
         guard var provenance else { return nil }
         provenance.remotePath = nil
         guard
-              let coords = SkillSourceCoordinates.parse(provenance: provenance) else { return nil }
+            let coords = SkillSourceCoordinates.parse(provenance: provenance)
+        else { return nil }
+
         return coords.repo.split(separator: "/").first.map(String.init)
     }
 }
@@ -88,18 +91,23 @@ struct Skill: Identifiable, Hashable {
 enum SkillProvenanceStore {
     static func read(from folderURL: URL) -> SkillProvenance? {
         let url = folderURL.appendingPathComponent(SkillProvenance.sidecarFilename)
+
         guard let data = try? Data(contentsOf: url) else { return nil }
         let decoder = JSONDecoder()
+
         decoder.dateDecodingStrategy = .iso8601
+
         return try? decoder.decode(SkillProvenance.self, from: data)
     }
 
     static func write(_ provenance: SkillProvenance, to folderURL: URL) throws {
         let url = folderURL.appendingPathComponent(SkillProvenance.sidecarFilename)
         let encoder = JSONEncoder()
+
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(provenance)
+
         try data.write(to: url, options: .atomic)
     }
 }

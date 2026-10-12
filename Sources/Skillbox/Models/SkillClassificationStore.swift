@@ -26,14 +26,17 @@ final class SkillClassificationStore {
     ) {
         self.cacheURL = cacheURL
         self.classify = classify
+
         if FileManager.default.fileExists(atPath: cacheURL.path) {
-            do { classifications = try JSONDecoder().decode([String: SkillClassification].self, from: Data(contentsOf: cacheURL)) }
-            catch { statusMessage = "Could not read saved classifications: \(error.localizedDescription)" }
+            do { classifications = try JSONDecoder().decode([String: SkillClassification].self, from: Data(contentsOf: cacheURL)) } catch {
+                statusMessage = "Could not read saved classifications: \(error.localizedDescription)"
+            }
         }
     }
 
     func classification(for skill: Skill) -> SkillClassification? {
         guard let result = classifications[skill.id], result.matches(skill) else { return nil }
+
         return result
     }
 
@@ -41,12 +44,13 @@ final class SkillClassificationStore {
     func filteredSkills(_ skills: [Skill]) -> [Skill] {
         skills.filter { skill in
             let result = classification(for: skill)
-            let matchesCategory = selectedCategory == "all" ||
-                (selectedCategory == "unclassified" && (result?.categories.isEmpty ?? true)) ||
-                (result?.categories.contains(where: { $0.rawValue == selectedCategory }) ?? false)
-            let matchesActivity = selectedActivity == "all" ||
-                (selectedActivity == "unclassified" && result?.activity == nil) ||
-                result?.activity?.rawValue == selectedActivity
+            let matchesCategory =
+                selectedCategory == "all" || (selectedCategory == "unclassified" && (result?.categories.isEmpty ?? true))
+                || (result?.categories.contains(where: { $0.rawValue == selectedCategory }) ?? false)
+            let matchesActivity =
+                selectedActivity == "all" || (selectedActivity == "unclassified" && result?.activity == nil)
+                || result?.activity?.rawValue == selectedActivity
+
             return matchesCategory && matchesActivity
         }
     }
@@ -56,6 +60,7 @@ final class SkillClassificationStore {
         guard !apiKey.isEmpty else {
             hasClassificationFailure = true
             statusMessage = SkillClassificationError.missingAPIKey.localizedDescription
+
             return
         }
         hasClassificationFailure = false
@@ -64,52 +69,67 @@ final class SkillClassificationStore {
         totalCount = skills.count
         statusMessage = nil
         classificationTask = Task {
-            defer { isClassifying = false; classificationTask = nil }
+            defer {
+                isClassifying = false
+                classificationTask = nil
+            }
             var classified = 0
             var skipped = 0
             var failed = 0
             var firstError: String?
+
             for skill in skills {
                 if Task.isCancelled { break }
+
                 do {
                     let content = try String(contentsOf: skill.skillFileURL, encoding: .utf8)
+
                     if !force, let saved = classification(for: skill),
-                       saved.contentDigest == SkillClassificationService.contentDigest(content) {
+                        saved.contentDigest == SkillClassificationService.contentDigest(content)
+                    {
                         skipped += 1
                     } else {
                         let result = try await classify(skill, content, apiKey)
+
                         try Task.checkCancellation()
                         // Never overwrite a cache with labels for a file edited during a request.
                         let current = try String(contentsOf: skill.skillFileURL, encoding: .utf8)
+
                         guard SkillClassificationService.contentDigest(current) == result.contentDigest else {
-                            throw NSError(domain: "SkillClassificationStore", code: 1, userInfo: [
-                                NSLocalizedDescriptionKey: "\(skill.name) changed during classification. Retry classification in Settings.",
-                            ])
+                            throw NSError(
+                                domain: "SkillClassificationStore", code: 1,
+                                userInfo: [
+                                    NSLocalizedDescriptionKey:
+                                        "\(skill.name) changed during classification. Retry classification in Settings."
+                                ])
                         }
                         var updated = classifications
+
                         updated[skill.id] = result
                         try saveClassifications(updated)
                         classifications = updated
                         classified += 1
                     }
-                } catch is CancellationError { break }
-                catch {
+                } catch is CancellationError { break } catch {
                     if Task.isCancelled { break }
+
                     hasClassificationFailure = true
                     failed += 1
                     firstError = firstError ?? error.localizedDescription
+
                     // Stop on API-wide failures instead of repeating rejected requests for every skill.
                     if let apiError = error as? SkillClassificationError,
-                       case .httpStatus(let code) = apiError, [401, 403, 429].contains(code) {
+                        case .httpStatus(let code) = apiError, [401, 403, 429].contains(code)
+                    {
                         completedCount += 1
                         break
                     }
                 }
                 completedCount += 1
             }
-            statusMessage = "\(classified) classified, \(skipped) unchanged" +
-                (failed > 0 ? ". \(failed) failed: \(firstError ?? "Unknown error")" : "") +
-                (Task.isCancelled ? ". Cancelled." : "")
+            statusMessage =
+                "\(classified) classified, \(skipped) unchanged"
+                + (failed > 0 ? ". \(failed) failed: \(firstError ?? "Unknown error")" : "") + (Task.isCancelled ? ". Cancelled." : "")
         }
     }
 
@@ -118,6 +138,7 @@ final class SkillClassificationStore {
     private func saveClassifications(_ values: [String: SkillClassification]) throws {
         try FileManager.default.createDirectory(at: cacheURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         let encoder = JSONEncoder()
+
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try encoder.encode(values).write(to: cacheURL, options: .atomic)
     }

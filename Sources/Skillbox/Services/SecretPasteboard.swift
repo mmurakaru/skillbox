@@ -10,12 +10,17 @@ enum SecretPasteboard {
 
     /// Returns the pending clear so callers can await it instead of guessing a sleep.
     @discardableResult
-    static func copyConcealed(_ value: String, to pasteboard: NSPasteboard = .general, clearAfter delay: Duration = clearDelay) -> Task<Void, Never> {
+    static func copyConcealed(
+        _ value: String,
+        to pasteboard: NSPasteboard = .general,
+        clearAfter delay: Duration = clearDelay
+    ) -> Task<Void, Never> {
         pasteboard.clearContents()
         pasteboard.declareTypes([.string, concealedPasteboardType], owner: nil)
         pasteboard.setString(value, forType: .string)
         pasteboard.setString("", forType: concealedPasteboardType)
         let copiedChangeCount = pasteboard.changeCount
+
         return Task {
             try? await Task.sleep(for: delay)
             clearIfUnchanged(pasteboard, since: copiedChangeCount)

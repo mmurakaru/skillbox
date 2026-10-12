@@ -8,6 +8,7 @@ struct SkillInstallOutput {
     mutating func append(_ chunk: String) {
         buffer = String((buffer + chunk).suffix(16_384))
         let text = Self.plainText(buffer).lowercased()
+
         if text.contains("installation complete") || text.contains("installed successfully") {
             stage = .finishing
         } else if text.contains("installing") || text.contains("installation summary") {
@@ -29,22 +30,29 @@ struct SkillInstallOutput {
         let lines = plainText(output).components(separatedBy: "\n")
         let reason = lines.first { line in
             let text = line.lowercased()
+
             return text.contains("fatal:") || text.contains("error:") || text.contains("no skills found") || text.contains("npm error")
         }?.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "│┃◇■└┌")))
+
         if let reason, !reason.isEmpty { return "Could not install the skill. \(String(reason.prefix(240)))" }
+
         return "Could not install the skill (exit \(exitCode)). Check the URL and your network connection, then try again."
     }
 
     static func installedNames(output: String) -> [String] {
         let text = plainText(output)
         let pattern = #"(?:~|/[^\s│]+)/(?:\.agents|\.claude)/skills/([A-Za-z0-9][A-Za-z0-9._-]*)"#
+
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
         var names: [String] = []
+
         for match in regex.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
             guard let range = Range(match.range(at: 1), in: text) else { continue }
             let name = String(text[range])
+
             if !names.contains(name) { names.append(name) }
         }
+
         return names
     }
 }

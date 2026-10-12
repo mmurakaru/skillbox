@@ -65,10 +65,12 @@ final class SkillFolderSync {
             // SHA gating: if upstream SHA is known and matches local, no-op (but still stamp lastCheckedAt).
             if let latest, latest == provenance.sha {
                 var updated = provenance
+
                 updated.lastCheckedAt = Date()
                 updated.latestKnownSHA = latest
                 try? SkillProvenanceStore.write(updated, to: skill.folderURL)
                 lastError = nil
+
                 return .upToDate(sha: latest)
             }
 
@@ -82,25 +84,31 @@ final class SkillFolderSync {
             for file in files {
                 // Skip the provenance sidecar even if upstream happens to contain a stray copy.
                 if file.relativePath == SkillProvenance.sidecarFilename { continue }
+
                 let data = try await SkillRegistry.fetchRawData(
                     repo: coords.repo,
                     branch: coords.branch,
                     path: file.absolutePath,
                     session: session
                 )
+
                 try write(data: data, to: skill.folderURL.appendingPathComponent(file.relativePath))
             }
 
             var updated = provenance
             let now = Date()
+
             updated.lastCheckedAt = now
+
             if let latest {
                 updated.sha = latest
                 updated.latestKnownSHA = latest
             }
+
             try SkillProvenanceStore.write(updated, to: skill.folderURL)
 
             lastError = nil
+
             return .mirrored(sha: latest ?? "", fileCount: files.count)
         } catch let error as SyncError {
             lastError = error.errorDescription
@@ -127,9 +135,11 @@ final class SkillFolderSync {
 
     private func write(data: Data, to fileURL: URL) throws {
         let parent = fileURL.deletingLastPathComponent()
+
         if !FileManager.default.fileExists(atPath: parent.path) {
             try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
         }
+
         try data.write(to: fileURL, options: .atomic)
     }
 }

@@ -28,6 +28,7 @@ public struct LocalModelScanConfiguration: Equatable, Sendable {
     /// Drops the home folder and `/`, since walking either for weight files would read most of the disk.
     public static func parseCustomPaths(_ rawPaths: String, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> [URL] {
         let refusedPaths: Set<String> = ["/", home.standardizedFileURL.path]
+
         return rawPaths.split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
@@ -41,48 +42,67 @@ public struct LocalModelScanConfiguration: Equatable, Sendable {
         applicationSupport: URL? = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
     ) -> [any LocalModelScanner] {
         var scanners: [any LocalModelScanner] = []
+
         if ollama {
             scanners.append(OllamaModelScanner(root: home.appending(path: ".ollama/models")))
         }
+
         if huggingFace {
             scanners.append(HuggingFaceCacheScanner(root: HuggingFaceCacheScanner.defaultRoot(home: home)))
         }
+
         if openWhispr {
-            scanners.append(FlatFileModelScanner(source: .openWhispr, roots: [
-                home.appending(path: ".cache/openwhispr/models"),
-            ]))
+            scanners.append(
+                FlatFileModelScanner(
+                    source: .openWhispr,
+                    roots: [
+                        home.appending(path: ".cache/openwhispr/models")
+                    ]))
         }
+
         if lmStudio {
-            scanners.append(FlatFileModelScanner(source: .lmStudio, roots: [
-                home.appending(path: ".lmstudio/models"),
-                home.appending(path: ".cache/lm-studio"),
-            ]))
+            scanners.append(
+                FlatFileModelScanner(
+                    source: .lmStudio,
+                    roots: [
+                        home.appending(path: ".lmstudio/models"),
+                        home.appending(path: ".cache/lm-studio"),
+                    ]))
         }
+
         if appSupport, let applicationSupport {
-            scanners.append(FlatFileModelScanner(
-                source: .appSupport,
-                roots: Self.applicationSupportModelFolders(in: applicationSupport)
-            ))
+            scanners.append(
+                FlatFileModelScanner(
+                    source: .appSupport,
+                    roots: Self.applicationSupportModelFolders(in: applicationSupport)
+                ))
         }
+
         if !customPaths.isEmpty {
             scanners.append(FlatFileModelScanner(source: .custom, roots: customPaths))
         }
+
         return scanners
     }
 
     /// Existing `<Application Support>/<app>/models` folders.
     public static func applicationSupportModelFolders(in applicationSupport: URL) -> [URL] {
         let fileManager = FileManager.default
-        guard let entries = try? fileManager.contentsOfDirectory(
-            at: applicationSupport,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        ) else { return [] }
 
-        return entries
+        guard
+            let entries = try? fileManager.contentsOfDirectory(
+                at: applicationSupport,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles]
+            )
+        else { return [] }
+
+        return
+            entries
             .map { $0.appending(path: "models") }
             .filter { url in
                 var isDirectory: ObjCBool = false
+
                 return fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) && isDirectory.boolValue
             }
     }

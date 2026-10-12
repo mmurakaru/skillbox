@@ -24,17 +24,20 @@ public struct HuggingFaceHubModel: Sendable, Codable, Identifiable, Equatable {
 
     public var lab: String {
         guard let slash = id.firstIndex(of: "/") else { return "" }
+
         return String(id[..<slash])
     }
 
     public var name: String {
         guard let slash = id.firstIndex(of: "/") else { return id }
+
         return String(id[id.index(after: slash)...])
     }
 
     /// Parameter count parsed from the name, such as "135M", "8B", "8X7B", or "70B"; a hint, not an exact size.
     public var parameterHint: String? {
         guard let match = name.firstMatch(of: /(\d+(?:\.\d+)?(?:[xX]\d+)?)([bBmM])(?:[-_. ]|$)/) else { return nil }
+
         return String(match.1).uppercased() + String(match.2).uppercased()
     }
 }
@@ -97,6 +100,7 @@ public struct HuggingFaceHubQuery: Sendable, Equatable, Codable {
     // Caches written before the limit existed decode with the default limit.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+
         search = try container.decode(String.self, forKey: .search)
         author = try container.decode(String.self, forKey: .author)
         formatFilter = try container.decodeIfPresent(String.self, forKey: .formatFilter)
@@ -134,30 +138,39 @@ public struct HuggingFaceHubClient: HuggingFaceHubSearching {
             URLQueryItem(name: "direction", value: "-1"),
         ]
         let search = query.search.trimmingCharacters(in: .whitespaces)
+
         if !search.isEmpty {
             items.append(URLQueryItem(name: "search", value: search))
         }
+
         let author = query.author.trimmingCharacters(in: .whitespaces)
+
         if !author.isEmpty {
             items.append(URLQueryItem(name: "author", value: author))
         }
+
         // The list API ignores `library`; format repos are tagged, and `filter` matches tags.
         if let formatFilter = query.formatFilter, !formatFilter.isEmpty {
             items.append(URLQueryItem(name: "filter", value: formatFilter))
         }
+
         components.queryItems = items
 
         guard let url = components.url else { throw HuggingFaceHubError.invalidRequest }
         var request = URLRequest(url: url)
+
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+
         return request
     }
 
     public func search(_ query: HuggingFaceHubQuery) async throws -> [HuggingFaceHubModel] {
         let (data, response) = try await session.data(for: try makeRequest(query))
+
         if let httpResponse = response as? HTTPURLResponse, !(200..<300).contains(httpResponse.statusCode) {
             throw HuggingFaceHubError.unexpectedStatus(httpResponse.statusCode)
         }
+
         return try JSONDecoder().decode([HuggingFaceHubModel].self, from: data)
     }
 }

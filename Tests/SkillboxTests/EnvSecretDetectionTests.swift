@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import Skillbox
 
 struct EnvSecretDetectionTests {
@@ -8,7 +9,9 @@ struct EnvSecretDetectionTests {
         #expect(EnvSecretDetection.nameLooksSecret(name))
     }
 
-    @Test(arguments: ["CLAUDE_CODE_DISABLE_THINKING", "API_TIMEOUT_MS", "EXAMPLE_BASE_URL", "GIT_AUTHOR_NAME", "OAUTH_CALLBACK_URL", "KEYBOARD_LAYOUT"])
+    @Test(arguments: [
+        "CLAUDE_CODE_DISABLE_THINKING", "API_TIMEOUT_MS", "EXAMPLE_BASE_URL", "GIT_AUTHOR_NAME", "OAUTH_CALLBACK_URL", "KEYBOARD_LAYOUT",
+    ])
     func nameLooksSecret_plainNames_areNotSecret(name: String) {
         #expect(!EnvSecretDetection.nameLooksSecret(name))
     }
@@ -25,6 +28,7 @@ struct EnvSecretDetectionTests {
     @Test func secretMarksFile_roundTripsNames() throws {
         let fileURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("skillbox-secret-marks-\(UUID().uuidString).json")
+
         defer { try? FileManager.default.removeItem(at: fileURL) }
         let marksFile = EnvSecretMarksFile(fileURL: fileURL)
 

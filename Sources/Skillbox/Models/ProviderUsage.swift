@@ -44,21 +44,25 @@ struct ProviderUsageSnapshot: Codable, Equatable, Sendable {
     var details: [ProviderUsageDetail] = []
     var updatedAt: Date
     var source: Source
-    var accountEmail: String? = nil
+    var accountEmail: String?
 }
-
 
 extension ProviderUsageSnapshot {
     /// Updates old saved Grok labels without changing their plan, percentages, or reset times.
     func normalizingUsageLabels() -> ProviderUsageSnapshot {
         guard provider == .grok else { return self }
         var snapshot = self
+
         snapshot.windows = windows.map { window in
             var window = window
+
             if window.label == "Weekly SuperGrok limit" { window.label = "Weekly limit" }
+
             if window.label == "Monthly SuperGrok limit" { window.label = "Monthly limit" }
+
             return window
         }
+
         return snapshot
     }
 }

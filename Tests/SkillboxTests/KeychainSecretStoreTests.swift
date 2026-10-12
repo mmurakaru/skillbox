@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import Skillbox
 
 /// Records every `security` invocation and replays canned results; never runs a real process.
@@ -21,6 +22,7 @@ final class RecordingProcessRunner: ProcessRunning, @unchecked Sendable {
     func run(executablePath: String, arguments: [String], standardInput: String?) throws -> ProcessRunResult {
         lock.withLock {
             recorded.append(Invocation(executablePath: executablePath, arguments: arguments, standardInput: standardInput))
+
             return cannedResultSequence.isEmpty ? cannedResult : cannedResultSequence.removeFirst()
         }
     }
@@ -41,6 +43,7 @@ final class InMemoryKeychainSecretStore: KeychainSecretStoring, @unchecked Senda
 
     func readSecretValue(named name: String) throws -> String {
         guard let value = lock.withLock({ values[name] }) else { throw KeychainSecretError.secretNotFound(name) }
+
         return value
     }
 
@@ -62,9 +65,11 @@ struct KeychainSecretStoreTests {
         try store.writeSecretValue("example-secret", named: "EXAMPLE_API_TOKEN")
 
         let invocation = try #require(runner.invocations.first)
+
         #expect(invocation.executablePath == "/usr/bin/security")
         #expect(invocation.arguments == ["-i"])
         let input = try #require(invocation.standardInput)
+
         #expect(!input.contains("example-secret"))
         #expect(input.contains("-X \"6578616d706c652d736563726574\""))
         #expect(input.contains("-s \"ai.skillbox.secret\" -a \"EXAMPLE_API_TOKEN\""))
@@ -73,15 +78,18 @@ struct KeychainSecretStoreTests {
 
     @Test func readSecretValue_stripsTrailingNewline() throws {
         let runner = RecordingProcessRunner()
+
         runner.cannedResult = ProcessRunResult(exitCode: 0, standardOutput: "example-secret\n")
         let store = SystemKeychainSecretStore(processRunner: runner)
 
         #expect(try store.readSecretValue(named: "EXAMPLE_API_TOKEN") == "example-secret")
-        #expect(runner.invocations.first?.arguments == ["find-generic-password", "-s", "ai.skillbox.secret", "-a", "EXAMPLE_API_TOKEN", "-w"])
+        #expect(
+            runner.invocations.first?.arguments == ["find-generic-password", "-s", "ai.skillbox.secret", "-a", "EXAMPLE_API_TOKEN", "-w"])
     }
 
     @Test func readSecretValue_missingItem_throwsNotFound() {
         let runner = RecordingProcessRunner()
+
         runner.cannedResult = ProcessRunResult(exitCode: 44, standardOutput: "")
         let store = SystemKeychainSecretStore(processRunner: runner)
 
@@ -92,6 +100,7 @@ struct KeychainSecretStoreTests {
 
     @Test func deleteSecret_missingItem_isNotAnError() throws {
         let runner = RecordingProcessRunner()
+
         runner.cannedResult = ProcessRunResult(exitCode: 44, standardOutput: "")
         try SystemKeychainSecretStore(processRunner: runner).deleteSecret(named: "EXAMPLE_API_TOKEN")
     }
@@ -106,22 +115,25 @@ struct KeychainSecretStoreTests {
         #expect(throws: KeychainSecretError.self) { try store.writeSecretValue("caf\u{E9}-token", named: "EXAMPLE_API_TOKEN") }
         #expect(throws: KeychainSecretError.self) { try store.writeSecretValue("tab\tseparated", named: "EXAMPLE_API_TOKEN") }
         #expect(throws: KeychainSecretError.self) {
-            try store.writeSecretValue(String(repeating: "a", count: KeychainSecretValidation.maximumValueByteCount + 1), named: "EXAMPLE_API_TOKEN")
+            try store.writeSecretValue(
+                String(repeating: "a", count: KeychainSecretValidation.maximumValueByteCount + 1), named: "EXAMPLE_API_TOKEN")
         }
         #expect(runner.invocations.isEmpty)
     }
 
     @Test func readCommand_usesSystemSecurityTool() {
-        #expect(SystemKeychainSecretStore.readCommand(forSecretNamed: "EXAMPLE_API_TOKEN")
-            == "/usr/bin/security find-generic-password -s ai.skillbox.secret -a EXAMPLE_API_TOKEN -w")
+        #expect(
+            SystemKeychainSecretStore.readCommand(forSecretNamed: "EXAMPLE_API_TOKEN")
+                == "/usr/bin/security find-generic-password -s ai.skillbox.secret -a EXAMPLE_API_TOKEN -w")
     }
 }
 
 @MainActor
 struct KeychainSecretsModelTests {
     private func makeEnvVar(key: String, value: String) -> EnvVar {
-        EnvVar(key: key, value: value, state: .enabled, scope: .userGlobal,
-               fileURL: URL(fileURLWithPath: "/tmp/settings.json"), modifiedAt: Date(), isSecret: true)
+        EnvVar(
+            key: key, value: value, state: .enabled, scope: .userGlobal,
+            fileURL: URL(fileURLWithPath: "/tmp/settings.json"), modifiedAt: Date(), isSecret: true)
     }
 
     @Test func addSecret_storesAndListsName() async throws {
@@ -146,6 +158,7 @@ struct KeychainSecretsModelTests {
 
     @Test func copyEnvSecret_readBackMismatch_removesNewItem() async {
         let keychain = InMemoryKeychainSecretStore()
+
         keychain.corruptsWrites = true
         let model = KeychainSecretsModel(secretStore: keychain)
 
@@ -178,6 +191,7 @@ struct KeychainSecretsModelTests {
     @Test func keychainHoldsSameValue_comparesStoredValue() async throws {
         let keychain = InMemoryKeychainSecretStore(values: ["EXAMPLE_API_TOKEN": "abc"])
         let model = KeychainSecretsModel(secretStore: keychain)
+
         await model.reload()
 
         #expect(await model.keychainHoldsSameValue(as: makeEnvVar(key: "EXAMPLE_API_TOKEN", value: "abc")))

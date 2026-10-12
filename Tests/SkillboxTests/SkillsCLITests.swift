@@ -1,16 +1,19 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import Skillbox
 
 struct SkillsCLITests {
     @Test func shellLaunchWithGUIEventQueueInStandardInput() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("skillbox-process-\(UUID().uuidString)")
+
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let fixture = root.appendingPathComponent("Harness.swift")
         let executable = root.appendingPathComponent("harness")
         let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Sources/Skillbox/Services/SkillsCLI.swift")
+
         try """
         import Foundation
         import Darwin
@@ -29,31 +32,39 @@ struct SkillsCLITests {
         """.write(to: fixture, atomically: true, encoding: .utf8)
         func run(_ path: String, _ arguments: [String]) throws -> (Int32, String) {
             let process = Process()
+
             process.executableURL = URL(fileURLWithPath: path)
             process.arguments = arguments
             process.standardInput = FileHandle.nullDevice
             let output = Pipe()
+
             process.standardOutput = output
             process.standardError = output
             try process.run()
             let data = output.fileHandleForReading.readDataToEndOfFile()
+
             process.waitUntilExit()
+
             return (process.terminationStatus, String(decoding: data, as: UTF8.self))
         }
         let build = try run("/usr/bin/xcrun", ["swiftc", source.path, fixture.path, "-o", executable.path])
+
         #expect(build.0 == 0, "\(build.1)")
         let result = try run(executable.path, [])
+
         #expect(result.0 == 0, "\(result.1)")
         #expect(result.1.contains("GUI process launch passed"))
     }
 
     @Test func addArgs_withoutSkill() {
         let opts = SkillsCLI.InstallOptions(source: "vercel-labs/agent-skills")
-        #expect(SkillsCLI.addArgs(for: opts) == [
-            "add", "vercel-labs/agent-skills",
-            "-a", "claude-code",
-            "-g", "--copy", "-y"
-        ])
+
+        #expect(
+            SkillsCLI.addArgs(for: opts) == [
+                "add", "vercel-labs/agent-skills",
+                "-a", "claude-code",
+                "-g", "--copy", "-y",
+            ])
     }
 
     @Test func addArgs_skipsCopyWhenDisabled() {
@@ -62,23 +73,27 @@ struct SkillsCLITests {
             global: false,
             copyMode: false
         )
-        #expect(SkillsCLI.addArgs(for: opts) == [
-            "add", "owner/repo",
-            "-a", "claude-code",
-            "-y"
-        ])
+
+        #expect(
+            SkillsCLI.addArgs(for: opts) == [
+                "add", "owner/repo",
+                "-a", "claude-code",
+                "-y",
+            ])
     }
 
     @Test func updateArgs() {
-        #expect(SkillsCLI.updateArgs(skillName: "find-skills") == [
-            "update", "find-skills", "-a", "claude-code", "-g", "-y"
-        ])
+        #expect(
+            SkillsCLI.updateArgs(skillName: "find-skills") == [
+                "update", "find-skills", "-a", "claude-code", "-g", "-y",
+            ])
     }
 
     @Test func removeArgs() {
-        #expect(SkillsCLI.removeArgs(skillName: "find-skills") == [
-            "remove", "find-skills", "-a", "claude-code", "-g", "-y"
-        ])
+        #expect(
+            SkillsCLI.removeArgs(skillName: "find-skills") == [
+                "remove", "find-skills", "-a", "claude-code", "-g", "-y",
+            ])
     }
 
     @Test func shellQuote_leavesSafeCharsAlone() {

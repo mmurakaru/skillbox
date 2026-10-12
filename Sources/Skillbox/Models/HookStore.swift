@@ -1,6 +1,8 @@
 import Foundation
 import Observation
 
+// swiftlint:disable no_untyped_dictionaries - JSON trust boundary: edits Claude Code settings.json, which must round-trip keys it does not model.
+
 struct HookProjectSummary: Identifiable, Hashable {
     let path: String
     let displayName: String
@@ -48,7 +50,9 @@ final class HookStore {
 
     func configure(claudeHomePath: String) {
         let expanded = (claudeHomePath as NSString).expandingTildeInPath
+
         if expanded == self.claudeHomePath { return }
+
         self.claudeHomePath = expanded
         rescan()
     }
@@ -57,9 +61,11 @@ final class HookStore {
         let sources = discoverSources()
         var collected: [Hook] = []
         var firstError: String?
+
         for source in sources {
             do {
                 let entries = try HookScanner.scan(fileURL: source.fileURL, scope: source.scope)
+
                 collected.append(contentsOf: entries)
             } catch {
                 if firstError == nil {
@@ -75,13 +81,17 @@ final class HookStore {
 
     var availableProjects: [HookProjectSummary] {
         var byPath: [String: (name: String, count: Int)] = [:]
+
         for hook in items {
             guard let path = hook.scope.projectPath else { continue }
             let name = hook.scope.displayName
+
             byPath[path, default: (name, 0)].count += 1
             byPath[path]?.name = name
         }
-        return byPath
+
+        return
+            byPath
             .map { HookProjectSummary(path: $0.key, displayName: $0.value.name, count: $0.value.count) }
             .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
     }
@@ -89,6 +99,7 @@ final class HookStore {
     var globalHookCount: Int {
         items.filter {
             if case .userGlobal = $0.scope { return true }
+
             return false
         }.count
     }
@@ -96,14 +107,19 @@ final class HookStore {
     var filteredHooks: [Hook] {
         let scoped = items.filter { hook in
             guard let key = selectedScopeKey, !key.isEmpty else { return true }
+
             if key == "global" {
                 if case .userGlobal = hook.scope { return true }
+
                 return false
             }
+
             return hook.scope.projectPath == key
         }
         let query = searchQuery.trimmingCharacters(in: .whitespaces)
+
         guard !query.isEmpty else { return scoped }
+
         return scoped.filter { Self.matches($0, query) }
     }
 
@@ -116,6 +132,7 @@ final class HookStore {
     func delete(_ hook: Hook) throws {
         let url = hook.fileURL
         let data = try Data(contentsOf: url)
+
         guard var root = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else {
             throw HookStoreError.parseFailed
         }
@@ -124,6 +141,7 @@ final class HookStore {
             withJSONObject: root,
             options: [.prettyPrinted, .withoutEscapingSlashes]
         )
+
         try out.write(to: url, options: .atomic)
         rescan()
     }
@@ -131,41 +149,47 @@ final class HookStore {
     // MARK: - Internal (exposed for tests)
 
     static func deleteAtPointer(in root: inout [String: Any], pointer: String) throws {
-        let tokens = pointer
+        let tokens =
+            pointer
             .split(separator: "/", omittingEmptySubsequences: false)
             .dropFirst()  // leading empty from "/hooks/..."
             .map { Self.unescape(String($0)) }
 
         guard tokens.count == 5,
-              tokens[0] == "hooks",
-              tokens[3] == "hooks",
-              let ruleIdx = Int(tokens[2]),
-              let innerIdx = Int(tokens[4]) else {
+            tokens[0] == "hooks",
+            tokens[3] == "hooks",
+            let ruleIdx = Int(tokens[2]),
+            let innerIdx = Int(tokens[4])
+        else {
             throw HookStoreError.invalidPointer
         }
         let eventKey = tokens[1]
 
         guard var hooksMap = root["hooks"] as? [String: Any],
-              var ruleGroups = hooksMap[eventKey] as? [Any],
-              ruleGroups.indices.contains(ruleIdx),
-              var rule = ruleGroups[ruleIdx] as? [String: Any],
-              var inner = rule["hooks"] as? [Any],
-              inner.indices.contains(innerIdx) else {
+            var ruleGroups = hooksMap[eventKey] as? [Any],
+            ruleGroups.indices.contains(ruleIdx),
+            var rule = ruleGroups[ruleIdx] as? [String: Any],
+            var inner = rule["hooks"] as? [Any],
+            inner.indices.contains(innerIdx)
+        else {
             throw HookStoreError.invalidPointer
         }
 
         inner.remove(at: innerIdx)
+
         if inner.isEmpty {
             ruleGroups.remove(at: ruleIdx)
         } else {
             rule["hooks"] = inner
             ruleGroups[ruleIdx] = rule
         }
+
         if ruleGroups.isEmpty {
             hooksMap.removeValue(forKey: eventKey)
         } else {
             hooksMap[eventKey] = ruleGroups
         }
+
         if hooksMap.isEmpty {
             root.removeValue(forKey: "hooks")
         } else {
@@ -192,19 +216,22 @@ final class HookStore {
 
         let home = URL(fileURLWithPath: claudeHomePath)
         let globalSettings = home.appendingPathComponent("settings.json")
+
         if fm.fileExists(atPath: globalSettings.path) {
             sources.append(HookSource(fileURL: globalSettings, scope: .userGlobal))
             seenPaths.insert(globalSettings.path)
         }
 
         let projectsRoot = home.appendingPathComponent("projects")
+
         guard fm.fileExists(atPath: projectsRoot.path) else { return sources }
 
-        let entries = (try? fm.contentsOfDirectory(
-            at: projectsRoot,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        )) ?? []
+        let entries =
+            (try? fm.contentsOfDirectory(
+                at: projectsRoot,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles]
+            )) ?? []
 
         for projDir in entries {
             guard (try? projDir.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { continue }
@@ -212,22 +239,28 @@ final class HookStore {
             let claudeDir = URL(fileURLWithPath: decoded.full).appendingPathComponent(".claude")
 
             let committed = claudeDir.appendingPathComponent("settings.json")
+
             if fm.fileExists(atPath: committed.path), !seenPaths.contains(committed.path) {
-                sources.append(HookSource(
-                    fileURL: committed,
-                    scope: .project(name: decoded.last, path: decoded.full)
-                ))
+                sources.append(
+                    HookSource(
+                        fileURL: committed,
+                        scope: .project(name: decoded.last, path: decoded.full)
+                    ))
                 seenPaths.insert(committed.path)
             }
+
             let local = claudeDir.appendingPathComponent("settings.local.json")
+
             if fm.fileExists(atPath: local.path), !seenPaths.contains(local.path) {
-                sources.append(HookSource(
-                    fileURL: local,
-                    scope: .projectLocal(name: decoded.last, path: decoded.full)
-                ))
+                sources.append(
+                    HookSource(
+                        fileURL: local,
+                        scope: .projectLocal(name: decoded.last, path: decoded.full)
+                    ))
                 seenPaths.insert(local.path)
             }
         }
+
         return sources
     }
 
@@ -235,6 +268,7 @@ final class HookStore {
         guard !claudeHomePath.isEmpty else { return }
         let urls = ClaudeSettingsWatchRoots.watchURLs(claudeHomePath: claudeHomePath)
         let paths = urls.map(\.path).sorted()
+
         guard paths != watchedPaths else { return }
         watchedPaths = paths
         watcher = DirectoryWatcher(urls: urls, acceptsPath: ClaudeSettingsWatchRoots.acceptsWatchPath) { [weak self] in
@@ -244,20 +278,21 @@ final class HookStore {
 
     private func ensureValidSelection() {
         guard let key = selectedScopeKey, !key.isEmpty else { return }
+
         if key == "global" {
             if globalHookCount == 0 { selectedScopeKey = nil }
+
             return
         }
+
         if !availableProjects.contains(where: { $0.path == key }) {
             selectedScopeKey = nil
         }
     }
 
     private static func matches(_ hook: Hook, _ query: String) -> Bool {
-        hook.eventName.displayLabel.localizedCaseInsensitiveContains(query) ||
-        (hook.matcher ?? "").localizedCaseInsensitiveContains(query) ||
-        hook.payload.localizedCaseInsensitiveContains(query) ||
-        hook.kind.displayLabel.localizedCaseInsensitiveContains(query)
+        hook.eventName.displayLabel.localizedCaseInsensitiveContains(query) || (hook.matcher ?? "").localizedCaseInsensitiveContains(query)
+            || hook.payload.localizedCaseInsensitiveContains(query) || hook.kind.displayLabel.localizedCaseInsensitiveContains(query)
     }
 
     private static func sort(_ hooks: [Hook]) -> [Hook] {
@@ -265,9 +300,11 @@ final class HookStore {
             if lhs.eventName.sortKey.0 != rhs.eventName.sortKey.0 {
                 return lhs.eventName.sortKey.0 < rhs.eventName.sortKey.0
             }
+
             if lhs.eventName.sortKey.1 != rhs.eventName.sortKey.1 {
                 return lhs.eventName.sortKey.1 < rhs.eventName.sortKey.1
             }
+
             return (lhs.matcher ?? "") < (rhs.matcher ?? "")
         }
     }

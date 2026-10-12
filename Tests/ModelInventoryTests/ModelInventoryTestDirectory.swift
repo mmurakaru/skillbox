@@ -21,8 +21,10 @@ final class ModelInventoryTestDirectory {
     @discardableResult
     func writeFile(_ relativePath: String, contents: Data) throws -> URL {
         let fileURL = url.appending(path: relativePath)
+
         try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try contents.write(to: fileURL)
+
         return fileURL
     }
 }

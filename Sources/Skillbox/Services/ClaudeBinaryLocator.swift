@@ -6,21 +6,26 @@ enum ClaudeBinaryLocator {
     /// 2. Otherwise search `$PATH` plus a handful of well-known fallback dirs.
     static func resolve(override: String?) -> Result {
         let trimmed = override?.trimmingCharacters(in: .whitespaces) ?? ""
+
         if !trimmed.isEmpty {
             if FileManager.default.isExecutableFile(atPath: trimmed) {
                 return .resolved(trimmed)
             }
+
             return .overrideMissing(trimmed)
         }
 
         let dirs = pathDirs()
         let fm = FileManager.default
+
         for dir in dirs {
             let candidate = "\(dir)/claude"
+
             if fm.isExecutableFile(atPath: candidate) {
                 return .resolved(candidate)
             }
         }
+
         return .notFoundOnPath(searched: dirs)
     }
 
@@ -40,7 +45,9 @@ enum ClaudeBinaryLocator {
             "\(NSHomeDirectory())/.local/bin",
             "/opt/local/bin",
         ]
+
         for e in extras where !dirs.contains(e) { dirs.append(e) }
+
         return dirs
     }
 }

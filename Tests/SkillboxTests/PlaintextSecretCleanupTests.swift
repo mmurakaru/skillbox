@@ -1,12 +1,14 @@
 import Foundation
 import Testing
+
 @testable import Skillbox
 
 @MainActor
 struct PlaintextSecretCleanupTests {
     private func makeCopy(value: String, fileName: String) -> EnvVar {
-        EnvVar(key: "EXAMPLE_API_TOKEN", value: value, state: .enabled, scope: .userGlobal,
-               fileURL: URL(fileURLWithPath: "/tmp/\(fileName)"), modifiedAt: Date(), isSecret: true)
+        EnvVar(
+            key: "EXAMPLE_API_TOKEN", value: value, state: .enabled, scope: .userGlobal,
+            fileURL: URL(fileURLWithPath: "/tmp/\(fileName)"), modifiedAt: Date(), isSecret: true)
     }
 
     @Test func run_withOneMismatchedCopy_removesNothing() async {
@@ -55,7 +57,9 @@ struct PlaintextSecretCleanupTests {
             removePlaintextCopy: { _ in throw ExampleRemovalError() }
         )
 
-        await #expect(throws: PlaintextSecretCleanupError.partiallyRemoved(removed: ["the static header"], reason: "settings.json is read-only.")) {
+        await #expect(
+            throws: PlaintextSecretCleanupError.partiallyRemoved(removed: ["the static header"], reason: "settings.json is read-only.")
+        ) {
             try await cleanup.run()
         }
     }

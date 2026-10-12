@@ -1,6 +1,8 @@
 import Foundation
 import Observation
 
+// swiftlint:disable no_untyped_dictionaries - JSON trust boundary: edits Claude Code settings.json, which must round-trip keys it does not model.
+
 /// Reads and writes the `skillOverrides` map in `~/.claude/settings.json`.
 /// Watches the file so external edits (e.g. via `/skills` in Claude Code) reflect live.
 @MainActor
@@ -17,7 +19,9 @@ final class SkillOverridesStore {
     func configure(claudeHomePath: String) {
         let expanded = (claudeHomePath as NSString).expandingTildeInPath
         let url = URL(fileURLWithPath: expanded).appendingPathComponent("settings.json")
+
         if url == settingsURL { return }
+
         settingsURL = url
         refresh()
         startWatching()
@@ -27,16 +31,20 @@ final class SkillOverridesStore {
         guard FileManager.default.fileExists(atPath: settingsURL.path) else {
             overrides = [:]
             lastError = nil
+
             return
         }
         do {
             let data = try Data(contentsOf: settingsURL)
+
             guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                 overrides = [:]
                 lastError = "settings.json is not a JSON object"
+
                 return
             }
             let raw = (root["skillOverrides"] as? [String: String]) ?? [:]
+
             overrides = raw.compactMapValues { SkillOverride(rawValue: $0) }
             lastError = nil
         } catch {
@@ -54,17 +62,20 @@ final class SkillOverridesStore {
     func set(_ name: String, to state: SkillOverride) throws {
         try writeSettingsChange { root in
             var map = (root["skillOverrides"] as? [String: String]) ?? [:]
+
             if state == .on {
                 map.removeValue(forKey: name)
             } else {
                 map[name] = state.rawValue
             }
+
             if map.isEmpty {
                 root.removeValue(forKey: "skillOverrides")
             } else {
                 root["skillOverrides"] = map
             }
         }
+
         // Optimistic local update; the watcher will re-confirm on next file change.
         if state == .on {
             overrides.removeValue(forKey: name)
@@ -77,8 +88,10 @@ final class SkillOverridesStore {
 
     private func writeSettingsChange(_ mutate: (inout [String: Any]) -> Void) throws {
         var root: [String: Any] = [:]
+
         if FileManager.default.fileExists(atPath: settingsURL.path) {
             let data = try Data(contentsOf: settingsURL)
+
             if let parsed = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 root = parsed
             } else {
@@ -89,15 +102,19 @@ final class SkillOverridesStore {
                 )
             }
         }
+
         mutate(&root)
         let parent = settingsURL.deletingLastPathComponent()
+
         if !FileManager.default.fileExists(atPath: parent.path) {
             try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
         }
+
         let out = try JSONSerialization.data(
             withJSONObject: root,
             options: [.prettyPrinted, .withoutEscapingSlashes]
         )
+
         try out.write(to: settingsURL, options: .atomic)
     }
 

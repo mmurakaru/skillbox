@@ -1,11 +1,12 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import Skillbox
 
 /// One end-to-end walkthrough of the remote-skill lifecycle:
 /// install → check for updates → run update.
 ///
-/// Reads top-to-bottom like the README — each step asserts the user-visible
+/// Reads top-to-bottom like the README - each step asserts the user-visible
 /// outcome before moving on. If you want to understand what the app does,
 /// start here.
 @MainActor
@@ -32,10 +33,11 @@ struct AppTourTest {
         // 2) After install, a sidecar exists recording where the skill came from
         //    and the SHA at install time.
         let sidecar = try #require(fs.readProvenance(at: installed.folderURL))
+
         #expect(sidecar.source == "https://github.com/vercel-labs/agent-skills/tree/main/skills/find-skills")
         #expect(sidecar.sha == "v1")
         #expect(sidecar.latestKnownSHA == "v1")
-        #expect(sidecar.hasUpdate == false) // freshly installed, nothing to update
+        #expect(sidecar.hasUpdate == false)  // freshly installed, nothing to update
 
         // 3) Time passes. The upstream repo gets a new commit on this skill.
         registry.setSHA(repo: "vercel-labs/agent-skills", path: "skills/find-skills", sha: "v2")
@@ -48,14 +50,16 @@ struct AppTourTest {
             modifiedAt: Date(),
             provenance: sidecar
         )
+
         await service.checkForUpdates([skill])
 
         // The sidecar now records the upstream SHA, but the installed SHA hasn't moved
-        // — the user hasn't accepted the upgrade yet.
+        // - the user hasn't accepted the upgrade yet.
         let afterCheck = try #require(fs.readProvenance(at: installed.folderURL))
+
         #expect(afterCheck.sha == "v1")
         #expect(afterCheck.latestKnownSHA == "v2")
-        #expect(afterCheck.hasUpdate == true) // UI shows the "Update" pill
+        #expect(afterCheck.hasUpdate == true)  // UI shows the "Update" pill
 
         // 5) The user clicks the "Update" pill.
         let staleSkill = Skill(
@@ -65,10 +69,12 @@ struct AppTourTest {
             modifiedAt: Date(),
             provenance: afterCheck
         )
+
         try await service.update(staleSkill) { _ in }
 
         // After update the installed SHA matches upstream and the row goes back to "current".
         let afterUpdate = try #require(fs.readProvenance(at: installed.folderURL))
+
         #expect(afterUpdate.sha == "v2")
         #expect(afterUpdate.latestKnownSHA == "v2")
         #expect(afterUpdate.hasUpdate == false)
@@ -87,6 +93,7 @@ private final class TourCLI: SkillsCLIRunning, @unchecked Sendable {
         stream: @escaping @Sendable (String) -> Void
     ) async throws -> SkillsCLI.RunResult {
         installCalls.append(options)
+
         return SkillsCLI.RunResult(exitCode: 0, combinedOutput: "")
     }
 
@@ -95,6 +102,7 @@ private final class TourCLI: SkillsCLIRunning, @unchecked Sendable {
         stream: @escaping @Sendable (String) -> Void
     ) async throws -> SkillsCLI.RunResult {
         updateCalls.append(skillName)
+
         return SkillsCLI.RunResult(exitCode: 0, combinedOutput: "")
     }
 }

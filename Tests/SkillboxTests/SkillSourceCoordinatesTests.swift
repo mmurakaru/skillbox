@@ -1,4 +1,5 @@
 import Testing
+
 @testable import Skillbox
 
 struct SkillSourceCoordinatesTests {
@@ -9,16 +10,20 @@ struct SkillSourceCoordinatesTests {
             ref: "main"
         )
         let coords = SkillSourceCoordinates.parse(provenance: provenance)
-        #expect(coords == SkillSourceCoordinates(
-            repo: "vercel-labs/agent-skills",
-            branch: "main",
-            path: "skills/frontend-design"
-        ))
+
+        #expect(
+            coords
+                == SkillSourceCoordinates(
+                    repo: "vercel-labs/agent-skills",
+                    branch: "main",
+                    path: "skills/frontend-design"
+                ))
     }
 
     @Test func parse_ownerRepoShorthand_withoutSkill() {
         let provenance = SkillProvenance(source: "owner/repo", ref: "main")
         let coords = SkillSourceCoordinates.parse(provenance: provenance)
+
         #expect(coords?.repo == "owner/repo")
         #expect(coords?.path == "skills")
     }
@@ -29,11 +34,14 @@ struct SkillSourceCoordinatesTests {
             ref: "main"
         )
         let coords = SkillSourceCoordinates.parse(provenance: provenance)
-        #expect(coords == SkillSourceCoordinates(
-            repo: "vercel-labs/agent-skills",
-            branch: "main",
-            path: "skills/frontend-design"
-        ))
+
+        #expect(
+            coords
+                == SkillSourceCoordinates(
+                    repo: "vercel-labs/agent-skills",
+                    branch: "main",
+                    path: "skills/frontend-design"
+                ))
     }
 
     @Test func parse_githubURL_dotGitSuffixStripped() {
@@ -43,12 +51,14 @@ struct SkillSourceCoordinatesTests {
             ref: "main"
         )
         let coords = SkillSourceCoordinates.parse(provenance: provenance)
+
         #expect(coords?.repo == "owner/repo")
         #expect(coords?.path == "skills/foo")
     }
 
     @Test func parse_returnsNilForUnsupportedSource() {
         let provenance = SkillProvenance(source: "/local/path", ref: "main")
+
         #expect(SkillSourceCoordinates.parse(provenance: provenance) == nil)
     }
 }

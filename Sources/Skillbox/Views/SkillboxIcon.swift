@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 @MainActor
 enum MenuBarIcon {
@@ -15,9 +15,9 @@ enum MenuBarIcon {
 
             let anchors: [(CGFloat, CGFloat)] = [
                 (163, 132.335),
-                (0,   287.335),
+                (0, 287.335),
                 (163, 452.335),
-                (0,   615.335),
+                (0, 615.335),
             ]
             let rectSize: CGFloat = 187.149
             let cornerRadius: CGFloat = 8
@@ -33,13 +33,17 @@ enum MenuBarIcon {
                     cornerHeight: cornerRadius,
                     transform: nil
                 )
+
                 ctx.addPath(path)
                 ctx.fillPath()
                 ctx.restoreGState()
             }
+
             return true
         }
+
         image.isTemplate = true
+
         return image
     }()
 }

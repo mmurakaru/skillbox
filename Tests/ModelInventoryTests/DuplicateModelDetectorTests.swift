@@ -1,10 +1,12 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import ModelInventory
 
 struct DuplicateModelDetectorTests {
     private func writeModel(_ name: String, contents: Data, in directory: ModelInventoryTestDirectory) throws -> LocalModel {
         let url = try directory.writeFile(name, contents: contents)
+
         return LocalModel(
             id: "custom:\(url.path)",
             name: url.deletingPathExtension().lastPathComponent,
@@ -33,6 +35,7 @@ struct DuplicateModelDetectorTests {
         let directory = try ModelInventoryTestDirectory()
         let small = try writeModel("a.gguf", contents: Data(repeating: 1, count: 100), in: directory)
         let large = try writeModel("b.gguf", contents: Data(repeating: 1, count: 200), in: directory)
+
         #expect(await DuplicateModelDetector().findDuplicates(in: [small, large]).isEmpty)
     }
 
@@ -40,16 +43,19 @@ struct DuplicateModelDetectorTests {
         let directory = try ModelInventoryTestDirectory()
         let first = try writeModel("a.gguf", contents: Data(repeating: 1, count: 512), in: directory)
         let second = try writeModel("b.gguf", contents: Data(repeating: 2, count: 512), in: directory)
+
         #expect(await DuplicateModelDetector().findDuplicates(in: [first, second]).isEmpty)
     }
 
     @Test func groupsByProvidedDigestWithoutReadingFiles() async {
-        let first = LocalModel(id: "ollama:a", name: "a", source: .ollama,
-                               path: URL(fileURLWithPath: "/nonexistent/a"), format: .ollamaBlob,
-                               sizeBytes: 10, digest: "sha256:abc")
-        let second = LocalModel(id: "ollama:b", name: "b", source: .ollama,
-                                path: URL(fileURLWithPath: "/nonexistent/b"), format: .ollamaBlob,
-                                sizeBytes: 10, digest: "sha256:abc")
+        let first = LocalModel(
+            id: "ollama:a", name: "a", source: .ollama,
+            path: URL(fileURLWithPath: "/nonexistent/a"), format: .ollamaBlob,
+            sizeBytes: 10, digest: "sha256:abc")
+        let second = LocalModel(
+            id: "ollama:b", name: "b", source: .ollama,
+            path: URL(fileURLWithPath: "/nonexistent/b"), format: .ollamaBlob,
+            sizeBytes: 10, digest: "sha256:abc")
 
         let groups = await DuplicateModelDetector().findDuplicates(in: [first, second])
 
@@ -59,10 +65,12 @@ struct DuplicateModelDetectorTests {
 
     @Test func ollamaTagsSharingABlobAreNotReclaimableDuplicates() async {
         let blobs: [String: Int64] = ["sha256:abc": 10]
-        let first = LocalModel(id: "ollama:a", name: "a", source: .ollama, path: URL(fileURLWithPath: "/nonexistent/a"),
-                               format: .ollamaBlob, sizeBytes: 10, digest: "sha256:abc", sharedBlobSizes: blobs)
-        let copiedTag = LocalModel(id: "ollama:b", name: "b", source: .ollama, path: URL(fileURLWithPath: "/nonexistent/b"),
-                                   format: .ollamaBlob, sizeBytes: 10, digest: "sha256:abc", sharedBlobSizes: blobs)
+        let first = LocalModel(
+            id: "ollama:a", name: "a", source: .ollama, path: URL(fileURLWithPath: "/nonexistent/a"),
+            format: .ollamaBlob, sizeBytes: 10, digest: "sha256:abc", sharedBlobSizes: blobs)
+        let copiedTag = LocalModel(
+            id: "ollama:b", name: "b", source: .ollama, path: URL(fileURLWithPath: "/nonexistent/b"),
+            format: .ollamaBlob, sizeBytes: 10, digest: "sha256:abc", sharedBlobSizes: blobs)
 
         #expect(await DuplicateModelDetector().findDuplicates(in: [first, copiedTag]).isEmpty)
     }

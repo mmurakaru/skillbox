@@ -34,19 +34,24 @@ final class FileBackedItemStore<Item: Identifiable & Sendable> {
 
     var filteredItems: [Item] {
         let query = searchQuery.trimmingCharacters(in: .whitespaces)
+
         guard !query.isEmpty else { return items }
+
         return items.filter { matchesQuery($0, query) }
     }
 
     func configure(rootPath: String) {
         let expanded = (rootPath as NSString).expandingTildeInPath
+
         if expanded == self.rootPath { return }
+
         self.rootPath = expanded
         rescan()
     }
 
     func rescan() {
         let url = URL(fileURLWithPath: rootPath)
+
         do {
             items = try scan(url).sorted(by: sort)
             lastError = nil
@@ -69,6 +74,7 @@ final class FileBackedItemStore<Item: Identifiable & Sendable> {
             .map { $0.resolvingSymlinksInPath() }
         let urls = [url] + targets
         let paths = urls.map(\.path).sorted()
+
         guard paths != watchedPaths else { return }
         watchedPaths = paths
         watcher = DirectoryWatcher(urls: urls, acceptsPath: acceptsWatchPath) { [weak self] in

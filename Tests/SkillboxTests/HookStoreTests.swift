@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import Skillbox
 
 @MainActor
@@ -35,6 +36,7 @@ struct HookStoreTests {
             makeHook(event: .preToolUse, payload: "a"),
             makeHook(event: .postToolUse, payload: "b", pointer: "/hooks/PostToolUse/0/hooks/0"),
         ])
+
         #expect(store.filteredHooks.count == 2)
     }
 
@@ -48,6 +50,7 @@ struct HookStoreTests {
                 fileURL: URL(fileURLWithPath: "/Users/me/alpha/.claude/settings.json")
             ),
         ])
+
         store.selectedScopeKey = "global"
         #expect(store.filteredHooks.map(\.payload) == ["global"])
     }
@@ -69,8 +72,10 @@ struct HookStoreTests {
             ),
             makeHook(payload: "global", scope: .userGlobal),
         ])
+
         store.selectedScopeKey = projectPath
         let payloads = store.filteredHooks.map(\.payload).sorted()
+
         #expect(payloads == ["committed", "local"])
     }
 
@@ -79,6 +84,7 @@ struct HookStoreTests {
             makeHook(event: .preToolUse, payload: "a"),
             makeHook(event: .sessionStart, payload: "b", pointer: "/hooks/SessionStart/0/hooks/0"),
         ])
+
         store.searchQuery = "session"
         #expect(store.filteredHooks.map(\.payload) == ["b"])
     }
@@ -88,6 +94,7 @@ struct HookStoreTests {
             makeHook(matcher: "Bash", payload: "a"),
             makeHook(matcher: "Edit", payload: "b", pointer: "/hooks/PreToolUse/1/hooks/0"),
         ])
+
         store.searchQuery = "edit"
         #expect(store.filteredHooks.map(\.payload) == ["b"])
     }
@@ -97,6 +104,7 @@ struct HookStoreTests {
             makeHook(payload: "echo blocked"),
             makeHook(payload: "echo allowed", pointer: "/hooks/PreToolUse/0/hooks/1"),
         ])
+
         store.searchQuery = "blocked"
         #expect(store.filteredHooks.map(\.payload) == ["echo blocked"])
     }
@@ -110,6 +118,7 @@ struct HookStoreTests {
                 pointer: "/hooks/PreToolUse/0/hooks/1"
             ),
         ])
+
         store.selectedScopeKey = ""
         #expect(store.filteredHooks.count == 2)
     }
@@ -124,8 +133,10 @@ struct HookStoreTests {
             makeHook(scope: .userGlobal, pointer: "/hooks/PreToolUse/0/hooks/2"),
         ])
         let projects = store.availableProjects
+
         #expect(projects.count == 1)
         let proj = try? #require(projects.first)
+
         #expect(proj?.path == path)
         #expect(proj?.count == 2)
     }
@@ -137,6 +148,7 @@ struct HookStoreTests {
             makeHook(scope: .project(name: "mu", path: "/m"), pointer: "/hooks/PreToolUse/0/hooks/2"),
         ])
         let names = store.availableProjects.map(\.displayName)
+
         #expect(names == ["alpha", "mu", "zeta"])
     }
 
@@ -152,18 +164,21 @@ struct HookStoreTests {
                             ["type": "command", "command": "a"],
                             ["type": "command", "command": "b"],
                         ],
-                    ],
-                ],
-            ],
+                    ]
+                ]
+            ]
         ]
+
         try HookStore.deleteAtPointer(in: &root, pointer: "/hooks/PreToolUse/0/hooks/0")
 
         let hooksMap = try #require(root["hooks"] as? [String: Any])
         let pre = try #require(hooksMap["PreToolUse"] as? [Any])
         let rule = try #require(pre.first as? [String: Any])
         let inner = try #require(rule["hooks"] as? [Any])
+
         #expect(inner.count == 1)
         let onlyEntry = try #require(inner.first as? [String: Any])
+
         #expect(onlyEntry["command"] as? String == "b")
     }
 
@@ -179,15 +194,18 @@ struct HookStoreTests {
                         "matcher": "Edit",
                         "hooks": [["type": "command", "command": "b"]],
                     ],
-                ],
-            ],
+                ]
+            ]
         ]
+
         try HookStore.deleteAtPointer(in: &root, pointer: "/hooks/PreToolUse/0/hooks/0")
 
         let hooksMap = try #require(root["hooks"] as? [String: Any])
         let pre = try #require(hooksMap["PreToolUse"] as? [Any])
+
         #expect(pre.count == 1)
         let rule = try #require(pre.first as? [String: Any])
+
         #expect(rule["matcher"] as? String == "Edit")
     }
 
@@ -195,16 +213,18 @@ struct HookStoreTests {
         var root: [String: Any] = [
             "hooks": [
                 "PreToolUse": [
-                    ["matcher": "Bash", "hooks": [["type": "command", "command": "a"]]],
+                    ["matcher": "Bash", "hooks": [["type": "command", "command": "a"]]]
                 ],
                 "PostToolUse": [
-                    ["matcher": "Bash", "hooks": [["type": "command", "command": "b"]]],
+                    ["matcher": "Bash", "hooks": [["type": "command", "command": "b"]]]
                 ],
-            ],
+            ]
         ]
+
         try HookStore.deleteAtPointer(in: &root, pointer: "/hooks/PreToolUse/0/hooks/0")
 
         let hooksMap = try #require(root["hooks"] as? [String: Any])
+
         #expect(hooksMap["PreToolUse"] == nil)
         #expect(hooksMap["PostToolUse"] != nil)
     }
@@ -214,10 +234,11 @@ struct HookStoreTests {
             "theme": "dark",
             "hooks": [
                 "PreToolUse": [
-                    ["matcher": "Bash", "hooks": [["type": "command", "command": "a"]]],
-                ],
+                    ["matcher": "Bash", "hooks": [["type": "command", "command": "a"]]]
+                ]
             ],
         ]
+
         try HookStore.deleteAtPointer(in: &root, pointer: "/hooks/PreToolUse/0/hooks/0")
 
         #expect(root["hooks"] == nil)
@@ -228,10 +249,11 @@ struct HookStoreTests {
         var root: [String: Any] = [
             "hooks": [
                 "PreToolUse": [
-                    ["matcher": "Bash", "hooks": [["type": "command", "command": "a"]]],
-                ],
-            ],
+                    ["matcher": "Bash", "hooks": [["type": "command", "command": "a"]]]
+                ]
+            ]
         ]
+
         #expect(throws: HookStoreError.self) {
             try HookStore.deleteAtPointer(in: &root, pointer: "/hooks/PreToolUse/9/hooks/0")
         }
@@ -242,6 +264,7 @@ struct HookStoreTests {
     @Test func delete_writesValidJSONBack() throws {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("skillbox-hook-delete-\(UUID().uuidString).json")
+
         try #"""
         {
           "hooks": {
@@ -268,6 +291,7 @@ struct HookStoreTests {
             pointer: "/hooks/PreToolUse/0/hooks/0",
             fileURL: url
         )
+
         try store.delete(hook)
 
         let data = try Data(contentsOf: url)
@@ -277,6 +301,7 @@ struct HookStoreTests {
         let rule = try #require(pre.first as? [String: Any])
         let inner = try #require(rule["hooks"] as? [Any])
         let only = try #require(inner.first as? [String: Any])
+
         #expect(only["command"] as? String == "b")
     }
 }

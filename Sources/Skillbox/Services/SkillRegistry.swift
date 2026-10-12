@@ -1,6 +1,8 @@
 import Foundation
 import Yams
 
+// swiftlint:disable no_untyped_dictionaries - JSON trust boundary: parses GitHub API payloads.
+
 struct RegistryEntry: Identifiable, Hashable {
     let path: String
     let name: String
@@ -46,9 +48,11 @@ enum SkillRegistry {
             for dir in dirs {
                 group.addTask {
                     let skillPath = "\(dir.path)/SKILL.md"
+
                     do {
                         let md = try await fetchRaw(repo: repo, branch: branch, path: skillPath, session: session)
                         let (name, description) = parseFrontmatter(md, fallbackName: dir.name)
+
                         return RegistryEntry(path: dir.path, name: name, description: description)
                     } catch {
                         return nil
@@ -56,9 +60,11 @@ enum SkillRegistry {
                 }
             }
             var results: [RegistryEntry] = []
+
             for try await entry in group {
                 if let entry { results.append(entry) }
             }
+
             return results.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         }
     }
@@ -69,11 +75,13 @@ enum SkillRegistry {
         path: String,
         session: URLSession = .shared
     ) async throws -> String? {
-        let url = URL(string: "https://api.github.com/repos/\(repo)/commits?path=\(path)&sha=\(branch)&per_page=1")!
+        let url = try requestURL("https://api.github.com/repos/\(repo)/commits?path=\(path)&sha=\(branch)&per_page=1")
         let data = try await fetchData(url: url, session: session)
+
         guard let array = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
             throw RegistryError.decoding("commits response is not an array")
         }
+
         return array.first?["sha"] as? String
     }
 
@@ -81,22 +89,28 @@ enum SkillRegistry {
 
     /// One tree request finds actual skill directories, including nested categories and repository roots.
     static func skillPaths(repo: String, branch: String, session: URLSession = .shared) async throws -> [String] {
-        let url = URL(string: "https://api.github.com/repos/\(repo)/git/trees/\(branch)?recursive=1")!
+        let url = try requestURL("https://api.github.com/repos/\(repo)/git/trees/\(branch)?recursive=1")
         let data = try await fetchData(url: url, session: session)
+
         guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              root["truncated"] as? Bool != true,
-              let tree = root["tree"] as? [[String: Any]] else {
+            root["truncated"] as? Bool != true,
+            let tree = root["tree"] as? [[String: Any]]
+        else {
             throw RegistryError.decoding("Skill directory tree is missing or truncated")
         }
+
         return tree.compactMap { item in
             guard item["type"] as? String == "blob", let path = item["path"] as? String else { return nil }
+
             if path == "SKILL.md" { return "" }
+
             guard path.hasSuffix("/SKILL.md") else { return nil }
+
             return String(path.dropLast("/SKILL.md".count))
         }
     }
 
-    struct DirEntry {
+    struct DirectoryEntry {
         let name: String
         let path: String
     }
@@ -114,15 +128,17 @@ enum SkillRegistry {
         branch: String,
         path: String,
         session: URLSession
-    ) async throws -> [DirEntry] {
+    ) async throws -> [DirectoryEntry] {
         let entries = try await listContents(repo: repo, branch: branch, path: path, session: session)
+
         return entries.compactMap { item in
             guard
                 (item["type"] as? String) == "dir",
                 let name = item["name"] as? String,
-                let p = item["path"] as? String
+                let entryPath = item["path"] as? String
             else { return nil }
-            return DirEntry(name: name, path: p)
+
+            return DirectoryEntry(name: name, path: entryPath)
         }
     }
 
@@ -135,7 +151,9 @@ enum SkillRegistry {
         session: URLSession = .shared
     ) async throws -> [FileEntry] {
         var results: [FileEntry] = []
+
         try await walk(repo: repo, branch: branch, basePath: path, currentPath: path, into: &results, session: session)
+
         return results
     }
 
@@ -148,11 +166,15 @@ enum SkillRegistry {
         session: URLSession
     ) async throws {
         let entries = try await listContents(repo: repo, branch: branch, path: currentPath, session: session)
+
         for item in entries {
             guard let type = item["type"] as? String,
-                  let absolute = item["path"] as? String else { continue }
+                let absolute = item["path"] as? String
+            else { continue }
+
             if type == "file" {
                 let relative = relativizePath(absolute, base: basePath)
+
                 results.append(FileEntry(relativePath: relative, absolutePath: absolute))
             } else if type == "dir" {
                 try await walk(
@@ -169,11 +191,15 @@ enum SkillRegistry {
 
     private static func relativizePath(_ absolute: String, base: String) -> String {
         let trimmedBase = base.hasSuffix("/") ? String(base.dropLast()) : base
+
         if absolute == trimmedBase { return absolute.split(separator: "/").last.map(String.init) ?? absolute }
+
         let prefix = trimmedBase + "/"
+
         if absolute.hasPrefix(prefix) {
             return String(absolute.dropFirst(prefix.count))
         }
+
         return absolute
     }
 
@@ -183,11 +209,13 @@ enum SkillRegistry {
         path: String,
         session: URLSession
     ) async throws -> [[String: Any]] {
-        let url = URL(string: "https://api.github.com/repos/\(repo)/contents/\(path)?ref=\(branch)&per_page=100")!
+        let url = try requestURL("https://api.github.com/repos/\(repo)/contents/\(path)?ref=\(branch)&per_page=100")
         let data = try await fetchData(url: url, session: session)
+
         guard let array = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
             throw RegistryError.decoding("contents response is not an array")
         }
+
         return array
     }
 
@@ -198,7 +226,8 @@ enum SkillRegistry {
         path: String,
         session: URLSession = .shared
     ) async throws -> Data {
-        let url = URL(string: "https://raw.githubusercontent.com/\(repo)/\(branch)/\(path)")!
+        let url = try requestURL("https://raw.githubusercontent.com/\(repo)/\(branch)/\(path)")
+
         return try await fetchData(url: url, session: session)
     }
 
@@ -208,38 +237,54 @@ enum SkillRegistry {
         path: String,
         session: URLSession
     ) async throws -> String {
-        let url = URL(string: "https://raw.githubusercontent.com/\(repo)/\(branch)/\(path)")!
+        let url = try requestURL("https://raw.githubusercontent.com/\(repo)/\(branch)/\(path)")
         let data = try await fetchData(url: url, session: session)
+
         return String(data: data, encoding: .utf8) ?? ""
     }
 
+    /// Repository names and paths come from user input, so a malformed one throws instead of crashing.
+    private static func requestURL(_ string: String) throws -> URL {
+        guard let url = URL(string: string) else { throw URLError(.badURL) }
+
+        return url
+    }
+
     private static func fetchData(url: URL, session: URLSession) async throws -> Data {
-        var req = URLRequest(url: url)
-        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        req.setValue("skillbox", forHTTPHeaderField: "User-Agent")
-        let (data, response) = try await session.data(for: req)
+        var request = URLRequest(url: url)
+
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("skillbox", forHTTPHeaderField: "User-Agent")
+        let (data, response) = try await session.data(for: request)
+
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             throw RegistryError.badResponse(status: http.statusCode)
         }
+
         return data
     }
 
     static func parseFrontmatter(_ markdown: String, fallbackName: String) -> (name: String, description: String) {
         let lines = markdown.components(separatedBy: "\n")
+
         guard lines.first?.trimmingCharacters(in: .whitespaces) == "---" else {
             return (fallbackName, "")
         }
         var fmLines: [String] = []
+
         for line in lines.dropFirst() {
             if line.trimmingCharacters(in: .whitespaces) == "---" { break }
+
             fmLines.append(line)
         }
         let yaml = fmLines.joined(separator: "\n")
+
         guard let parsed = try? Yams.load(yaml: yaml) as? [String: Any] else {
             return (fallbackName, "")
         }
         let name = (parsed["name"] as? String) ?? fallbackName
         let description = (parsed["description"] as? String) ?? ""
+
         return (name, description)
     }
 }

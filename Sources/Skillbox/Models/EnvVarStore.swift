@@ -1,6 +1,8 @@
 import Foundation
 import Observation
 
+// swiftlint:disable no_untyped_dictionaries - JSON trust boundary: edits Claude Code settings.json, which must round-trip keys it does not model.
+
 struct EnvProjectSummary: Identifiable, Hashable {
     let path: String
     let displayName: String
@@ -55,7 +57,9 @@ final class EnvVarStore {
 
     func configure(claudeHomePath: String) {
         let expanded = (claudeHomePath as NSString).expandingTildeInPath
+
         if expanded == self.claudeHomePath { return }
+
         self.claudeHomePath = expanded
         rescan()
     }
@@ -65,12 +69,14 @@ final class EnvVarStore {
         let stash = EnvVarScanner.loadStash(stashURL: stashURL)
         let sources = discoverSources()
         var collected: [EnvVar] = []
+
         for source in sources {
             let entries = EnvVarScanner.scan(
                 settingsURL: source.fileURL,
                 scope: source.scope,
                 stashEntries: stash[source.fileURL.path] ?? [:]
             )
+
             collected.append(contentsOf: entries)
         }
         for index in collected.indices {
@@ -86,13 +92,17 @@ final class EnvVarStore {
 
     var availableProjects: [EnvProjectSummary] {
         var byPath: [String: (name: String, count: Int)] = [:]
+
         for item in items {
             guard let path = item.scope.projectPath else { continue }
             let name = item.scope.displayName
+
             byPath[path, default: (name, 0)].count += 1
             byPath[path]?.name = name
         }
-        return byPath
+
+        return
+            byPath
             .map { EnvProjectSummary(path: $0.key, displayName: $0.value.name, count: $0.value.count) }
             .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
     }
@@ -100,6 +110,7 @@ final class EnvVarStore {
     var globalCount: Int {
         items.filter {
             if case .userGlobal = $0.scope { return true }
+
             return false
         }.count
     }
@@ -111,37 +122,47 @@ final class EnvVarStore {
         guard !claudeHomePath.isEmpty else { return [.userGlobal] }
         var scopes: [EnvScope] = [.userGlobal]
         let projectsRoot = URL(fileURLWithPath: claudeHomePath).appendingPathComponent("projects")
-        let entries = (try? FileManager.default.contentsOfDirectory(
-            at: projectsRoot,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        )) ?? []
+        let entries =
+            (try? FileManager.default.contentsOfDirectory(
+                at: projectsRoot,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles]
+            )) ?? []
 
         var seenProjectPaths: Set<String> = []
+
         for projDir in entries {
             guard (try? projDir.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { continue }
             let decoded = Memory.decodeProjectPath(projDir.lastPathComponent)
+
             guard FileManager.default.fileExists(atPath: decoded.full) else { continue }
             guard !seenProjectPaths.contains(decoded.full) else { continue }
             seenProjectPaths.insert(decoded.full)
             scopes.append(.project(name: decoded.last, path: decoded.full))
             scopes.append(.projectLocal(name: decoded.last, path: decoded.full))
         }
+
         return scopes
     }
 
     var filteredEnvVars: [EnvVar] {
         let scoped = items.filter { item in
             guard let key = selectedScopeKey, !key.isEmpty else { return true }
+
             if key == Self.keychainScopeKey { return false }
+
             if key == "global" {
                 if case .userGlobal = item.scope { return true }
+
                 return false
             }
+
             return item.scope.projectPath == key
         }
         let query = searchQuery.trimmingCharacters(in: .whitespaces)
+
         guard !query.isEmpty else { return scoped }
+
         return scoped.filter { Self.matches($0, query) }
     }
 
@@ -153,6 +174,7 @@ final class EnvVarStore {
         switch envVar.state {
         case .enabled:
             try removeFromSettings(key: envVar.key, fileURL: envVar.fileURL)
+
             if !envVar.isSecret {
                 try writeStashChange(filePath: envVar.fileURL.path) { entries in
                     entries[envVar.key] = envVar.value
@@ -161,6 +183,7 @@ final class EnvVarStore {
         case .disabled:
             try writeSettingsChange(fileURL: envVar.fileURL) { root in
                 var env = (root["env"] as? [String: Any]) ?? [:]
+
                 env[envVar.key] = envVar.value
                 root["env"] = env
             }
@@ -204,6 +227,7 @@ final class EnvVarStore {
         if items.contains(where: { $0.fileURL.path == fileURL.path && $0.key == key }) {
             throw EnvVarStoreError.duplicateKey(key)
         }
+
         if EnvSecretDetection.isSecret(key: key, markedSecretNames: markedSecretNames), scope.isSharedWithVersionControl {
             throw EnvVarStoreError.secretInSharedProjectScope(key)
         }
@@ -211,6 +235,7 @@ final class EnvVarStore {
         try ensureParentDirectory(for: fileURL)
         try writeSettingsChange(fileURL: fileURL) { root in
             var env = (root["env"] as? [String: Any]) ?? [:]
+
             env[key] = value
             root["env"] = env
         }
@@ -222,15 +247,18 @@ final class EnvVarStore {
         if marked {
             try validateSecretMark(forName: key)
         }
+
         try saveSecretMark(marked, forName: key)
         rescan()
     }
 
     private func validateSecretMark(forName key: String) throws {
         let instances = items.filter { $0.key == key }
+
         if instances.contains(where: { $0.scope.isSharedWithVersionControl }) {
             throw EnvVarStoreError.secretInSharedProjectScope(key)
         }
+
         if instances.contains(where: { !$0.isEnabled }) {
             throw EnvVarStoreError.secretMarkOnDisabledVar(key)
         }
@@ -238,7 +266,9 @@ final class EnvVarStore {
 
     private func saveSecretMark(_ marked: Bool, forName key: String) throws {
         var names = secretMarksFile.load()
+
         if marked { names.insert(key) } else { names.remove(key) }
+
         try secretMarksFile.save(names)
     }
 
@@ -272,39 +302,48 @@ final class EnvVarStore {
     func removeFromSettings(key: String, fileURL: URL) throws {
         guard FileManager.default.fileExists(atPath: fileURL.path) else { return }
         let data = try Data(contentsOf: fileURL)
+
         guard var root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw EnvVarStoreError.parseFailed
         }
         var env = (root["env"] as? [String: Any]) ?? [:]
+
         env.removeValue(forKey: key)
+
         if env.isEmpty {
             root.removeValue(forKey: "env")
         } else {
             root["env"] = env
         }
+
         let out = try JSONSerialization.data(
             withJSONObject: root,
             options: [.prettyPrinted, .withoutEscapingSlashes]
         )
+
         try out.write(to: fileURL, options: .atomic)
     }
 
     /// Read settings.json (or treat as `{}` if missing), apply mutation, write back.
     func writeSettingsChange(fileURL: URL, _ mutate: (inout [String: Any]) -> Void) throws {
         var root: [String: Any] = [:]
+
         if FileManager.default.fileExists(atPath: fileURL.path) {
             let data = try Data(contentsOf: fileURL)
+
             if let parsed = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 root = parsed
             } else {
                 throw EnvVarStoreError.parseFailed
             }
         }
+
         mutate(&root)
         let out = try JSONSerialization.data(
             withJSONObject: root,
             options: [.prettyPrinted, .withoutEscapingSlashes]
         )
+
         try out.write(to: fileURL, options: .atomic)
     }
 
@@ -313,22 +352,27 @@ final class EnvVarStore {
     func writeStashChange(filePath: String, _ mutate: (inout [String: String]) -> Void) throws {
         var stash = EnvVarScanner.loadStash(stashURL: stashURL)
         var entries = stash[filePath] ?? [:]
+
         mutate(&entries)
+
         if entries.isEmpty {
             stash.removeValue(forKey: filePath)
         } else {
             stash[filePath] = entries
         }
+
         let asAny: [String: Any] = stash.reduce(into: [:]) { $0[$1.key] = $1.value }
         let out = try JSONSerialization.data(
             withJSONObject: asAny,
             options: [.prettyPrinted, .withoutEscapingSlashes]
         )
+
         try out.write(to: stashURL, options: .atomic)
     }
 
     private func ensureParentDirectory(for fileURL: URL) throws {
         let parent = fileURL.deletingLastPathComponent()
+
         if !FileManager.default.fileExists(atPath: parent.path) {
             try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
         }
@@ -352,19 +396,22 @@ final class EnvVarStore {
 
         let home = URL(fileURLWithPath: claudeHomePath)
         let globalSettings = home.appendingPathComponent("settings.json")
+
         if fm.fileExists(atPath: globalSettings.path) {
             sources.append(EnvSource(fileURL: globalSettings, scope: .userGlobal))
             seenPaths.insert(globalSettings.path)
         }
 
         let projectsRoot = home.appendingPathComponent("projects")
+
         guard fm.fileExists(atPath: projectsRoot.path) else { return sources }
 
-        let entries = (try? fm.contentsOfDirectory(
-            at: projectsRoot,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        )) ?? []
+        let entries =
+            (try? fm.contentsOfDirectory(
+                at: projectsRoot,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles]
+            )) ?? []
 
         for projDir in entries {
             guard (try? projDir.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { continue }
@@ -372,22 +419,28 @@ final class EnvVarStore {
             let claudeDir = URL(fileURLWithPath: decoded.full).appendingPathComponent(".claude")
 
             let committed = claudeDir.appendingPathComponent("settings.json")
+
             if fm.fileExists(atPath: committed.path), !seenPaths.contains(committed.path) {
-                sources.append(EnvSource(
-                    fileURL: committed,
-                    scope: .project(name: decoded.last, path: decoded.full)
-                ))
+                sources.append(
+                    EnvSource(
+                        fileURL: committed,
+                        scope: .project(name: decoded.last, path: decoded.full)
+                    ))
                 seenPaths.insert(committed.path)
             }
+
             let local = claudeDir.appendingPathComponent("settings.local.json")
+
             if fm.fileExists(atPath: local.path), !seenPaths.contains(local.path) {
-                sources.append(EnvSource(
-                    fileURL: local,
-                    scope: .projectLocal(name: decoded.last, path: decoded.full)
-                ))
+                sources.append(
+                    EnvSource(
+                        fileURL: local,
+                        scope: .projectLocal(name: decoded.last, path: decoded.full)
+                    ))
                 seenPaths.insert(local.path)
             }
         }
+
         return sources
     }
 
@@ -395,6 +448,7 @@ final class EnvVarStore {
         guard !claudeHomePath.isEmpty else { return }
         let urls = ClaudeSettingsWatchRoots.watchURLs(claudeHomePath: claudeHomePath)
         let paths = urls.map(\.path).sorted()
+
         guard paths != watchedPaths else { return }
         watchedPaths = paths
         watcher = DirectoryWatcher(urls: urls, acceptsPath: ClaudeSettingsWatchRoots.acceptsWatchPath) { [weak self] in
@@ -404,10 +458,13 @@ final class EnvVarStore {
 
     private func ensureValidSelection() {
         guard let key = selectedScopeKey, !key.isEmpty, key != Self.keychainScopeKey else { return }
+
         if key == "global" {
             if globalCount == 0 { selectedScopeKey = nil }
+
             return
         }
+
         if !availableProjects.contains(where: { $0.path == key }) {
             selectedScopeKey = nil
         }
@@ -415,10 +472,16 @@ final class EnvVarStore {
 
     private static func matches(_ item: EnvVar, _ query: String) -> Bool {
         if item.key.localizedCaseInsensitiveContains(query) { return true }
+
         // Matching on a secret's value would reveal it one keystroke at a time.
         if !item.isSecret, item.value.localizedCaseInsensitiveContains(query) { return true }
+
         if let desc = EnvVarCatalog.description(for: item.key),
-           desc.localizedCaseInsensitiveContains(query) { return true }
+            desc.localizedCaseInsensitiveContains(query)
+        {
+            return true
+        }
+
         return false
     }
 
@@ -427,6 +490,7 @@ final class EnvVarStore {
             if lhs.key != rhs.key {
                 return lhs.key.localizedCaseInsensitiveCompare(rhs.key) == .orderedAscending
             }
+
             return scopeRank(lhs.scope) < scopeRank(rhs.scope)
         }
     }

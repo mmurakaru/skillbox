@@ -25,7 +25,9 @@ final class MemoryStore {
             scan: { try MemoryScanner.scan(rootURL: $0) },
             matchesQuery: Self.matches,
             sort: { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending },
-            acceptsWatchPath: { URL(fileURLWithPath: $0).pathExtension.lowercased() == "md" || URL(fileURLWithPath: $0).pathExtension.isEmpty }
+            acceptsWatchPath: {
+                URL(fileURLWithPath: $0).pathExtension.lowercased() == "md" || URL(fileURLWithPath: $0).pathExtension.isEmpty
+            }
         )
     }
 
@@ -58,9 +60,11 @@ final class MemoryStore {
 
     var availableProjects: [ProjectSummary] {
         let groups = Dictionary(grouping: memories) { $0.projectFolderURL.path }
+
         return groups.map { (_, entries) in
             let first = entries[0]
             let mostRecent = entries.map(\.modifiedAt).max() ?? first.modifiedAt
+
             return ProjectSummary(
                 folderURL: first.projectFolderURL,
                 displayName: first.projectDisplayName,
@@ -75,23 +79,26 @@ final class MemoryStore {
     var filteredMemories: [Memory] {
         let scoped = memories.filter { mem in
             guard let selected = selectedProjectPath, !selected.isEmpty else { return true }
+
             return mem.projectFolderURL.path == selected
         }
         let query = searchQuery.trimmingCharacters(in: .whitespaces)
+
         guard !query.isEmpty else { return scoped }
+
         return scoped.filter { Self.matches($0, query) }
     }
 
     // MARK: - Private
 
     private static func matches(_ memory: Memory, _ query: String) -> Bool {
-        memory.name.localizedCaseInsensitiveContains(query) ||
-        memory.description.localizedCaseInsensitiveContains(query) ||
-        memory.projectDisplayName.localizedCaseInsensitiveContains(query)
+        memory.name.localizedCaseInsensitiveContains(query) || memory.description.localizedCaseInsensitiveContains(query)
+            || memory.projectDisplayName.localizedCaseInsensitiveContains(query)
     }
 
     private func ensureValidSelection() {
         guard let selected = selectedProjectPath, !selected.isEmpty else { return }
+
         if !availableProjects.contains(where: { $0.folderURL.path == selected }) {
             selectedProjectPath = nil
         }

@@ -1,12 +1,15 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import Skillbox
 
 struct MemoryScannerTests {
     private func makeFixture() throws -> URL {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("skillbox-scanner-tests-\(UUID().uuidString)")
+
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
         return root
     }
 
@@ -24,14 +27,17 @@ struct MemoryScannerTests {
 
     @Test func scan_emptyRoot_returnsEmpty() throws {
         let root = try makeFixture()
+
         defer { cleanup(root) }
 
         let result = try MemoryScanner.scan(rootURL: root)
+
         #expect(result.isEmpty)
     }
 
     @Test func scan_projectWithoutMemoryDir_isIgnored() throws {
         let root = try makeFixture()
+
         defer { cleanup(root) }
 
         try FileManager.default.createDirectory(
@@ -40,31 +46,38 @@ struct MemoryScannerTests {
         )
 
         let result = try MemoryScanner.scan(rootURL: root)
+
         #expect(result.isEmpty)
     }
 
     @Test func scan_parsesFrontmatterFields() throws {
         let root = try makeFixture()
+
         defer { cleanup(root) }
 
-        let memoryFile = root
+        let memoryFile =
+            root
             .appendingPathComponent("-Users-alice-project")
             .appendingPathComponent("memory")
             .appendingPathComponent("feedback_use_pnpm.md")
 
-        try writeFile(at: memoryFile, contents: """
-        ---
-        name: Use pnpm not npm
-        description: User prefers pnpm for all package install commands
-        type: feedback
-        ---
+        try writeFile(
+            at: memoryFile,
+            contents: """
+                ---
+                name: Use pnpm not npm
+                description: User prefers pnpm for all package install commands
+                type: feedback
+                ---
 
-        Body of the memory entry.
-        """)
+                Body of the memory entry.
+                """)
 
         let result = try MemoryScanner.scan(rootURL: root)
+
         #expect(result.count == 1)
         let entry = try #require(result.first)
+
         #expect(entry.name == "Use pnpm not npm")
         #expect(entry.description == "User prefers pnpm for all package install commands")
         #expect(entry.type == .feedback)
@@ -72,9 +85,11 @@ struct MemoryScannerTests {
 
     @Test func scan_skipsMEMORYIndexFile() throws {
         let root = try makeFixture()
+
         defer { cleanup(root) }
 
-        let memoryDir = root
+        let memoryDir =
+            root
             .appendingPathComponent("-Users-alice-project")
             .appendingPathComponent("memory")
 
@@ -82,46 +97,56 @@ struct MemoryScannerTests {
             at: memoryDir.appendingPathComponent("MEMORY.md"),
             contents: "# Memory Index\n\n- [feedback_use_pnpm.md](feedback_use_pnpm.md) - line\n"
         )
-        try writeFile(at: memoryDir.appendingPathComponent("feedback_use_pnpm.md"), contents: """
-        ---
-        name: Use pnpm
-        description: prefer pnpm
-        type: feedback
-        ---
-        """)
+        try writeFile(
+            at: memoryDir.appendingPathComponent("feedback_use_pnpm.md"),
+            contents: """
+                ---
+                name: Use pnpm
+                description: prefer pnpm
+                type: feedback
+                ---
+                """)
 
         let result = try MemoryScanner.scan(rootURL: root)
+
         #expect(result.count == 1)
         #expect(result.first?.name == "Use pnpm")
     }
 
     @Test func scan_ignoresNonMarkdownFiles() throws {
         let root = try makeFixture()
+
         defer { cleanup(root) }
 
-        let memoryDir = root
+        let memoryDir =
+            root
             .appendingPathComponent("-Users-alice-project")
             .appendingPathComponent("memory")
 
         try writeFile(at: memoryDir.appendingPathComponent("notes.txt"), contents: "ignore me")
-        try writeFile(at: memoryDir.appendingPathComponent("user_role.md"), contents: """
-        ---
-        name: Role
-        description: data scientist
-        type: user
-        ---
-        """)
+        try writeFile(
+            at: memoryDir.appendingPathComponent("user_role.md"),
+            contents: """
+                ---
+                name: Role
+                description: data scientist
+                type: user
+                ---
+                """)
 
         let result = try MemoryScanner.scan(rootURL: root)
+
         #expect(result.count == 1)
         #expect(result.first?.name == "Role")
     }
 
     @Test func scan_missingFrontmatter_fallsBackToFilenameAndPrefixType() throws {
         let root = try makeFixture()
+
         defer { cleanup(root) }
 
-        let memoryFile = root
+        let memoryFile =
+            root
             .appendingPathComponent("-Users-alice-project")
             .appendingPathComponent("memory")
             .appendingPathComponent("reference_some_topic.md")
@@ -130,35 +155,42 @@ struct MemoryScannerTests {
 
         let result = try MemoryScanner.scan(rootURL: root)
         let entry = try #require(result.first)
+
         #expect(entry.name == "reference some topic")
-        #expect(entry.description == "")
+        #expect(entry.description.isEmpty)
         #expect(entry.type == .reference)
     }
 
     @Test func scan_typeFromFilename_whenFrontmatterOmitsType() throws {
         let root = try makeFixture()
+
         defer { cleanup(root) }
 
-        let memoryFile = root
+        let memoryFile =
+            root
             .appendingPathComponent("-Users-alice-project")
             .appendingPathComponent("memory")
             .appendingPathComponent("project_auth_rewrite.md")
 
-        try writeFile(at: memoryFile, contents: """
-        ---
-        name: Auth middleware rewrite
-        description: legal-driven, not tech debt
-        ---
-        body
-        """)
+        try writeFile(
+            at: memoryFile,
+            contents: """
+                ---
+                name: Auth middleware rewrite
+                description: legal-driven, not tech debt
+                ---
+                body
+                """)
 
         let result = try MemoryScanner.scan(rootURL: root)
         let entry = try #require(result.first)
+
         #expect(entry.type == .project)
     }
 
     @Test func scan_aggregatesAcrossMultipleProjects() throws {
         let root = try makeFixture()
+
         defer { cleanup(root) }
 
         try writeFile(
@@ -175,8 +207,10 @@ struct MemoryScannerTests {
         )
 
         let result = try MemoryScanner.scan(rootURL: root)
+
         #expect(result.count == 2)
         let names = Set(result.map(\.name))
+
         #expect(names == ["A role", "B feedback"])
     }
 }

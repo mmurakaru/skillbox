@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 /// A regular window keeps the usage editor alive when the menu bar popover loses focus.
 struct UsageSnapshotScene: Scene {

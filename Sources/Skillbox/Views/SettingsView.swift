@@ -1,8 +1,8 @@
-import SwiftUI
-import ServiceManagement
 import AppKit
-import Sparkle
 import ModelInventory
+import ServiceManagement
+import Sparkle
+import SwiftUI
 
 struct SettingsView: View {
     @Environment(SkillStore.self) private var skillStore
@@ -22,10 +22,13 @@ struct SettingsView: View {
     @AppStorage("launchAtLogin") private var launchAtLogin: Bool = false
     @AppStorage("syncRemoteSkillsOnLaunch") private var syncRemoteSkillsOnLaunch: Bool = false
     @AppStorage(LocalModelScanSettings.scanOllamaKey) private var scanOllamaModels: Bool = LocalModelScanSettings.sourceEnabledByDefault
-    @AppStorage(LocalModelScanSettings.scanHuggingFaceKey) private var scanHuggingFaceModels: Bool = LocalModelScanSettings.sourceEnabledByDefault
+    @AppStorage(LocalModelScanSettings.scanHuggingFaceKey) private var scanHuggingFaceModels: Bool = LocalModelScanSettings
+        .sourceEnabledByDefault
     @AppStorage(LocalModelScanSettings.scanLMStudioKey) private var scanLMStudioModels: Bool = LocalModelScanSettings.sourceEnabledByDefault
-    @AppStorage(LocalModelScanSettings.scanOpenWhisprKey) private var scanOpenWhisprModels: Bool = LocalModelScanSettings.sourceEnabledByDefault
-    @AppStorage(LocalModelScanSettings.scanAppSupportKey) private var scanAppSupportModels: Bool = LocalModelScanSettings.sourceEnabledByDefault
+    @AppStorage(LocalModelScanSettings.scanOpenWhisprKey) private var scanOpenWhisprModels: Bool = LocalModelScanSettings
+        .sourceEnabledByDefault
+    @AppStorage(LocalModelScanSettings.scanAppSupportKey) private var scanAppSupportModels: Bool = LocalModelScanSettings
+        .sourceEnabledByDefault
     @AppStorage(LocalModelScanSettings.customPathsKey) private var customModelPaths: String = ""
     @State private var customModelPathsDraft: String?
     @FocusState private var customModelPathsFieldFocused: Bool
@@ -42,6 +45,7 @@ struct SettingsView: View {
                 Button(action: { insightsModel.run(claudeOverride: claudeCommand) }) {
                     HStack {
                         if insightsModel.isRunning { ProgressView().controlSize(.small) }
+
                         Label("Claude Code Insights", systemImage: "lightbulb")
                     }
                 }
@@ -59,37 +63,50 @@ struct SettingsView: View {
                     if typeSafeSettings.needsUnlock {
                         Button("Unlock saved key") { typeSafeSettings.unlockSavedAPIKey() }
                     }
+
                     Button("Save key") { typeSafeSettings.saveAPIKey(typeSafeAPIKey) }
                         .disabled(typeSafeAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
                     if !typeSafeSettings.apiKey.isEmpty {
                         Button("Remove key") {
                             typeSafeSettings.saveAPIKey("")
+
                             if typeSafeSettings.lastError == nil { typeSafeAPIKey = "" }
                         }
                     }
+
                     Spacer()
                     Link("Get an API key", destination: URL(string: "https://console.typesafe.ai")!)
                 }
-                Text(typeSafeSettings.needsUnlock ? "Saved key is locked for this build." : typeSafeSettings.apiKey.isEmpty ? "No API key saved." : "API key saved in macOS Keychain.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                Text("Skills are classified automatically on launch and when added or changed. Their SKILL.md contents are sent to TypeSafe; unchanged results are reused.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                Text(
+                    typeSafeSettings.needsUnlock
+                        ? "Saved key is locked for this build."
+                        : typeSafeSettings.apiKey.isEmpty ? "No API key saved." : "API key saved in macOS Keychain."
+                )
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                Text(
+                    "Skills are classified automatically on launch and when added or changed. Their SKILL.md contents are sent to TypeSafe; unchanged results are reused."
+                )
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
                 HStack {
                     Button("Retry classification") {
                         classifications.startClassification(skills: skillStore.items, apiKey: typeSafeSettings.apiKey)
                     }
                     .disabled(typeSafeSettings.apiKey.isEmpty || skillStore.items.isEmpty || classifications.isClassifying)
                     .tint(classifications.hasClassificationFailure ? .red : nil)
+
                     if classifications.isClassifying {
                         ProgressView().controlSize(.small)
                         Button("Cancel") { classifications.cancelClassification() }
                     }
                 }
+
                 if let message = classifications.statusMessage {
                     Text(message).font(.system(size: 11)).foregroundStyle(.secondary)
                 }
+
                 if let error = typeSafeSettings.lastError {
                     Text(error).font(.system(size: 11)).foregroundStyle(.red)
                 }
@@ -138,6 +155,7 @@ struct SettingsView: View {
                     if detectedEditors.isEmpty {
                         Text("No GUI editor detected").tag("")
                     }
+
                     ForEach(detectedEditors, id: \.command) { editor in
                         Text(editor.displayName).tag(editor.command)
                     }
@@ -146,7 +164,9 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.menu)
 
-                if editorCommand == "__custom__" || (!editorCommand.isEmpty && !detectedEditors.contains(where: { $0.command == editorCommand })) {
+                if editorCommand == "__custom__"
+                    || (!editorCommand.isEmpty && !detectedEditors.contains(where: { $0.command == editorCommand }))
+                {
                     TextField("Custom command (e.g. /usr/local/bin/code)", text: $editorCommand)
                         .textFieldStyle(.roundedBorder)
                 }
@@ -230,19 +250,24 @@ struct SettingsView: View {
             Toggle("OpenWhispr", isOn: $scanOpenWhisprModels)
             Toggle("Application Support model folders", isOn: $scanAppSupportModels)
             VStack(alignment: .leading, spacing: 6) {
-                TextField("Additional folders", text: Binding(
-                    get: { customModelPathsDraft ?? customModelPaths },
-                    set: { customModelPathsDraft = $0 }
-                ))
+                TextField(
+                    "Additional folders",
+                    text: Binding(
+                        get: { customModelPathsDraft ?? customModelPaths },
+                        set: { customModelPathsDraft = $0 }
+                    )
+                )
                 .textFieldStyle(.roundedBorder)
                 .focused($customModelPathsFieldFocused)
                 .onSubmit(commitCustomModelPaths)
                 .onChange(of: customModelPathsFieldFocused) { _, focused in
                     if !focused { commitCustomModelPaths() }
                 }
-                Text("Comma-separated folders to search for .gguf and .safetensors files. Press Return to apply. Your home folder and / are skipped.")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
+                Text(
+                    "Comma-separated folders to search for .gguf and .safetensors files. Press Return to apply. Your home folder and / are skipped."
+                )
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
             }
         } header: {
             Text("Local models")
@@ -266,10 +291,12 @@ struct SettingsView: View {
 
     private func browseForFolder(binding: Binding<String>) {
         let panel = NSOpenPanel()
+
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         panel.directoryURL = URL(fileURLWithPath: (binding.wrappedValue as NSString).expandingTildeInPath)
+
         if panel.runModal() == .OK, let url = panel.url {
             binding.wrappedValue = url.path
         }
@@ -278,17 +305,21 @@ struct SettingsView: View {
     private func openAgentsMd() {
         let target = (NSHomeDirectory() as NSString).appendingPathComponent("AGENTS.md")
         let command = editorCommand.isEmpty ? EditorDetector.preferredCommand : editorCommand
+
         EditorLauncher.openAsWorkspace(target, command: command)
     }
 
     private func browseForFile(binding: Binding<String>) {
         let panel = NSOpenPanel()
+
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
         panel.treatsFilePackagesAsDirectories = true
         let initial = binding.wrappedValue.isEmpty ? "/usr/local/bin" : (binding.wrappedValue as NSString).expandingTildeInPath
+
         panel.directoryURL = URL(fileURLWithPath: initial)
+
         if panel.runModal() == .OK, let url = panel.url {
             binding.wrappedValue = url.path
         }
@@ -316,6 +347,7 @@ struct SettingsView: View {
 
     private func syncAllNow() {
         let remoteSkills = skillStore.items.filter { $0.provenance != nil }
+
         isSyncingAll = true
         Task { @MainActor in
             await skillFolderSync.syncAll(remoteSkills)
@@ -341,10 +373,12 @@ struct SettingsView: View {
                     CheckForUpdatesView(updater: updater)
                 }
 
-                Toggle("Automatically check for updates", isOn: Binding(
-                    get: { updater.automaticallyChecksForUpdates },
-                    set: { updater.automaticallyChecksForUpdates = $0 }
-                ))
+                Toggle(
+                    "Automatically check for updates",
+                    isOn: Binding(
+                        get: { updater.automaticallyChecksForUpdates },
+                        set: { updater.automaticallyChecksForUpdates = $0 }
+                    ))
             } header: {
                 Text("Updates")
             }
@@ -355,6 +389,7 @@ struct SettingsView: View {
         let info = Bundle.main.infoDictionary
         let short = info?["CFBundleShortVersionString"] as? String ?? "?"
         let build = info?["CFBundleVersion"] as? String ?? "?"
+
         return "Current version: \(short) (build \(build))"
     }
 }

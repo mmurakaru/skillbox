@@ -73,6 +73,7 @@ extension Collection where Element == LocalModel {
     public var totalStorageBytes: Int64 {
         var blobSizes: [String: Int64] = [:]
         var otherBytes: Int64 = 0
+
         for model in self {
             if model.sharedBlobSizes.isEmpty {
                 otherBytes += model.sizeBytes
@@ -80,6 +81,7 @@ extension Collection where Element == LocalModel {
                 blobSizes.merge(model.sharedBlobSizes) { first, _ in first }
             }
         }
+
         return blobSizes.values.reduce(otherBytes, +)
     }
 }
@@ -88,8 +90,10 @@ extension Int64 {
     /// File-size text for a byte count, for example "4.7 GB".
     public var formattedFileSize: String {
         let formatter = ByteCountFormatter()
+
         formatter.countStyle = .file
         formatter.allowsNonnumericFormatting = false
+
         return formatter.string(fromByteCount: self)
     }
 }

@@ -1,6 +1,6 @@
-import SwiftUI
 import AppKit
 import ModelInventory
+import SwiftUI
 
 /// One Hub search result: name, lab, parameter hint, downloads, and hand-off actions on hover.
 struct HuggingFaceHubModelRowView: View {
@@ -18,6 +18,7 @@ struct HuggingFaceHubModelRowView: View {
                         .font(.system(size: 13, weight: .semibold))
                         .lineLimit(1)
                         .truncationMode(.middle)
+
                     if isInstalled {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 10))
@@ -50,6 +51,7 @@ struct HuggingFaceHubModelRowView: View {
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
+
                 if let downloads = model.downloads {
                     Text("\(downloads.formatted(.number.notation(.compactName))) downloads")
                         .font(.system(size: 9))

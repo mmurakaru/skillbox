@@ -1,6 +1,8 @@
 import Foundation
 import Yams
 
+// swiftlint:disable no_untyped_dictionaries - JSON trust boundary: reads YAML frontmatter, which may hold any value type.
+
 enum SkillScanner {
     static func scan(rootURL: URL) throws -> [Skill] {
         let fm = FileManager.default
@@ -13,7 +15,9 @@ enum SkillScanner {
         return children.compactMap { childURL in
             guard isSkillDirectory(childURL) else { return nil }
             let skillFile = childURL.appendingPathComponent("SKILL.md")
+
             guard fm.fileExists(atPath: skillFile.path) else { return nil }
+
             return parseSkill(folderURL: childURL, skillFileURL: skillFile)
         }
     }
@@ -22,15 +26,18 @@ enum SkillScanner {
         if (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
             return true
         }
+
         guard (try? url.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true else {
             return false
         }
+
         return (try? url.resolvingSymlinksInPath().resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
     }
 
     private static func parseSkill(folderURL: URL, skillFileURL: URL) -> Skill? {
         guard let data = try? Data(contentsOf: skillFileURL),
-              let content = String(data: data, encoding: .utf8) else { return nil }
+            let content = String(data: data, encoding: .utf8)
+        else { return nil }
 
         guard let frontmatter = extractFrontmatter(from: content) else { return nil }
 
@@ -40,7 +47,8 @@ enum SkillScanner {
         let description = (yaml["description"] as? String) ?? ""
         let authorLocked = (yaml["disable-model-invocation"] as? Bool) ?? false
 
-        let modifiedAt = (try? skillFileURL.resourceValues(forKeys: [.contentModificationDateKey]))?
+        let modifiedAt =
+            (try? skillFileURL.resourceValues(forKeys: [.contentModificationDateKey]))?
             .contentModificationDate ?? Date()
 
         let provenance = SkillProvenanceStore.read(from: folderURL)
@@ -57,14 +65,18 @@ enum SkillScanner {
 
     private static func extractFrontmatter(from content: String) -> String? {
         let lines = content.components(separatedBy: "\n")
+
         guard lines.first?.trimmingCharacters(in: .whitespaces) == "---" else { return nil }
         var fmLines: [String] = []
+
         for line in lines.dropFirst() {
             if line.trimmingCharacters(in: .whitespaces) == "---" {
                 return fmLines.joined(separator: "\n")
             }
+
             fmLines.append(line)
         }
+
         return nil
     }
 }

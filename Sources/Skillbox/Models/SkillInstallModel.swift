@@ -17,6 +17,7 @@ final class SkillInstallModel {
     func installSkill(source: String, rootPath: String, mountPath: String, service: RemoteSkillService) async {
         guard phase != .running else { return }
         let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines)
+
         guard !trimmed.isEmpty else { return }
         self.source = trimmed
         phase = .running
@@ -27,6 +28,7 @@ final class SkillInstallModel {
             let installed = try await service.install(source: trimmed, rootPath: rootPath, claudeMountPath: mountPath) { [weak self] in
                 self?.output.append($0)
             }
+
             installedNames = installed.names
             phase = .done
         } catch {

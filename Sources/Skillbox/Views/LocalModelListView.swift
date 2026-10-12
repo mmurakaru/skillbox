@@ -1,6 +1,6 @@
-import SwiftUI
 import AppKit
 import ModelInventory
+import SwiftUI
 
 /// Models tab: the AI models stored on this Mac, with size, RAM fit, and duplicate copies.
 struct LocalModelListView: View {
@@ -32,7 +32,7 @@ struct LocalModelListView: View {
             Divider()
 
             if let trashErrorMessage {
-                trashErrorBanner(trashErrorMessage)
+                ErrorBannerView(message: trashErrorMessage) { self.trashErrorMessage = nil }
             }
 
             list
@@ -57,33 +57,15 @@ struct LocalModelListView: View {
         }
     }
 
-    private func trashErrorBanner(_ message: String) -> some View {
-        HStack(alignment: .top, spacing: 6) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
-            Text(message)
-                .font(.system(size: 11))
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-            Button(action: { trashErrorMessage = nil }) {
-                Image(systemName: "xmark")
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-            .help("Dismiss")
-            .accessibilityLabel("Dismiss")
-        }
-        .padding(8)
-        .background(Color.orange.opacity(0.08))
-    }
-
     private var summary: some View {
         VStack(alignment: .leading, spacing: 1) {
             Text("\(store.models.count) model\(store.models.count == 1 ? "" : "s")")
                 .font(.system(size: 12, weight: .semibold))
+
             if !store.models.isEmpty {
                 HStack(spacing: 4) {
                     Text("\(store.totalBytes.formattedFileSize) on disk")
+
                     if store.reclaimableBytes > 0 {
                         Text("· \(store.reclaimableBytes.formattedFileSize) reclaimable")
                             .foregroundStyle(.orange)
@@ -144,11 +126,13 @@ struct LocalModelListView: View {
 
     private var searchBar: some View {
         @Bindable var store = store
+
         return HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
             TextField("Search models", text: $store.searchQuery)
                 .textFieldStyle(.plain)
+
             if !store.searchQuery.isEmpty {
                 Button(action: { store.searchQuery = "" }) {
                     Image(systemName: "xmark.circle.fill")
@@ -193,6 +177,7 @@ struct LocalModelListView: View {
             Image(systemName: "internaldrive")
                 .font(.system(size: 32))
                 .foregroundStyle(.tertiary)
+
             if store.isScanning && store.models.isEmpty {
                 Text("Scanning model folders…")
                     .font(.system(size: 12))

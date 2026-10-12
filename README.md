@@ -28,6 +28,15 @@ make install   # builds and copies to /Applications
 
 `make bundle` creates an ad-hoc signed `Skillbox.app`. Run tests with `swift test`.
 
+## Lint & format
+
+```sh
+make format    # swift-format, blank-line padding, then SwiftLint autofix
+make lint      # the same checks CI runs
+```
+
+`swift format` comes with the Swift toolchain and reads `.swift-format`. SwiftLint is a pinned, checksum-verified binary that `make` downloads into `.build/tools`, so nothing is installed system-wide. `.swiftlint.yml` holds the type-safety rules: no force casts, tries, or unwraps without a `SAFETY:` reason, no `Any` parameters, returns, or aliases, and untyped JSON dictionaries only in files that state they parse external JSON. `Tools/StatementPadding` adds blank lines around `if` statements, after declaration groups, and before `return`.
+
 ## Usage overview
 
 Open the Usage tab with ⌘5 to see stacked Codex, Grok, and Claude Code cards. Live cards refresh every five minutes, including while the panel is closed. Each card has a **Refresh** text button; explicitly refreshing a manual card resumes live data on success. Snapshot editors open in regular windows and keep unsaved edits when the menu bar panel loses focus. All bars show **percent used**; each provider keeps its own quota windows, reset times, credit units, and snapshot timestamp.

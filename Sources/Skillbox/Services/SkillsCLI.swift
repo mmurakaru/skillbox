@@ -24,6 +24,7 @@ enum SkillsCLI {
                 return "Node/npx not found. Install Node.js to manage remote skills."
             case .nonZeroExit(let code, let output):
                 let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+
                 return "skills CLI failed (exit \(code))\(trimmed.isEmpty ? "" : ":\n\(trimmed)")"
             case .launchFailed(let msg):
                 return "Failed to run skills CLI: \(msg)"
@@ -43,11 +44,13 @@ enum SkillsCLI {
     static func resolvedNpxPath() async -> String? {
         if let cached = cachedNpxPath.get() { return cached }
 
-        // 1. Ask an interactive login zsh — picks up .zshrc setup (nvm/fnm/asdf/Homebrew shellenv).
+        // 1. Ask an interactive login zsh - picks up .zshrc setup (nvm/fnm/asdf/Homebrew shellenv).
         if let viaShell = try? await runShellRaw("command -v npx"),
-           viaShell.exitCode == 0 {
+            viaShell.exitCode == 0
+        {
             if let path = extractNpxPath(from: viaShell.combinedOutput) {
                 cachedNpxPath.set(path)
+
                 return path
             }
         }
@@ -58,10 +61,13 @@ enum SkillsCLI {
             "/usr/local/bin/npx",
             (NSHomeDirectory() as NSString).appendingPathComponent(".volta/bin/npx"),
         ]
+
         for candidate in candidates where FileManager.default.isExecutableFile(atPath: candidate) {
             cachedNpxPath.set(candidate)
+
             return candidate
         }
+
         return nil
     }
 
@@ -76,11 +82,14 @@ enum SkillsCLI {
     private static func extractNpxPath(from output: String) -> String? {
         for line in output.components(separatedBy: "\n").reversed() {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
+
             if trimmed.hasPrefix("/"), trimmed.hasSuffix("npx"),
-               FileManager.default.isExecutableFile(atPath: trimmed) {
+                FileManager.default.isExecutableFile(atPath: trimmed)
+            {
                 return trimmed
             }
         }
+
         return nil
     }
 
@@ -116,10 +125,15 @@ enum SkillsCLI {
 
     static func addArgs(for options: InstallOptions) -> [String] {
         var argv: [String] = ["add", options.source]
+
         argv.append(contentsOf: ["-a", options.agent])
+
         if options.global { argv.append("-g") }
+
         if options.copyMode { argv.append("--copy") }
+
         argv.append("-y")
+
         return argv
     }
 
@@ -144,6 +158,7 @@ enum SkillsCLI {
         let quoted = ([npxPath, "--yes", "skills"] + args)
             .map(shellQuote)
             .joined(separator: " ")
+
         return try await runShellRaw(quoted, stream: stream)
     }
 
@@ -154,18 +169,22 @@ enum SkillsCLI {
     ) async throws -> RunResult {
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<RunResult, Error>) in
             let task = Process()
+
             task.executableURL = URL(fileURLWithPath: "/bin/zsh")
             task.arguments = ["-i", "-l", "-c", command]
             // GUI launches can reuse descriptor zero for an event queue, which cannot be inherited.
             task.standardInput = FileHandle.nullDevice
 
             let pipe = Pipe()
+
             task.standardOutput = pipe
             task.standardError = pipe
 
             let buffer = OutputBuffer()
+
             pipe.fileHandleForReading.readabilityHandler = { handle in
                 let data = handle.availableData
+
                 guard !data.isEmpty, let chunk = String(data: data, encoding: .utf8) else { return }
                 buffer.append(chunk)
                 stream?(chunk)
@@ -173,16 +192,20 @@ enum SkillsCLI {
 
             task.terminationHandler = { proc in
                 pipe.fileHandleForReading.readabilityHandler = nil
+
                 if let leftover = try? pipe.fileHandleForReading.readToEnd(),
-                   !leftover.isEmpty,
-                   let chunk = String(data: leftover, encoding: .utf8) {
+                    !leftover.isEmpty,
+                    let chunk = String(data: leftover, encoding: .utf8)
+                {
                     buffer.append(chunk)
                     stream?(chunk)
                 }
-                cont.resume(returning: RunResult(
-                    exitCode: proc.terminationStatus,
-                    combinedOutput: buffer.snapshot()
-                ))
+
+                cont.resume(
+                    returning: RunResult(
+                        exitCode: proc.terminationStatus,
+                        combinedOutput: buffer.snapshot()
+                    ))
             }
 
             do {
@@ -196,9 +219,13 @@ enum SkillsCLI {
 
     static func shellQuote(_ s: String) -> String {
         if s.isEmpty { return "''" }
+
         let safe = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@%+=:,./-_")
+
         if s.unicodeScalars.allSatisfy({ safe.contains($0) }) { return s }
+
         let escaped = s.replacingOccurrences(of: "'", with: "'\\''")
+
         return "'\(escaped)'"
     }
 }
@@ -208,12 +235,15 @@ private final class OutputBuffer: @unchecked Sendable {
     private var value = ""
 
     func append(_ s: String) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         value += s
     }
 
     func snapshot() -> String {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
+
         return value
     }
 }
@@ -223,12 +253,15 @@ private final class NpxPathCache: @unchecked Sendable {
     private var value: String?
 
     func get() -> String? {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
+
         return value
     }
 
     func set(_ newValue: String?) {
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
+        defer { lock.unlock() }
         value = newValue
     }
 }

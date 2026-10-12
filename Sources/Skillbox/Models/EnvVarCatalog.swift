@@ -43,7 +43,9 @@ enum EnvVarCatalog {
     static let entries: [EnvVarCatalogEntry] = [
         // Auth & API
         .init(key: "ANTHROPIC_API_KEY", description: "Anthropic API key", category: .auth, suggestedValue: ""),
-        .init(key: "ANTHROPIC_AUTH_TOKEN", description: "Custom Authorization header (prefixed with Bearer)", category: .auth, suggestedValue: ""),
+        .init(
+            key: "ANTHROPIC_AUTH_TOKEN", description: "Custom Authorization header (prefixed with Bearer)", category: .auth,
+            suggestedValue: ""),
         .init(key: "ANTHROPIC_BETAS", description: "Comma-separated beta header values", category: .api, suggestedValue: ""),
         .init(key: "ANTHROPIC_CUSTOM_HEADERS", description: "Custom HTTP headers (newline-separated)", category: .api, suggestedValue: ""),
         .init(key: "ANTHROPIC_BASE_URL", description: "Override Anthropic API endpoint", category: .api, suggestedValue: ""),
@@ -57,16 +59,25 @@ enum EnvVarCatalog {
         .init(key: "ANTHROPIC_DEFAULT_OPUS_MODEL", description: "Default Opus model id", category: .model, suggestedValue: ""),
         .init(key: "ANTHROPIC_DEFAULT_HAIKU_MODEL", description: "Default Haiku model id", category: .model, suggestedValue: ""),
         .init(key: "CLAUDE_CODE_DISABLE_1M_CONTEXT", description: "Disable 1M context window", category: .feature, suggestedValue: "1"),
-        .init(key: "CLAUDE_CODE_DISABLE_LEGACY_MODEL_REMAP", description: "Prevent remapping Opus 4.0/4.1", category: .feature, suggestedValue: "1"),
+        .init(
+            key: "CLAUDE_CODE_DISABLE_LEGACY_MODEL_REMAP", description: "Prevent remapping Opus 4.0/4.1", category: .feature,
+            suggestedValue: "1"),
 
         // Performance
-        .init(key: "API_TIMEOUT_MS", description: "API request timeout in ms (default 600000)", category: .performance, suggestedValue: "600000"),
-        .init(key: "BASH_DEFAULT_TIMEOUT_MS", description: "Default Bash command timeout in ms", category: .performance, suggestedValue: "120000"),
+        .init(
+            key: "API_TIMEOUT_MS", description: "API request timeout in ms (default 600000)", category: .performance,
+            suggestedValue: "600000"),
+        .init(
+            key: "BASH_DEFAULT_TIMEOUT_MS", description: "Default Bash command timeout in ms", category: .performance,
+            suggestedValue: "120000"),
         .init(key: "BASH_MAX_TIMEOUT_MS", description: "Max Bash command timeout in ms", category: .performance, suggestedValue: "600000"),
         .init(key: "BASH_MAX_OUTPUT_LENGTH", description: "Max Bash output before truncation", category: .performance, suggestedValue: ""),
         .init(key: "CLAUDE_CODE_MAX_RETRIES", description: "Failed-request retry count", category: .performance, suggestedValue: "10"),
-        .init(key: "CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY", description: "Max parallel read-only tools", category: .performance, suggestedValue: "10"),
-        .init(key: "CLAUDE_CODE_MAX_OUTPUT_TOKENS", description: "Max output tokens per request", category: .performance, suggestedValue: ""),
+        .init(
+            key: "CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY", description: "Max parallel read-only tools", category: .performance,
+            suggestedValue: "10"),
+        .init(
+            key: "CLAUDE_CODE_MAX_OUTPUT_TOKENS", description: "Max output tokens per request", category: .performance, suggestedValue: ""),
 
         // UI
         .init(key: "CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN", description: "Disable fullscreen rendering", category: .ui, suggestedValue: "1"),
@@ -79,10 +90,14 @@ enum EnvVarCatalog {
         .init(key: "CLAUDE_CODE_HIDE_CWD", description: "Hide working directory in startup logo", category: .ui, suggestedValue: "1"),
 
         // Feature flags
-        .init(key: "CLAUDE_CODE_DISABLE_ATTACHMENTS", description: "Disable file attachment processing", category: .feature, suggestedValue: "1"),
+        .init(
+            key: "CLAUDE_CODE_DISABLE_ATTACHMENTS", description: "Disable file attachment processing", category: .feature,
+            suggestedValue: "1"),
         .init(key: "CLAUDE_CODE_DISABLE_AUTO_MEMORY", description: "Disable auto memory", category: .feature, suggestedValue: "1"),
         .init(key: "CLAUDE_CODE_DISABLE_CRON", description: "Disable scheduled tasks", category: .feature, suggestedValue: "1"),
-        .init(key: "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS", description: "Disable all background tasks", category: .feature, suggestedValue: "1"),
+        .init(
+            key: "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS", description: "Disable all background tasks", category: .feature,
+            suggestedValue: "1"),
         .init(key: "CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING", description: "Disable /rewind", category: .feature, suggestedValue: "1"),
         .init(key: "CLAUDE_CODE_DISABLE_THINKING", description: "Force-disable extended thinking", category: .feature, suggestedValue: "1"),
         .init(key: "CLAUDE_CODE_DISABLE_FAST_MODE", description: "Disable fast mode", category: .feature, suggestedValue: "1"),
@@ -90,17 +105,25 @@ enum EnvVarCatalog {
         // Experimental
         .init(key: "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", description: "Enable agent teams", category: .experimental, suggestedValue: "1"),
         .init(key: "CLAUDE_CODE_FORK_SUBAGENT", description: "Enable forked subagents", category: .experimental, suggestedValue: "1"),
-        .init(key: "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS", description: "Strip experimental betas", category: .experimental, suggestedValue: "1"),
+        .init(
+            key: "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS", description: "Strip experimental betas", category: .experimental,
+            suggestedValue: "1"),
 
         // Debug
-        .init(key: "CLAUDE_CODE_DEBUG_LOG_LEVEL", description: "Min debug log level: verbose|debug|info|warn|error", category: .debug, suggestedValue: "info"),
+        .init(
+            key: "CLAUDE_CODE_DEBUG_LOG_LEVEL", description: "Min debug log level: verbose|debug|info|warn|error", category: .debug,
+            suggestedValue: "info"),
         .init(key: "CLAUDE_CODE_DEBUG_LOGS_DIR", description: "Override debug log path", category: .debug, suggestedValue: ""),
         .init(key: "CLAUDE_CODE_ENABLE_TELEMETRY", description: "Enable OpenTelemetry", category: .debug, suggestedValue: "1"),
-        .init(key: "CLAUDE_CODE_OTEL_FLUSH_TIMEOUT_MS", description: "OTel span flush timeout in ms", category: .debug, suggestedValue: "5000"),
+        .init(
+            key: "CLAUDE_CODE_OTEL_FLUSH_TIMEOUT_MS", description: "OTel span flush timeout in ms", category: .debug, suggestedValue: "5000"
+        ),
 
         // Security
         .init(key: "CLAUDE_CODE_MCP_ALLOWLIST_ENV", description: "Sandbox MCP environment", category: .security, suggestedValue: "1"),
-        .init(key: "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB", description: "Strip credentials from subprocess env", category: .security, suggestedValue: "1"),
+        .init(
+            key: "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB", description: "Strip credentials from subprocess env", category: .security,
+            suggestedValue: "1"),
         .init(key: "CLAUDE_CODE_PERFORCE_MODE", description: "Enable Perforce write protection", category: .security, suggestedValue: "1"),
     ]
 
@@ -114,11 +137,13 @@ enum EnvVarCatalog {
 
     static func suggestions(matching query: String, limit: Int = 8) -> [EnvVarCatalogEntry] {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
+
         guard !trimmed.isEmpty else { return [] }
-        return entries
+
+        return
+            entries
             .filter { entry in
-                entry.key.localizedCaseInsensitiveContains(trimmed) ||
-                entry.description.localizedCaseInsensitiveContains(trimmed)
+                entry.key.localizedCaseInsensitiveContains(trimmed) || entry.description.localizedCaseInsensitiveContains(trimmed)
             }
             .prefix(limit)
             .map { $0 }

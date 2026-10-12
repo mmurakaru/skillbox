@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 struct HookListView: View {
     @Environment(HookStore.self) private var store
@@ -49,22 +49,35 @@ struct HookListView: View {
         .onChange(of: store.searchQuery) { _, _ in
             selectedHookID = store.filteredHooks.first?.id
         }
-        .onKeyPress(.upArrow) { moveSelection(by: -1); return .handled }
-        .onKeyPress(.downArrow) { moveSelection(by: 1); return .handled }
+        .onKeyPress(.upArrow) {
+            moveSelection(by: -1)
+
+            return .handled
+        }
+        .onKeyPress(.downArrow) {
+            moveSelection(by: 1)
+
+            return .handled
+        }
         .onKeyPress(.return) {
             if searchFocused { return .ignored }
+
             triggerEditOnSelected()
+
             return .handled
         }
         .onKeyPress(.delete) {
             if searchFocused { return .ignored }
+
             triggerDeleteConfirmOnSelected()
+
             return .handled
         }
     }
 
     private var scopePicker: some View {
         @Bindable var store = store
+
         return Picker("Scope", selection: $store.selectedScopeKey) {
             Text("All scopes").tag(String?.none)
             Text("User Global (\(store.globalHookCount))").tag(Optional("global"))
@@ -83,12 +96,15 @@ struct HookListView: View {
         guard let key = store.selectedScopeKey, !key.isEmpty else {
             return "Showing hooks from all scopes"
         }
+
         if key == "global" { return "~/.claude/settings.json" }
+
         return key
     }
 
     private var searchBar: some View {
         @Bindable var store = store
+
         return HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
@@ -96,6 +112,7 @@ struct HookListView: View {
                 .textFieldStyle(.plain)
                 .focused($searchFocused)
                 .onSubmit { triggerEditOnSelected() }
+
             if !store.searchQuery.isEmpty {
                 Button(action: { store.searchQuery = "" }) {
                     Image(systemName: "xmark.circle.fill")
@@ -150,6 +167,7 @@ struct HookListView: View {
             Image(systemName: "bolt.slash")
                 .font(.system(size: 32))
                 .foregroundStyle(.tertiary)
+
             if let err = store.lastError {
                 Text(err)
                     .font(.system(size: 11))
@@ -184,11 +202,13 @@ struct HookListView: View {
 
     private func applyStickyOrDefault() {
         if !hooksSelectedScope.isEmpty,
-           store.selectedScopeKey != hooksSelectedScope {
+            store.selectedScopeKey != hooksSelectedScope
+        {
             if hooksSelectedScope == "global" || store.availableProjects.contains(where: { $0.path == hooksSelectedScope }) {
                 store.selectedScopeKey = hooksSelectedScope
             }
         }
+
         if selectedHookID == nil {
             selectedHookID = store.filteredHooks.first?.id
         }
@@ -196,10 +216,13 @@ struct HookListView: View {
 
     private func moveSelection(by delta: Int) {
         let items = store.filteredHooks
+
         guard !items.isEmpty else { return }
         searchFocused = false
+
         if let current = selectedHookID, let idx = items.firstIndex(where: { $0.id == current }) {
             let next = max(0, min(items.count - 1, idx + delta))
+
             selectedHookID = items[next].id
         } else {
             selectedHookID = items.first?.id
@@ -208,7 +231,8 @@ struct HookListView: View {
 
     private func triggerEditOnSelected() {
         guard let id = selectedHookID,
-              let hook = store.filteredHooks.first(where: { $0.id == id }) else { return }
+            let hook = store.filteredHooks.first(where: { $0.id == id })
+        else { return }
         open(hook: hook)
     }
 
@@ -219,6 +243,7 @@ struct HookListView: View {
 
     private func open(hook: Hook) {
         let cmd = editorCommand.isEmpty ? "code" : editorCommand
+
         EditorLauncher.openPath(hook.fileURL.path, command: cmd)
         NSApp.deactivate()
     }
@@ -226,6 +251,7 @@ struct HookListView: View {
     private func performDelete(hook: Hook) {
         do {
             try store.delete(hook)
+
             if selectedHookID == hook.id {
                 selectedHookID = store.filteredHooks.first?.id
             }

@@ -9,11 +9,10 @@ enum InsightsLinkExtractor {
     /// Returns the first `file://*.html` URL in the markdown that resolves to an
     /// existing file on disk. Returns nil if none exist.
     static func firstExistingHTMLLink(in markdown: String) -> URL? {
-        for candidate in candidateURLs(in: markdown) {
-            if FileManager.default.fileExists(atPath: candidate.path) {
-                return candidate
-            }
+        for candidate in candidateURLs(in: markdown) where FileManager.default.fileExists(atPath: candidate.path) {
+            return candidate
         }
+
         return nil
     }
 
@@ -22,32 +21,39 @@ enum InsightsLinkExtractor {
     static func candidateURLs(in markdown: String) -> [URL] {
         // Allow most URL chars; stop at whitespace, backticks, common bracket/quote
         // characters that wrap markdown links.
-        guard let regex = try? NSRegularExpression(
-            pattern: #"file://[^\s)\]'"`<>]+\.html?"#,
-            options: [.caseInsensitive]
-        ) else {
+        guard
+            let regex = try? NSRegularExpression(
+                pattern: #"file://[^\s)\]'"`<>]+\.html?"#,
+                options: [.caseInsensitive]
+            )
+        else {
             return []
         }
         let nsRange = NSRange(markdown.startIndex..., in: markdown)
         let matches = regex.matches(in: markdown, range: nsRange)
         var seen: Set<String> = []
         var urls: [URL] = []
+
         for match in matches {
             guard let range = Range(match.range, in: markdown) else { continue }
             var raw = String(markdown[range])
+
             // Trim trailing punctuation that often follows a URL in prose.
             while let last = raw.last, ".,!?;:".contains(last) {
                 raw.removeLast()
             }
             guard !seen.contains(raw) else { continue }
             seen.insert(raw)
+
             if let url = URL(string: raw) {
                 urls.append(url)
             } else if let decoded = raw.removingPercentEncoding,
-                      let url = URL(string: decoded) {
+                let url = URL(string: decoded)
+            {
                 urls.append(url)
             }
         }
+
         return urls
     }
 }

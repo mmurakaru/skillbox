@@ -1,5 +1,5 @@
-import SwiftUI
 import ModelInventory
+import SwiftUI
 
 /// Explore tab: browse Hugging Face Hub models by search, lab, format, size, and sort.
 struct ModelExplorerView: View {
@@ -33,12 +33,14 @@ struct ModelExplorerView: View {
 
     private var searchBar: some View {
         @Bindable var explorer = explorer
+
         return HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
             TextField("Search Hugging Face", text: $explorer.query.search)
                 .textFieldStyle(.plain)
                 .onSubmit { runSearch() }
+
             if !explorer.query.search.isEmpty {
                 Button(action: {
                     explorer.query.search = ""
@@ -57,6 +59,7 @@ struct ModelExplorerView: View {
 
     private var filterBar: some View {
         @Bindable var explorer = explorer
+
         return HStack(spacing: 6) {
             TextField("Lab", text: $explorer.query.author)
                 .textFieldStyle(.roundedBorder)
@@ -117,6 +120,7 @@ struct ModelExplorerView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                     }
+
                     ForEach(explorer.displayedResults) { hubModel in
                         HuggingFaceHubModelRowView(
                             model: hubModel,
@@ -133,6 +137,7 @@ struct ModelExplorerView: View {
 
     private var unknownSizeNote: String {
         let count = explorer.unknownSizeCountHiddenByFilter
+
         return count == 1
             ? "1 repo is hidden because its name has no parameter count."
             : "\(count) repos are hidden because their names have no parameter count."
@@ -140,7 +145,9 @@ struct ModelExplorerView: View {
 
     private var emptyResultsMessage: String {
         if explorer.results.isEmpty { return "No models found" }
+
         guard explorer.unknownSizeCountHiddenByFilter > 0 else { return "No models in this size range" }
+
         return "No models in this size range. \(unknownSizeNote)"
     }
 
@@ -172,7 +179,9 @@ struct ModelExplorerView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
             Spacer(minLength: 0)
+
             if explorer.isLoading {
                 ProgressView()
                     .controlSize(.mini)
@@ -186,7 +195,9 @@ struct ModelExplorerView: View {
         guard let lastSynced = explorer.lastSynced else { return "Not synced yet" }
         guard now.timeIntervalSince(lastSynced) >= 60 else { return "Synced just now" }
         let formatter = RelativeDateTimeFormatter()
+
         formatter.unitsStyle = .full
+
         return "Synced \(formatter.localizedString(for: lastSynced, relativeTo: now))"
     }
 }

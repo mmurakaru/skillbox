@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 struct EnvListView: View {
     @Environment(EnvVarStore.self) private var store
@@ -40,7 +40,7 @@ struct EnvListView: View {
             Divider()
 
             if let keychainError = keychainSecrets.lastError {
-                keychainErrorBanner(keychainError)
+                ErrorBannerView(message: keychainError) { keychainSecrets.dismissError() }
                 Divider()
             }
 
@@ -63,21 +63,35 @@ struct EnvListView: View {
         .onChange(of: store.searchQuery) { _, _ in
             selectedEnvID = store.filteredEnvVars.first?.id
         }
-        .onKeyPress(.upArrow) { moveSelection(by: -1); return .handled }
-        .onKeyPress(.downArrow) { moveSelection(by: 1); return .handled }
+        .onKeyPress(.upArrow) {
+            moveSelection(by: -1)
+
+            return .handled
+        }
+        .onKeyPress(.downArrow) {
+            moveSelection(by: 1)
+
+            return .handled
+        }
         .onKeyPress(.return) {
             if searchFocused { return .ignored }
+
             triggerEditOnSelected()
+
             return .handled
         }
         .onKeyPress(.delete) {
             if searchFocused { return .ignored }
+
             triggerDeleteConfirmOnSelected()
+
             return .handled
         }
         .onKeyPress(.space) {
             if searchFocused { return .ignored }
+
             triggerToggleOnSelected()
+
             return .handled
         }
         .sheet(isPresented: $showingAddSheet) {
@@ -92,6 +106,7 @@ struct EnvListView: View {
                             try await keychainSecrets.addSecret(named: key, value: value)
                         }
                         showingAddSheet = false
+
                         return nil
                     } catch {
                         return error.localizedDescription
@@ -119,6 +134,7 @@ struct EnvListView: View {
 
     private var scopePicker: some View {
         @Bindable var store = store
+
         return Picker("Scope", selection: $store.selectedScopeKey) {
             Text("All scopes").tag(String?.none)
             Text("User Global (\(store.globalCount))").tag(Optional("global"))
@@ -138,8 +154,11 @@ struct EnvListView: View {
         guard let key = store.selectedScopeKey, !key.isEmpty else {
             return "Showing env vars from all scopes"
         }
+
         if key == "global" { return "~/.claude/settings.json" }
+
         if key == EnvVarStore.keychainScopeKey { return "Secrets stored in the login Keychain" }
+
         return key
     }
 
@@ -158,6 +177,7 @@ struct EnvListView: View {
 
     private var searchBar: some View {
         @Bindable var store = store
+
         return HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
@@ -165,6 +185,7 @@ struct EnvListView: View {
                 .textFieldStyle(.plain)
                 .focused($searchFocused)
                 .onSubmit { triggerEditOnSelected() }
+
             if !store.searchQuery.isEmpty {
                 Button(action: { store.searchQuery = "" }) {
                     Image(systemName: "xmark.circle.fill")
@@ -181,15 +202,19 @@ struct EnvListView: View {
     private var stashedSecretsBanner: some View {
         let count = store.stashedSecrets.count
         let subject = count == 1 ? "1 disabled secret sits" : "\(count) disabled secrets sit"
+
         return HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
-            Text(isConfirmingStashPurge
-                ? "Delete these stashed values? Enable a secret first to keep it."
-                : "\(subject) in plaintext in the Skillbox stash.")
-                .font(.system(size: 11))
-                .fixedSize(horizontal: false, vertical: true)
+            Text(
+                isConfirmingStashPurge
+                    ? "Delete these stashed values? Enable a secret first to keep it."
+                    : "\(subject) in plaintext in the Skillbox stash."
+            )
+            .font(.system(size: 11))
+            .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 4)
+
             if isConfirmingStashPurge {
                 Button("Cancel") { isConfirmingStashPurge = false }
                     .controlSize(.small)
@@ -273,6 +298,7 @@ struct EnvListView: View {
             Image(systemName: "switch.2")
                 .font(.system(size: 32))
                 .foregroundStyle(.tertiary)
+
             if let err = store.lastError {
                 Text(err)
                     .font(.system(size: 11))
@@ -300,28 +326,6 @@ struct EnvListView: View {
         keychainSecrets.visibleSecretNames(scopeKey: store.selectedScopeKey, searchQuery: store.searchQuery)
     }
 
-    private func keychainErrorBanner(_ message: String) -> some View {
-        HStack(alignment: .top, spacing: 6) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
-            Text(message)
-                .font(.system(size: 11))
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-            Button(action: { keychainSecrets.dismissError() }) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help("Dismiss")
-            .accessibilityLabel("Dismiss")
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(Color.orange.opacity(0.1))
-    }
-
     // MARK: - Actions
 
     private func performCopyToKeychain(_ envVar: EnvVar) {
@@ -343,6 +347,7 @@ struct EnvListView: View {
         Task {
             guard await keychainSecrets.keychainHoldsSameValue(as: envVar) else {
                 keychainSecrets.reportError(KeychainSecretsModelError.keychainHoldsDifferentValue(envVar.key))
+
                 return
             }
             performDelete(envVar)
@@ -375,12 +380,15 @@ struct EnvListView: View {
 
     private func applyStickyOrDefault() {
         if !envSelectedScope.isEmpty,
-           store.selectedScopeKey != envSelectedScope {
+            store.selectedScopeKey != envSelectedScope
+        {
             if envSelectedScope == "global" || envSelectedScope == EnvVarStore.keychainScopeKey
-                || store.availableProjects.contains(where: { $0.path == envSelectedScope }) {
+                || store.availableProjects.contains(where: { $0.path == envSelectedScope })
+            {
                 store.selectedScopeKey = envSelectedScope
             }
         }
+
         if selectedEnvID == nil {
             selectedEnvID = store.filteredEnvVars.first?.id
         }
@@ -388,10 +396,13 @@ struct EnvListView: View {
 
     private func moveSelection(by delta: Int) {
         let items = store.filteredEnvVars
+
         guard !items.isEmpty else { return }
         searchFocused = false
+
         if let current = selectedEnvID, let idx = items.firstIndex(where: { $0.id == current }) {
             let next = max(0, min(items.count - 1, idx + delta))
+
             selectedEnvID = items[next].id
         } else {
             selectedEnvID = items.first?.id
@@ -400,7 +411,8 @@ struct EnvListView: View {
 
     private func triggerEditOnSelected() {
         guard let id = selectedEnvID,
-              let envVar = store.filteredEnvVars.first(where: { $0.id == id }) else { return }
+            let envVar = store.filteredEnvVars.first(where: { $0.id == id })
+        else { return }
         open(envVar: envVar)
     }
 
@@ -411,7 +423,9 @@ struct EnvListView: View {
 
     private func triggerToggleOnSelected() {
         guard let id = selectedEnvID,
-              let envVar = store.filteredEnvVars.first(where: { $0.id == id }) else { return }
+            let envVar = store.filteredEnvVars.first(where: { $0.id == id })
+        else { return }
+
         if envVar.isSecret && envVar.isEnabled {
             secretDisableConfirmationID = envVar.id
         } else {
@@ -422,6 +436,7 @@ struct EnvListView: View {
     private func open(envVar: EnvVar) {
         guard envVar.isEnabled else { return }
         let cmd = editorCommand.isEmpty ? "code" : editorCommand
+
         EditorLauncher.openPath(envVar.fileURL.path, command: cmd)
         NSApp.deactivate()
     }
@@ -447,6 +462,7 @@ struct EnvListView: View {
     private func performDelete(_ envVar: EnvVar) {
         do {
             try store.delete(envVar)
+
             if selectedEnvID == envVar.id {
                 selectedEnvID = store.filteredEnvVars.first?.id
             }
