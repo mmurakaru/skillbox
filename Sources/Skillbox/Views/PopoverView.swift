@@ -13,9 +13,9 @@ enum AppTab: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .skills: "Skills"
-        case .memory: "Memory"
-        case .hooks: "Hooks"
-        case .env: "Env"
+        case .memory: "Claude Code memory"
+        case .hooks: "Claude Code hooks"
+        case .env: "Claude Code env"
         case .usage: "Usage"
         }
     }
@@ -230,6 +230,7 @@ struct PopoverView: View {
 
     private var skillsBody: some View {
         return VStack(spacing: 0) {
+            TabHeaderView(title: "Skills", subtitle: "Shared skill store with a Claude Code mount")
             HStack(spacing: 6) {
                 classificationControls
                 installButton
@@ -299,24 +300,33 @@ struct PopoverView: View {
     }
 
     private var memoryBody: some View {
-        MemoryListView(
-            selectedMemoryID: $selectedMemoryID,
-            rowStates: $memoryRowStates
-        )
+        VStack(spacing: 0) {
+            TabHeaderView(title: "Memory", subtitle: "Claude Code auto-memory")
+            MemoryListView(
+                selectedMemoryID: $selectedMemoryID,
+                rowStates: $memoryRowStates
+            )
+        }
     }
 
     private var hooksBody: some View {
-        HookListView(
-            selectedHookID: $selectedHookID,
-            rowStates: $hookRowStates
-        )
+        VStack(spacing: 0) {
+            TabHeaderView(title: "Hooks", subtitle: "Claude Code hooks in settings.json")
+            HookListView(
+                selectedHookID: $selectedHookID,
+                rowStates: $hookRowStates
+            )
+        }
     }
 
     private var envBody: some View {
-        EnvListView(
-            selectedEnvID: $selectedEnvID,
-            rowStates: $envRowStates
-        )
+        VStack(spacing: 0) {
+            TabHeaderView(title: "Env", subtitle: "Claude Code env vars in settings.json")
+            EnvListView(
+                selectedEnvID: $selectedEnvID,
+                rowStates: $envRowStates
+            )
+        }
     }
 
     private var installButton: some View {

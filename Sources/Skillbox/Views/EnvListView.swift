@@ -237,7 +237,7 @@ struct EnvListView: View {
                 Text("No env vars configured")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
-                Text("Click + to add one. Env vars live in settings.json under the `env` key.")
+                Text("Click + to add one. Claude Code reads env vars from settings.json under the `env` key.")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
                     .multilineTextAlignment(.center)
