@@ -2,12 +2,14 @@ import SwiftUI
 
 struct EnvAddSheet: View {
     let availableScopes: [EnvScope]
-    let onAdd: (String, String, EnvScope) -> String?  // returns error message or nil
+    /// Returns an error message to show, or nil on success.
+    let onAdd: (String, String, EnvScope, Bool) -> String?
     let onCancel: () -> Void
 
     @State private var keyText: String = ""
     @State private var valueText: String = ""
     @State private var selectedScopeIndex: Int = 0
+    @State private var isMarkedSecret: Bool = false
     @State private var errorMessage: String?
     @FocusState private var keyFocused: Bool
 
@@ -36,12 +38,32 @@ struct EnvAddSheet: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Value")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                TextField("1", text: $valueText)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(.body, design: .monospaced))
+                HStack {
+                    Text("Value")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Toggle("Secret", isOn: secretToggleBinding)
+                        .toggleStyle(.checkbox)
+                        .controlSize(.small)
+                        .disabled(nameLooksSecret)
+                        .help(nameLooksSecret ? "Detected as a secret from its name" : "Mask this value and keep it out of shared files")
+                }
+                Group {
+                    if isSecret {
+                        SecureField("Secret value", text: $valueText)
+                    } else {
+                        TextField("1", text: $valueText)
+                    }
+                }
+                .textFieldStyle(.roundedBorder)
+                .font(.system(.body, design: .monospaced))
+                if isSecret {
+                    Text("Values in the env block reach every process Claude Code starts, including agent shell commands.")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -49,12 +71,20 @@ struct EnvAddSheet: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Picker("", selection: $selectedScopeIndex) {
-                    ForEach(Array(availableScopes.enumerated()), id: \.offset) { idx, scope in
-                        Text(scopeLabel(scope)).tag(idx)
+                    ForEach(Array(availableScopes.enumerated()), id: \.offset) { index, scope in
+                        Text(scopeLabel(scope))
+                            .tag(index)
+                            .selectionDisabled(isSecret && scope.isSharedWithVersionControl)
                     }
                 }
                 .labelsHidden()
                 .pickerStyle(.menu)
+                if isSecret {
+                    Text("Secrets can't go in a project's shared settings.json, which is meant for version control.")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             if let err = errorMessage {
@@ -70,15 +100,44 @@ struct EnvAddSheet: View {
                 Button("Add") { submit() }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
-                    .disabled(keyText.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(keyText.trimmingCharacters(in: .whitespaces).isEmpty || selectedScopeRejectsSecret)
             }
         }
         .padding(20)
         .frame(width: 380)
+        .onChange(of: isSecret) { _, secret in
+            if secret { moveSelectionOffSharedProjectScope() }
+        }
         .task {
             try? await Task.sleep(for: .milliseconds(50))
             keyFocused = true
         }
+    }
+
+    private var nameLooksSecret: Bool {
+        EnvSecretDetection.nameLooksSecret(keyText.trimmingCharacters(in: .whitespaces))
+    }
+
+    private var isSecret: Bool { nameLooksSecret || isMarkedSecret }
+
+    private var secretToggleBinding: Binding<Bool> {
+        Binding(get: { isSecret }, set: { isMarkedSecret = $0 })
+    }
+
+    private var selectedScopeRejectsSecret: Bool {
+        guard isSecret, availableScopes.indices.contains(selectedScopeIndex) else { return false }
+        return availableScopes[selectedScopeIndex].isSharedWithVersionControl
+    }
+
+    /// Falls back to User Global when the project has no local scope entry.
+    private func moveSelectionOffSharedProjectScope() {
+        guard availableScopes.indices.contains(selectedScopeIndex),
+              case .project(_, let path) = availableScopes[selectedScopeIndex] else { return }
+        let localIndex = availableScopes.firstIndex {
+            if case .projectLocal(_, let localPath) = $0 { return localPath == path }
+            return false
+        }
+        selectedScopeIndex = localIndex ?? 0
     }
 
     private var suggestions: [EnvVarCatalogEntry] {
@@ -133,8 +192,8 @@ struct EnvAddSheet: View {
         guard !trimmedKey.isEmpty else { return }
         guard availableScopes.indices.contains(selectedScopeIndex) else { return }
         let scope = availableScopes[selectedScopeIndex]
-        if let err = onAdd(trimmedKey, valueText, scope) {
-            errorMessage = err
+        if let addError = onAdd(trimmedKey, valueText, scope, isMarkedSecret) {
+            errorMessage = addError
         }
     }
 }
