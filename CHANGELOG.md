@@ -1,5 +1,11 @@
 # skillbox
 
+## 0.9.0
+
+### Minor Changes
+
+- [#25](https://github.com/mmurakaru/skillbox/pull/25) [`e8abc86`](https://github.com/mmurakaru/skillbox/commit/e8abc86f5be910d1a934dd5f3c25090082a0b74e) Thanks [@mmurakaru](https://github.com/mmurakaru)! - Add an Explore tab that searches the Hugging Face Hub without a token, filters by lab, format, size, and sort, keeps the last results offline, marks models already on this Mac, and copies an Ollama or Hugging Face CLI download command.
+
 ## 0.8.0
 
 ### Minor Changes
