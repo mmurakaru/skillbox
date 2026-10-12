@@ -10,6 +10,12 @@ enum EnvScope: Hashable {
     case project(name: String, path: String)
     case projectLocal(name: String, path: String)
 
+    /// The project `settings.json` is meant to be committed, so secrets must never be written there.
+    var isSharedWithVersionControl: Bool {
+        if case .project = self { return true }
+        return false
+    }
+
     var shortLabel: String {
         switch self {
         case .userGlobal: "Global"
@@ -43,6 +49,8 @@ struct EnvVar: Identifiable, Hashable {
     let scope: EnvScope
     let fileURL: URL
     let modifiedAt: Date
+    /// True when the value is a credential; the UI masks it and never stashes it in plaintext.
+    var isSecret: Bool
 
     init(
         key: String,
@@ -50,7 +58,8 @@ struct EnvVar: Identifiable, Hashable {
         state: EnvVarState,
         scope: EnvScope,
         fileURL: URL,
-        modifiedAt: Date
+        modifiedAt: Date,
+        isSecret: Bool = false
     ) {
         self.id = "\(fileURL.path)#\(key)"
         self.key = key
@@ -59,6 +68,7 @@ struct EnvVar: Identifiable, Hashable {
         self.scope = scope
         self.fileURL = fileURL
         self.modifiedAt = modifiedAt
+        self.isSecret = isSecret
     }
 
     var isEnabled: Bool { state == .enabled }

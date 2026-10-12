@@ -35,18 +35,28 @@ struct EnvRowView: View {
     let onToggle: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
+    let onSetSecretMark: (Bool) -> Void
 
     @Binding var rowState: SkillRowView.RowState
+    /// Owned by the list so keyboard toggles reach the same confirmation as the switch.
+    @Binding var isConfirmingSecretDisable: Bool
 
     @State private var isHoveringRow = false
     @State private var isHoveringEdit = false
     @State private var isHoveringDelete = false
+    @State private var isHoveringReveal = false
+    @State private var isHoveringCopy = false
+    @State private var isSecretValueRevealed = false
+
+    private static let maskedSecretValue = "••••••••"
 
     var body: some View {
         ZStack {
-            if rowState != .normal { normalContent.hidden() }
+            if rowState != .normal || isConfirmingSecretDisable { normalContent.hidden() }
             if rowState == .confirmingDelete {
                 confirmContent
+            } else if isConfirmingSecretDisable {
+                confirmSecretDisableContent
             } else {
                 normalContent
             }
@@ -61,6 +71,7 @@ struct EnvRowView: View {
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.12)) { isHoveringRow = hovering }
         }
+        .contextMenu { secretMarkMenu }
     }
 
     private var rowBackground: Color {
@@ -69,11 +80,32 @@ struct EnvRowView: View {
         return .clear
     }
 
+    @ViewBuilder
+    private var secretMarkMenu: some View {
+        if EnvSecretDetection.nameLooksSecret(envVar.key) {
+            Text("Secret (detected from its name)")
+        } else if envVar.isSecret {
+            Button("Unmark as Secret") { onSetSecretMark(false) }
+        } else if !envVar.isEnabled {
+            Text("Enable to mark as secret")
+        } else if envVar.scope.isSharedWithVersionControl {
+            Text("Move to the local scope to mark as secret")
+        } else {
+            Button("Mark as Secret") { onSetSecretMark(true) }
+        }
+    }
+
     private var normalContent: some View {
         HStack(spacing: 8) {
             Toggle("", isOn: Binding(
                 get: { envVar.isEnabled },
-                set: { _ in onToggle() }
+                set: { _ in
+                    if envVar.isSecret && envVar.isEnabled {
+                        isConfirmingSecretDisable = true
+                    } else {
+                        onToggle()
+                    }
+                }
             ))
             .toggleStyle(.switch)
             .controlSize(.mini)
@@ -87,6 +119,18 @@ struct EnvRowView: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
                     EnvScopeBadge(scope: envVar.scope)
+                    if envVar.isSecret {
+                        Image(systemName: "key.fill")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("Secret")
+                    }
+                    if envVar.isSecret && envVar.scope.isSharedWithVersionControl {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.orange)
+                            .accessibilityLabel("Secret in a shared project file")
+                    }
                     Spacer(minLength: 0)
                 }
                 Text(secondaryLine)
@@ -98,6 +142,23 @@ struct EnvRowView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .help(helpText)
+
+            if envVar.isSecret {
+                iconButton(
+                    systemName: isSecretValueRevealed ? "eye.slash" : "eye",
+                    isHovering: $isHoveringReveal,
+                    tint: .accentColor,
+                    help: isSecretValueRevealed ? "Hide value" : "Reveal value",
+                    action: { isSecretValueRevealed.toggle() }
+                )
+                iconButton(
+                    systemName: "doc.on.doc",
+                    isHovering: $isHoveringCopy,
+                    tint: .accentColor,
+                    help: "Copy value",
+                    action: { SecretPasteboard.copyConcealed(envVar.value) }
+                )
+            }
 
             if envVar.isEnabled {
                 iconButton(
@@ -122,7 +183,14 @@ struct EnvRowView: View {
     }
 
     private var secondaryLine: String {
-        let valuePart = envVar.value.isEmpty ? "(empty)" : "= \(envVar.value)"
+        let valuePart: String
+        if envVar.value.isEmpty {
+            valuePart = "(empty)"
+        } else if envVar.isSecret && !isSecretValueRevealed {
+            valuePart = "= \(Self.maskedSecretValue)"
+        } else {
+            valuePart = "= \(envVar.value)"
+        }
         if showProjectName {
             switch envVar.scope {
             case .userGlobal:
@@ -135,9 +203,15 @@ struct EnvRowView: View {
     }
 
     private var helpText: String {
-        var lines = ["\(envVar.key) = \(envVar.value)"]
-        if let desc = EnvVarCatalog.description(for: envVar.key) {
-            lines.append(desc)
+        var lines = [envVar.isSecret ? envVar.key : "\(envVar.key) = \(envVar.value)"]
+        if envVar.isSecret {
+            lines.append("secret - value hidden; env values reach every process Claude Code starts")
+        }
+        if envVar.isSecret && envVar.scope.isSharedWithVersionControl {
+            lines.append("this file is meant for version control - move the secret to the local scope")
+        }
+        if let catalogDescription = EnvVarCatalog.description(for: envVar.key) {
+            lines.append(catalogDescription)
         }
         switch envVar.scope {
         case .userGlobal:
@@ -173,37 +247,67 @@ struct EnvRowView: View {
         }
         .buttonStyle(.plain)
         .help(help)
+        .accessibilityLabel(help)
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.1)) { isHovering.wrappedValue = hovering }
         }
     }
 
     private var confirmContent: some View {
+        confirmationRow(
+            verb: "Delete",
+            detail: "?",
+            confirmTint: .red,
+            onCancel: { rowState = .normal },
+            onConfirm: {
+                onDelete()
+                rowState = .normal
+            }
+        )
+    }
+
+    private var confirmSecretDisableContent: some View {
+        confirmationRow(
+            verb: "Disable",
+            detail: "? Its value is removed, not stashed.",
+            confirmTint: .orange,
+            onCancel: { isConfirmingSecretDisable = false },
+            onConfirm: {
+                onToggle()
+                isConfirmingSecretDisable = false
+            }
+        )
+    }
+
+    private func confirmationRow(
+        verb: String,
+        detail: String,
+        confirmTint: Color,
+        onCancel: @escaping () -> Void,
+        onConfirm: @escaping () -> Void
+    ) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
                 .frame(width: 18)
 
-            Text("Delete ")
+            Text("\(verb) ")
                 .font(.system(size: 12)) +
             Text(envVar.key)
                 .font(.system(size: 12, weight: .semibold, design: .monospaced)) +
-            Text("?")
+            Text(detail)
                 .font(.system(size: 12))
 
             Spacer()
 
-            Button("Cancel") { rowState = .normal }
+            Button("Cancel", action: onCancel)
                 .controlSize(.small)
                 .keyboardShortcut(.cancelAction)
 
-            Button("Delete") {
-                onDelete()
-                rowState = .normal
-            }
-            .controlSize(.small)
-            .buttonStyle(.borderedProminent)
-            .tint(.red)
+            Button(verb, action: onConfirm)
+                .controlSize(.small)
+                .buttonStyle(.borderedProminent)
+                .tint(confirmTint)
         }
     }
 }
