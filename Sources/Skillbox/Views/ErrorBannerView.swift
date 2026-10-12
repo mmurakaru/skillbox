@@ -20,6 +20,7 @@ struct ErrorBannerView: View {
             .buttonStyle(.plain)
             .help("Dismiss")
             .accessibilityLabel("Dismiss")
+            .hoverActionLabel("Dismiss")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)

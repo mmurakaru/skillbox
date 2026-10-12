@@ -109,6 +109,7 @@ struct PopoverView: View {
             }
         }
         .frame(width: 410, height: 480)
+        .hoverActionLabelHost()
         .task {
             migrateLegacySkillsRootIfNeeded()
             store.configure(rootPath: skillsRootPath)
@@ -207,17 +208,20 @@ struct PopoverView: View {
                 .font(.system(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .help(activeCountHelp)
+                .hoverActionLabel(activeCountHelp, placement: .trailing)
             Button(action: showSettings) {
                 Image(systemName: "gearshape").frame(width: 36, height: 32)
             }
             .help("Settings")
             .accessibilityLabel("Settings")
+            .hoverActionLabel("Settings", placement: .trailing)
             .keyboardShortcut(",", modifiers: .command)
             Button(action: { NSApp.terminate(nil) }) {
                 Image(systemName: "power").frame(width: 36, height: 32)
             }
             .help("Quit Skillbox")
             .accessibilityLabel("Quit Skillbox")
+            .hoverActionLabel("Quit Skillbox", placement: .trailing)
             .keyboardShortcut("q", modifiers: .command)
         }
         .buttonStyle(.plain)
@@ -250,6 +254,7 @@ struct PopoverView: View {
         .buttonStyle(.plain)
         .help(tab.label)
         .accessibilityLabel(tab.label)
+        .hoverActionLabel(tab.label, placement: .trailing)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
         .glassEffect(.regular, in: .rect(cornerRadius: 6))
     }
@@ -378,6 +383,8 @@ struct PopoverView: View {
         }
         .buttonStyle(.plain)
         .help("Install skill from URL (⌘N)")
+        .accessibilityLabel("Install skill from URL")
+        .hoverActionLabel("Install skill from URL (⌘N)")
         .keyboardShortcut("n", modifiers: .command)
     }
 
@@ -398,6 +405,9 @@ struct PopoverView: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.borderless)
+                .help("Clear search")
+                .accessibilityLabel("Clear search")
+                .hoverActionLabel("Clear search")
             }
         }
         .padding(.vertical, 4)

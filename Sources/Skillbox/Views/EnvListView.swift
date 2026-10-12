@@ -172,6 +172,8 @@ struct EnvListView: View {
         }
         .buttonStyle(.plain)
         .help("Add env var (⌘N)")
+        .accessibilityLabel("Add env var")
+        .hoverActionLabel("Add env var (⌘N)")
         .keyboardShortcut("n", modifiers: .command)
     }
 
@@ -192,6 +194,9 @@ struct EnvListView: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.borderless)
+                .help("Clear search")
+                .accessibilityLabel("Clear search")
+                .hoverActionLabel("Clear search")
             }
         }
         .padding(.vertical, 4)

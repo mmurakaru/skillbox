@@ -122,6 +122,7 @@ struct LocalModelListView: View {
         .disabled(isDisabled)
         .help(help)
         .accessibilityLabel(help)
+        .hoverActionLabel(help)
     }
 
     private var searchBar: some View {
@@ -139,6 +140,9 @@ struct LocalModelListView: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.borderless)
+                .help("Clear search")
+                .accessibilityLabel("Clear search")
+                .hoverActionLabel("Clear search")
             }
         }
         .padding(.vertical, 4)

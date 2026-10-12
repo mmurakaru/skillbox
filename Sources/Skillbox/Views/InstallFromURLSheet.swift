@@ -24,6 +24,7 @@ struct InstallFromURLSheet: View {
                 .buttonStyle(.plain)
                 .disabled(model.phase == .running)
                 .help("Close")
+                .hoverActionLabel("Close")
                 .accessibilityLabel("Close installation")
             }
 

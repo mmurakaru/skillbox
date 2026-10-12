@@ -11,10 +11,6 @@ struct KeychainSecretRowView: View {
     @State private var revealedValue: String?
     @State private var isConfirmingDelete = false
     @State private var isHoveringRow = false
-    @State private var isHoveringReveal = false
-    @State private var isHoveringCopy = false
-    @State private var isHoveringConnect = false
-    @State private var isHoveringDelete = false
 
     var body: some View {
         ZStack {
@@ -48,48 +44,46 @@ struct KeychainSecretRowView: View {
                         .font(.system(size: 13, weight: .semibold, design: .monospaced))
                         .lineLimit(1)
                         .truncationMode(.tail)
-                    KeychainStorageBadge()
                     Spacer(minLength: 0)
                 }
-                Text("= \(revealedValue ?? "••••••••")")
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                HStack(spacing: 4) {
+                    KeychainStorageBadge()
+                    Text("= \(revealedValue ?? "••••••••")")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .help(
                 "\(secretName)\nsecret - stored in the login Keychain, not in settings.json or agent environments\nreadable without a prompt by processes running as you through the security tool"
             )
 
-            rowButton(
+            RowIconActionButton(
                 systemName: revealedValue == nil ? "eye" : "eye.slash",
-                isHovering: $isHoveringReveal,
                 tint: .accentColor,
-                help: revealedValue == nil ? "Reveal value" : "Hide value",
+                label: revealedValue == nil ? "Reveal value" : "Hide value",
                 action: toggleReveal
             )
-            rowButton(
+            RowIconActionButton(
                 systemName: "doc.on.doc",
-                isHovering: $isHoveringCopy,
                 tint: .accentColor,
-                help: "Copy value",
+                label: "Copy value",
                 action: copyValue
             )
-            rowButton(
+            RowIconActionButton(
                 systemName: "point.3.connected.trianglepath.dotted",
-                isHovering: $isHoveringConnect,
                 tint: .accentColor,
-                help: "Connect to an MCP server",
+                label: "Connect to an MCP server",
                 action: onConnectToMCPServer
             )
             // Keeps buttons in the same columns as settings-backed secret rows.
             Color.clear.frame(width: 22, height: 22)
-            rowButton(
+            RowIconActionButton(
                 systemName: "trash",
-                isHovering: $isHoveringDelete,
                 tint: .red,
-                help: "Delete from Keychain",
+                label: "Delete from Keychain",
                 action: { isConfirmingDelete = true }
             )
         }
@@ -138,37 +132,14 @@ struct KeychainSecretRowView: View {
         }
     }
 
-    private func rowButton(
-        systemName: String,
-        isHovering: Binding<Bool>,
-        tint: Color,
-        help: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(isHovering.wrappedValue ? tint : Color.secondary)
-                .frame(width: 22, height: 22)
-                .background(
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(isHovering.wrappedValue ? tint.opacity(0.15) : Color.clear)
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help(help)
-        .accessibilityLabel(help)
-        .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.1)) { isHovering.wrappedValue = hovering }
-        }
-    }
 }
 
 struct KeychainStorageBadge: View {
     var body: some View {
         Text("Keychain")
             .font(.system(size: 9, weight: .semibold))
+            .lineLimit(1)
+            .fixedSize()
             .foregroundStyle(.green)
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
