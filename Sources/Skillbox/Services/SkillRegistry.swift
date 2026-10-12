@@ -110,7 +110,7 @@ enum SkillRegistry {
         }
     }
 
-    struct DirEntry {
+    struct DirectoryEntry {
         let name: String
         let path: String
     }
@@ -128,17 +128,17 @@ enum SkillRegistry {
         branch: String,
         path: String,
         session: URLSession
-    ) async throws -> [DirEntry] {
+    ) async throws -> [DirectoryEntry] {
         let entries = try await listContents(repo: repo, branch: branch, path: path, session: session)
 
         return entries.compactMap { item in
             guard
                 (item["type"] as? String) == "dir",
                 let name = item["name"] as? String,
-                let p = item["path"] as? String
+                let entryPath = item["path"] as? String
             else { return nil }
 
-            return DirEntry(name: name, path: p)
+            return DirectoryEntry(name: name, path: entryPath)
         }
     }
 
@@ -251,11 +251,11 @@ enum SkillRegistry {
     }
 
     private static func fetchData(url: URL, session: URLSession) async throws -> Data {
-        var req = URLRequest(url: url)
+        var request = URLRequest(url: url)
 
-        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        req.setValue("skillbox", forHTTPHeaderField: "User-Agent")
-        let (data, response) = try await session.data(for: req)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("skillbox", forHTTPHeaderField: "User-Agent")
+        let (data, response) = try await session.data(for: request)
 
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             throw RegistryError.badResponse(status: http.statusCode)

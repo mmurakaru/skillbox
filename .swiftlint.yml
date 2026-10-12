@@ -89,8 +89,9 @@ custom_rules:
     severity: error
   no_any_parameters:
     name: No Any parameters
-    regex: ':\s*(?:inout\s+)?(?:Any|AnyObject)\??\s*[,)]'
-    match_kinds: [typeidentifier, keyword]
+    # Anchored to lowercase parameter names after `(` or `,`, so protocol inheritance and generic constraints pass.
+    regex: '(?<=[(,][ \t\n]{0,80})(?:[a-z_]\w*\s+)?[a-z_]\w*\s*:\s*(?:inout\s+)?(?:Any|AnyObject)\??(?=\s*[,)])'
+    match_kinds: [identifier, typeidentifier, keyword]
     message: "Accept a named domain type; parse untyped input at its boundary."
     severity: error
   no_any_returns:
@@ -117,6 +118,7 @@ custom_rules:
   no_chained_casts:
     name: No chained casts
     regex: '\bas[!?]?\s+[\w.<>]+\??\s+as[!?]?\s'
+    match_kinds: [keyword, typeidentifier]
     message: "A cast chain discards type evidence; keep the original type or parse at the boundary."
     severity: error
   no_reflection:

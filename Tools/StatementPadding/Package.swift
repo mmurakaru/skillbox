@@ -8,7 +8,7 @@ let package = Package(
         .executable(name: "statement-padding", targets: ["statement-padding"])
     ],
     dependencies: [
-        .package(url: "https://github.com/swiftlang/swift-syntax.git", exact: "603.0.2")
+        .package(url: "https://github.com/swiftlang/swift-syntax.git", exact: "604.0.0")
     ],
     targets: [
         .target(
