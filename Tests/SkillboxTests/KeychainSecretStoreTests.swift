@@ -120,63 +120,63 @@ struct KeychainSecretsModelTests {
                fileURL: URL(fileURLWithPath: "/tmp/settings.json"), modifiedAt: Date(), isSecret: true)
     }
 
-    @Test func addSecret_storesAndListsName() throws {
+    @Test func addSecret_storesAndListsName() async throws {
         let keychain = InMemoryKeychainSecretStore()
         let model = KeychainSecretsModel(secretStore: keychain)
 
-        try model.addSecret(named: "EXAMPLE_API_TOKEN", value: "abc")
+        try await model.addSecret(named: "EXAMPLE_API_TOKEN", value: "abc")
 
         #expect(keychain.storedValues == ["EXAMPLE_API_TOKEN": "abc"])
         #expect(model.secretNames == ["EXAMPLE_API_TOKEN"])
     }
 
-    @Test func addSecret_existingName_throwsWithoutWriting() {
+    @Test func addSecret_existingName_throwsWithoutWriting() async {
         let keychain = InMemoryKeychainSecretStore(values: ["EXAMPLE_API_TOKEN": "old"])
         let model = KeychainSecretsModel(secretStore: keychain)
 
-        #expect(throws: KeychainSecretsModelError.secretAlreadyExists("EXAMPLE_API_TOKEN")) {
-            try model.addSecret(named: "EXAMPLE_API_TOKEN", value: "new")
+        await #expect(throws: KeychainSecretsModelError.secretAlreadyExists("EXAMPLE_API_TOKEN")) {
+            try await model.addSecret(named: "EXAMPLE_API_TOKEN", value: "new")
         }
         #expect(keychain.storedValues["EXAMPLE_API_TOKEN"] == "old")
     }
 
-    @Test func copyEnvSecret_readBackMismatch_removesNewItem() {
+    @Test func copyEnvSecret_readBackMismatch_removesNewItem() async {
         let keychain = InMemoryKeychainSecretStore()
         keychain.corruptsWrites = true
         let model = KeychainSecretsModel(secretStore: keychain)
 
-        #expect(throws: KeychainSecretsModelError.readBackMismatch("EXAMPLE_API_TOKEN")) {
-            try model.copyEnvSecretToKeychain(makeEnvVar(key: "EXAMPLE_API_TOKEN", value: "abc"))
+        await #expect(throws: KeychainSecretsModelError.readBackMismatch("EXAMPLE_API_TOKEN")) {
+            try await model.copyEnvSecretToKeychain(makeEnvVar(key: "EXAMPLE_API_TOKEN", value: "abc"))
         }
         #expect(keychain.storedValues.isEmpty)
     }
 
-    @Test func copyEnvSecret_sameValueAlreadyStored_doesNotRewrite() throws {
+    @Test func copyEnvSecret_sameValueAlreadyStored_doesNotRewrite() async throws {
         let keychain = InMemoryKeychainSecretStore(values: ["EXAMPLE_API_TOKEN": "abc"])
         let model = KeychainSecretsModel(secretStore: keychain)
 
-        try model.copyEnvSecretToKeychain(makeEnvVar(key: "EXAMPLE_API_TOKEN", value: "abc"))
+        try await model.copyEnvSecretToKeychain(makeEnvVar(key: "EXAMPLE_API_TOKEN", value: "abc"))
 
         #expect(keychain.writeCount == 0)
         #expect(model.containsSecret(named: "EXAMPLE_API_TOKEN"))
     }
 
-    @Test func copyEnvSecret_differentValueStored_throwsAndKeepsKeychainValue() {
+    @Test func copyEnvSecret_differentValueStored_throwsAndKeepsKeychainValue() async {
         let keychain = InMemoryKeychainSecretStore(values: ["EXAMPLE_API_TOKEN": "other"])
         let model = KeychainSecretsModel(secretStore: keychain)
 
-        #expect(throws: KeychainSecretsModelError.keychainHoldsDifferentValue("EXAMPLE_API_TOKEN")) {
-            try model.copyEnvSecretToKeychain(makeEnvVar(key: "EXAMPLE_API_TOKEN", value: "abc"))
+        await #expect(throws: KeychainSecretsModelError.keychainHoldsDifferentValue("EXAMPLE_API_TOKEN")) {
+            try await model.copyEnvSecretToKeychain(makeEnvVar(key: "EXAMPLE_API_TOKEN", value: "abc"))
         }
         #expect(keychain.storedValues["EXAMPLE_API_TOKEN"] == "other")
     }
 
-    @Test func keychainHoldsSameValue_comparesStoredValue() throws {
+    @Test func keychainHoldsSameValue_comparesStoredValue() async throws {
         let keychain = InMemoryKeychainSecretStore(values: ["EXAMPLE_API_TOKEN": "abc"])
         let model = KeychainSecretsModel(secretStore: keychain)
-        model.reload()
+        await model.reload()
 
-        #expect(model.keychainHoldsSameValue(as: makeEnvVar(key: "EXAMPLE_API_TOKEN", value: "abc")))
-        #expect(!model.keychainHoldsSameValue(as: makeEnvVar(key: "EXAMPLE_API_TOKEN", value: "changed")))
+        #expect(await model.keychainHoldsSameValue(as: makeEnvVar(key: "EXAMPLE_API_TOKEN", value: "abc")))
+        #expect(await !model.keychainHoldsSameValue(as: makeEnvVar(key: "EXAMPLE_API_TOKEN", value: "changed")))
     }
 }

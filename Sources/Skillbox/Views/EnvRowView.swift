@@ -178,7 +178,7 @@ struct EnvRowView: View {
                     systemName: hasKeychainSecretWithSameName ? "xmark.bin" : "key.horizontal",
                     isHovering: $isHoveringKeychain,
                     tint: hasKeychainSecretWithSameName ? .orange : .green,
-                    help: hasKeychainSecretWithSameName ? "Remove plaintext copy after checking the Keychain holds the same value" : "Copy to Keychain",
+                    help: hasKeychainSecretWithSameName ? "Remove plaintext copy after checking the Keychain holds the same value. Claude Code then stops getting it as an env var, so connect it to an MCP server first if a server needs it." : "Copy to Keychain",
                     action: {
                         if hasKeychainSecretWithSameName {
                             isConfirmingPlaintextRemoval = true
@@ -311,7 +311,7 @@ struct EnvRowView: View {
     private var confirmPlaintextRemovalContent: some View {
         confirmationRow(
             verb: "Remove",
-            detail: " from settings.json?",
+            detail: " from settings.json? Claude Code loses it.",
             confirmTint: .orange,
             onCancel: { isConfirmingPlaintextRemoval = false },
             onConfirm: {

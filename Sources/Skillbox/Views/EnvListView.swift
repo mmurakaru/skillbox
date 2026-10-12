@@ -51,7 +51,7 @@ struct EnvListView: View {
             list
         }
         .task {
-            keychainSecrets.reload()
+            await keychainSecrets.reload()
             applyStickyOrDefault()
         }
         .onChange(of: store.items.count) { _, _ in applyStickyOrDefault() }
@@ -88,7 +88,7 @@ struct EnvListView: View {
                         case .settings(let scope):
                             try store.add(key: key, value: value, scope: scope)
                         case .keychain:
-                            try keychainSecrets.addSecret(named: key, value: value)
+                            try await keychainSecrets.addSecret(named: key, value: value)
                         }
                         showingAddSheet = false
                         return nil
@@ -212,7 +212,7 @@ struct EnvListView: View {
                         ForEach(visibleKeychainSecretNames, id: \.self) { secretName in
                             KeychainSecretRowView(
                                 secretName: secretName,
-                                readValue: { try keychainSecrets.readSecretValue(named: secretName) },
+                                readValue: { try await keychainSecrets.readSecretValue(named: secretName) },
                                 onDelete: { performDeleteKeychainSecret(named: secretName) },
                                 onError: { keychainSecrets.reportError($0) }
                             )
@@ -308,27 +308,33 @@ struct EnvListView: View {
     // MARK: - Actions
 
     private func performCopyToKeychain(_ envVar: EnvVar) {
-        do {
-            try keychainSecrets.copyEnvSecretToKeychain(envVar)
-        } catch {
-            keychainSecrets.reportError(error)
+        Task {
+            do {
+                try await keychainSecrets.copyEnvSecretToKeychain(envVar)
+            } catch {
+                keychainSecrets.reportError(error)
+            }
         }
     }
 
     /// Re-verifies the Keychain value right before deleting, so a changed or missing copy never loses data.
     private func performRemovePlaintextCopy(_ envVar: EnvVar) {
-        guard keychainSecrets.keychainHoldsSameValue(as: envVar) else {
-            keychainSecrets.reportError(KeychainSecretsModelError.keychainHoldsDifferentValue(envVar.key))
-            return
+        Task {
+            guard await keychainSecrets.keychainHoldsSameValue(as: envVar) else {
+                keychainSecrets.reportError(KeychainSecretsModelError.keychainHoldsDifferentValue(envVar.key))
+                return
+            }
+            performDelete(envVar)
         }
-        performDelete(envVar)
     }
 
     private func performDeleteKeychainSecret(named secretName: String) {
-        do {
-            try keychainSecrets.deleteSecret(named: secretName)
-        } catch {
-            keychainSecrets.reportError(error)
+        Task {
+            do {
+                try await keychainSecrets.deleteSecret(named: secretName)
+            } catch {
+                keychainSecrets.reportError(error)
+            }
         }
     }
 
