@@ -1,9 +1,15 @@
 import SwiftUI
 
+/// Where a new env var is stored: a settings.json scope for plain values, the login Keychain for secrets.
+enum EnvAddDestination: Equatable {
+    case settings(EnvScope)
+    case keychain
+}
+
 struct EnvAddSheet: View {
     let availableScopes: [EnvScope]
-    /// Returns an error message to show, or nil on success.
-    let onAdd: (String, String, EnvScope, Bool) -> String?
+    /// Receives key, value, and destination; returns an error message or nil.
+    let onAdd: (String, String, EnvAddDestination) async -> String?
     let onCancel: () -> Void
 
     @State private var keyText: String = ""
@@ -47,7 +53,7 @@ struct EnvAddSheet: View {
                         .toggleStyle(.checkbox)
                         .controlSize(.small)
                         .disabled(nameLooksSecret)
-                        .help(nameLooksSecret ? "Detected as a secret from its name" : "Mask this value and keep it out of shared files")
+                        .help(nameLooksSecret ? "Detected as a secret from its name" : "Store this value in the login Keychain")
                 }
                 Group {
                     if isSecret {
@@ -58,37 +64,32 @@ struct EnvAddSheet: View {
                 }
                 .textFieldStyle(.roundedBorder)
                 .font(.system(.body, design: .monospaced))
-                if isSecret {
-                    Text("Values in the env block reach every process Claude Code starts, including agent shell commands.")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Scope")
+                Text(isSecret ? "Storage" : "Scope")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
-                Picker("", selection: $selectedScopeIndex) {
-                    ForEach(Array(availableScopes.enumerated()), id: \.offset) { index, scope in
-                        Text(scopeLabel(scope))
-                            .tag(index)
-                            .selectionDisabled(isSecret && scope.isSharedWithVersionControl)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
                 if isSecret {
-                    Text("Secrets can't go in a project's shared settings.json, which is meant for version control.")
+                    Label("Login Keychain", systemImage: "key.fill")
+                        .font(.system(size: 12))
+                    Text("Nothing is written to settings.json, so the value stays out of files and of every process Claude Code starts. Processes running as you can still read it without a prompt through the security tool. Values must be one line of printable ASCII up to 1,500 bytes, so PEM keys and JSON files are not supported.")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Picker("", selection: $selectedScopeIndex) {
+                        ForEach(Array(availableScopes.enumerated()), id: \.offset) { index, scope in
+                            Text(scopeLabel(scope)).tag(index)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
                 }
             }
 
-            if let err = errorMessage {
-                Text(err)
+            if let errorMessage {
+                Text(errorMessage)
                     .font(.system(size: 11))
                     .foregroundStyle(.red)
             }
@@ -100,14 +101,11 @@ struct EnvAddSheet: View {
                 Button("Add") { submit() }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
-                    .disabled(keyText.trimmingCharacters(in: .whitespaces).isEmpty || selectedScopeRejectsSecret)
+                    .disabled(keyText.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
         .padding(20)
         .frame(width: 380)
-        .onChange(of: isSecret) { _, secret in
-            if secret { moveSelectionOffSharedProjectScope() }
-        }
         .task {
             try? await Task.sleep(for: .milliseconds(50))
             keyFocused = true
@@ -122,22 +120,6 @@ struct EnvAddSheet: View {
 
     private var secretToggleBinding: Binding<Bool> {
         Binding(get: { isSecret }, set: { isMarkedSecret = $0 })
-    }
-
-    private var selectedScopeRejectsSecret: Bool {
-        guard isSecret, availableScopes.indices.contains(selectedScopeIndex) else { return false }
-        return availableScopes[selectedScopeIndex].isSharedWithVersionControl
-    }
-
-    /// Falls back to User Global when the project has no local scope entry.
-    private func moveSelectionOffSharedProjectScope() {
-        guard availableScopes.indices.contains(selectedScopeIndex),
-              case .project(_, let path) = availableScopes[selectedScopeIndex] else { return }
-        let localIndex = availableScopes.firstIndex {
-            if case .projectLocal(_, let localPath) = $0 { return localPath == path }
-            return false
-        }
-        selectedScopeIndex = localIndex ?? 0
     }
 
     private var suggestions: [EnvVarCatalogEntry] {
@@ -190,10 +172,17 @@ struct EnvAddSheet: View {
     private func submit() {
         let trimmedKey = keyText.trimmingCharacters(in: .whitespaces)
         guard !trimmedKey.isEmpty else { return }
-        guard availableScopes.indices.contains(selectedScopeIndex) else { return }
-        let scope = availableScopes[selectedScopeIndex]
-        if let addError = onAdd(trimmedKey, valueText, scope, isMarkedSecret) {
-            errorMessage = addError
+        let destination: EnvAddDestination
+        if isSecret {
+            destination = .keychain
+        } else {
+            guard availableScopes.indices.contains(selectedScopeIndex) else { return }
+            destination = .settings(availableScopes[selectedScopeIndex])
+        }
+        Task {
+            if let addError = await onAdd(trimmedKey, valueText, destination) {
+                errorMessage = addError
+            }
         }
     }
 }
