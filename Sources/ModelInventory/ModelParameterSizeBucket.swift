@@ -23,6 +23,7 @@ public enum ModelParameterSizeBucket: String, CaseIterable, Identifiable, Sendab
     public func matches(_ parameterHint: String?) -> Bool {
         guard let bounds = billionBounds else { return true }
         guard let billions = Self.billions(from: parameterHint) else { return false }
+
         return billions > bounds.exclusiveLower && billions <= bounds.inclusiveUpper
     }
 
@@ -40,8 +41,10 @@ public enum ModelParameterSizeBucket: String, CaseIterable, Identifiable, Sendab
     public static func billions(from parameterHint: String?) -> Double? {
         guard let hint = parameterHint?.lowercased(), let unit = hint.last, unit == "b" || unit == "m" else { return nil }
         let factors = hint.dropLast().split(separator: "x").compactMap { Double($0) }
+
         guard !factors.isEmpty else { return nil }
         let count = factors.reduce(1, *)
+
         return unit == "m" ? count / 1_000 : count
     }
 }

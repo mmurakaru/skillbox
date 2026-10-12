@@ -1,4 +1,5 @@
 import Testing
+
 @testable import Skillbox
 
 struct MemoryDecodeTests {
@@ -17,6 +18,7 @@ struct MemoryDecodeTests {
             "-Users-alice-projects-widget",
             validator: validator(existing: existing)
         )
+
         #expect(result.full == "/Users/alice/projects/widget")
         #expect(result.last == "widget")
     }
@@ -32,6 +34,7 @@ struct MemoryDecodeTests {
             "-Users-alice-projects-multi-word-project",
             validator: validator(existing: existing)
         )
+
         #expect(result.full == "/Users/alice/projects/multi-word-project")
         #expect(result.last == "multi-word-project")
     }
@@ -47,6 +50,7 @@ struct MemoryDecodeTests {
             "-Users-alice-example-projects-widget",
             validator: validator(existing: existing)
         )
+
         #expect(result.full == "/Users/alice.example/projects/widget")
         #expect(result.last == "widget")
     }
@@ -62,6 +66,7 @@ struct MemoryDecodeTests {
             "-Users-alice-example-projects-multi-word-project",
             validator: validator(existing: existing)
         )
+
         #expect(result.full == "/Users/alice.example/projects/multi-word-project")
         #expect(result.last == "multi-word-project")
     }
@@ -71,6 +76,7 @@ struct MemoryDecodeTests {
             "-this-path-does-not-exist-on-disk",
             validator: { _ in false }
         )
+
         #expect(result.full == "/this/path/does/not/exist/on/disk")
         #expect(result.last == "disk")
     }

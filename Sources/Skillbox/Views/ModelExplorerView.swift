@@ -1,5 +1,5 @@
-import SwiftUI
 import ModelInventory
+import SwiftUI
 
 /// Explore tab: browse Hugging Face Hub models by search, lab, format, size, and sort.
 struct ModelExplorerView: View {
@@ -33,12 +33,14 @@ struct ModelExplorerView: View {
 
     private var searchBar: some View {
         @Bindable var explorer = explorer
+
         return HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
             TextField("Search Hugging Face", text: $explorer.query.search)
                 .textFieldStyle(.plain)
                 .onSubmit { runSearch() }
+
             if !explorer.query.search.isEmpty {
                 Button(action: {
                     explorer.query.search = ""
@@ -57,6 +59,7 @@ struct ModelExplorerView: View {
 
     private var filterBar: some View {
         @Bindable var explorer = explorer
+
         return HStack(spacing: 6) {
             TextField("Lab", text: $explorer.query.author)
                 .textFieldStyle(.roundedBorder)
@@ -148,7 +151,9 @@ struct ModelExplorerView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
             Spacer(minLength: 0)
+
             if explorer.isLoading {
                 ProgressView()
                     .controlSize(.mini)
@@ -162,7 +167,9 @@ struct ModelExplorerView: View {
         guard let lastSynced = explorer.lastSynced else { return "Not synced yet" }
         guard now.timeIntervalSince(lastSynced) >= 60 else { return "Synced just now" }
         let formatter = RelativeDateTimeFormatter()
+
         formatter.unitsStyle = .full
+
         return "Synced \(formatter.localizedString(for: lastSynced, relativeTo: now))"
     }
 }

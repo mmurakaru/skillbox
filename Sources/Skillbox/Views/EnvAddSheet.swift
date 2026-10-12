@@ -70,6 +70,7 @@ struct EnvAddSheet: View {
                 Text(isSecret ? "Storage" : "Scope")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
+
                 if isSecret {
                     Label("Login Keychain", systemImage: "key.fill")
                         .font(.system(size: 12))
@@ -132,6 +133,7 @@ struct EnvAddSheet: View {
             ForEach(suggestions, id: \.key) { entry in
                 Button(action: {
                     keyText = entry.key
+
                     if valueText.isEmpty { valueText = entry.suggestedValue }
                 }) {
                     VStack(alignment: .leading, spacing: 1) {
@@ -171,14 +173,17 @@ struct EnvAddSheet: View {
 
     private func submit() {
         let trimmedKey = keyText.trimmingCharacters(in: .whitespaces)
+
         guard !trimmedKey.isEmpty else { return }
         let destination: EnvAddDestination
+
         if isSecret {
             destination = .keychain
         } else {
             guard availableScopes.indices.contains(selectedScopeIndex) else { return }
             destination = .settings(availableScopes[selectedScopeIndex])
         }
+
         if let addError = onAdd(trimmedKey, valueText, destination) {
             errorMessage = addError
         }

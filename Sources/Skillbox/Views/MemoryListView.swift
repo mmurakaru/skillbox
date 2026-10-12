@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 struct MemoryListView: View {
     @Environment(MemoryStore.self) private var store
@@ -49,26 +49,41 @@ struct MemoryListView: View {
         .onChange(of: store.searchQuery) { _, _ in
             selectedMemoryID = store.filteredMemories.first?.id
         }
-        .onKeyPress(.upArrow) { moveSelection(by: -1); return .handled }
-        .onKeyPress(.downArrow) { moveSelection(by: 1); return .handled }
+        .onKeyPress(.upArrow) {
+            moveSelection(by: -1)
+
+            return .handled
+        }
+        .onKeyPress(.downArrow) {
+            moveSelection(by: 1)
+
+            return .handled
+        }
         .onKeyPress(.return) {
             if searchFocused { return .ignored }
+
             triggerEditOnSelected()
+
             return .handled
         }
         .onKeyPress(.delete) {
             if searchFocused { return .ignored }
+
             triggerDeleteConfirmOnSelected()
+
             return .handled
         }
     }
 
     private func moveSelection(by delta: Int) {
         let items = store.filteredMemories
+
         guard !items.isEmpty else { return }
         searchFocused = false
+
         if let current = selectedMemoryID, let idx = items.firstIndex(where: { $0.id == current }) {
             let next = max(0, min(items.count - 1, idx + delta))
+
             selectedMemoryID = items[next].id
         } else {
             selectedMemoryID = items.first?.id
@@ -82,6 +97,7 @@ struct MemoryListView: View {
 
     private var projectPicker: some View {
         @Bindable var store = store
+
         return Picker("Project", selection: $store.selectedProjectPath) {
             Text("All projects").tag(String?.none)
             ForEach(store.availableProjects) { project in
@@ -97,14 +113,17 @@ struct MemoryListView: View {
 
     private var currentProjectTooltip: String {
         guard let path = store.selectedProjectPath, !path.isEmpty,
-              let project = store.availableProjects.first(where: { $0.folderURL.path == path }) else {
+            let project = store.availableProjects.first(where: { $0.folderURL.path == path })
+        else {
             return "Showing memory entries from all projects"
         }
+
         return project.fullPath
     }
 
     private var searchBar: some View {
         @Bindable var store = store
+
         return HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
@@ -112,6 +131,7 @@ struct MemoryListView: View {
                 .textFieldStyle(.plain)
                 .focused($searchFocused)
                 .onSubmit { triggerEditOnSelected() }
+
             if !store.searchQuery.isEmpty {
                 Button(action: { store.searchQuery = "" }) {
                     Image(systemName: "xmark.circle.fill")
@@ -167,6 +187,7 @@ struct MemoryListView: View {
             Image(systemName: "brain")
                 .font(.system(size: 32))
                 .foregroundStyle(.tertiary)
+
             if let err = store.lastError {
                 Text(err)
                     .font(.system(size: 11))
@@ -199,10 +220,12 @@ struct MemoryListView: View {
 
     private func applyStickyOrDefault() {
         if !memorySelectedProject.isEmpty,
-           store.availableProjects.contains(where: { $0.folderURL.path == memorySelectedProject }),
-           store.selectedProjectPath != memorySelectedProject {
+            store.availableProjects.contains(where: { $0.folderURL.path == memorySelectedProject }),
+            store.selectedProjectPath != memorySelectedProject
+        {
             store.selectedProjectPath = memorySelectedProject
         }
+
         if selectedMemoryID == nil {
             selectedMemoryID = store.filteredMemories.first?.id
         }
@@ -210,6 +233,7 @@ struct MemoryListView: View {
 
     private func open(memory: Memory) {
         let cmd = editorCommand.isEmpty ? "code" : editorCommand
+
         EditorLauncher.openPath(memory.fileURL.path, command: cmd)
         NSApp.deactivate()
     }
@@ -218,6 +242,7 @@ struct MemoryListView: View {
         do {
             try FileManager.default.trashItem(at: memory.fileURL, resultingItemURL: nil)
             store.remove(memory)
+
             if selectedMemoryID == memory.id {
                 selectedMemoryID = store.filteredMemories.first?.id
             }
@@ -229,7 +254,8 @@ struct MemoryListView: View {
 
     private func triggerEditOnSelected() {
         guard let id = selectedMemoryID,
-              let memory = store.filteredMemories.first(where: { $0.id == id }) else { return }
+            let memory = store.filteredMemories.first(where: { $0.id == id })
+        else { return }
         open(memory: memory)
     }
 }

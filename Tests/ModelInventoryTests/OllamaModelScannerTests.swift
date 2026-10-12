@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import ModelInventory
 
 struct OllamaModelScannerTests {
@@ -13,14 +14,17 @@ struct OllamaModelScannerTests {
 
     @Test func readsManifestAndSumsBlobSizes() throws {
         let store = try ModelInventoryTestDirectory()
+
         try writeBlob("sha256:config", bytes: 100, in: store)
         try writeBlob("sha256:weights", bytes: 5000, in: store)
-        try writeManifest("registry.ollama.ai/library/llama3/8b", json: """
-        {
-          "config": {"digest": "sha256:config", "mediaType": "application/vnd.ollama.image.config"},
-          "layers": [{"digest": "sha256:weights", "mediaType": "application/vnd.ollama.image.model"}]
-        }
-        """, in: store)
+        try writeManifest(
+            "registry.ollama.ai/library/llama3/8b",
+            json: """
+                {
+                  "config": {"digest": "sha256:config", "mediaType": "application/vnd.ollama.image.config"},
+                  "layers": [{"digest": "sha256:weights", "mediaType": "application/vnd.ollama.image.model"}]
+                }
+                """, in: store)
 
         let models = OllamaModelScanner(root: store.url).scan()
 
@@ -34,16 +38,20 @@ struct OllamaModelScannerTests {
 
     @Test func keepsNamespaceOutsideTheLibrary() throws {
         let store = try ModelInventoryTestDirectory()
+
         try writeBlob("sha256:w", bytes: 10, in: store)
-        try writeManifest("hf.co/user/mymodel/q4", json: """
-        {"layers": [{"digest": "sha256:w", "mediaType": "application/vnd.ollama.image.model"}]}
-        """, in: store)
+        try writeManifest(
+            "hf.co/user/mymodel/q4",
+            json: """
+                {"layers": [{"digest": "sha256:w", "mediaType": "application/vnd.ollama.image.model"}]}
+                """, in: store)
 
         #expect(OllamaModelScanner(root: store.url).scan().map(\.name) == ["user/mymodel:q4"])
     }
 
     @Test func missingStoreYieldsNothing() throws {
         let store = try ModelInventoryTestDirectory()
+
         #expect(OllamaModelScanner(root: store.url.appending(path: "missing")).scan().isEmpty)
     }
 }

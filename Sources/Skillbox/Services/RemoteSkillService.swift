@@ -65,6 +65,7 @@ final class RemoteSkillService {
         }
 
         let result: SkillsCLI.RunResult
+
         do {
             result = try await cli.install(options, stream: bridgedStream)
         } catch {
@@ -79,10 +80,15 @@ final class RemoteSkillService {
         let names = reportedNames.isEmpty ? [installedName] : reportedNames
         let sourceCoordinates = SkillSourceCoordinates.parse(provenance: SkillProvenance(source: source))
         let paths: [String]
+
         if let sourceCoordinates {
             paths = (try? await registry.skillPaths(repo: sourceCoordinates.repo, branch: sourceCoordinates.branch)) ?? []
-        } else { paths = [] }
+        } else {
+            paths = []
+        }
+
         var installedFolders: [URL] = []
+
         for name in names {
             let folder = try reconcileInstalledFolder(
                 installedName: name,
@@ -95,19 +101,24 @@ final class RemoteSkillService {
                 installedAt: now, lastCheckedAt: now,
                 remotePath: Self.resolveRemotePath(name: name, source: source, coordinates: sourceCoordinates, paths: paths)
             )
+
             if let coordinates = SkillSourceCoordinates.parse(provenance: provenance),
-               let sha = try? await registry.latestSHA(repo: coordinates.repo, branch: coordinates.branch, path: coordinates.path) {
+                let sha = try? await registry.latestSHA(repo: coordinates.repo, branch: coordinates.branch, path: coordinates.path)
+            {
                 provenance.sha = sha
                 provenance.latestKnownSHA = sha
             }
+
             do {
                 try fileSystem.writeProvenance(provenance, to: folder)
+
                 if let mountRootURL {
                     try reconcileClaudeMount(sourceURL: folder, mountRootURL: mountRootURL)
                 }
             } catch { throw ServiceError.underlying(error) }
             installedFolders.append(folder)
         }
+
         return InstalledSkill(folderURL: installedFolders[0], name: names[0], additionalNames: Array(names.dropFirst()))
     }
 
@@ -126,6 +137,7 @@ final class RemoteSkillService {
         }
 
         let result: SkillsCLI.RunResult
+
         do {
             result = try await cli.update(skillName: target, stream: bridgedStream)
         } catch {
@@ -152,28 +164,31 @@ final class RemoteSkillService {
     // MARK: - Private
 
     private enum SHAStamp {
-        /// Install / update — record the new SHA as both installed and upstream.
+        /// Install / update - record the new SHA as both installed and upstream.
         case acceptedUpgrade
-        /// Background poll — record only the upstream SHA.
+        /// Background poll - record only the upstream SHA.
         case upstreamOnly
     }
 
     private func stampSHA(_ stamp: SHAStamp, provenance: SkillProvenance, folderURL: URL) async {
         guard let coordinates = SkillSourceCoordinates.parse(provenance: provenance) else { return }
-        guard let sha = try? await registry.latestSHA(
-            repo: coordinates.repo,
-            branch: coordinates.branch,
-            path: coordinates.path
-        ) else { return }
+        guard
+            let sha = try? await registry.latestSHA(
+                repo: coordinates.repo,
+                branch: coordinates.branch,
+                path: coordinates.path
+            )
+        else { return }
 
         var updated = provenance
+
         updated.latestKnownSHA = sha
         updated.lastCheckedAt = Date()
         switch stamp {
         case .acceptedUpgrade:
             updated.sha = sha
         case .upstreamOnly:
-            if updated.sha == nil { updated.sha = sha }   // seed once on first check
+            if updated.sha == nil { updated.sha = sha }  // seed once on first check
         }
         try? fileSystem.writeProvenance(updated, to: folderURL)
     }
@@ -188,20 +203,25 @@ final class RemoteSkillService {
 
         // A fresh Claude copy wins over an older custom canonical folder; keep the old files as a backup.
         if let mountedFolderURL, mountedFolderURL != folderURL,
-           !SkillMountSync.isSymlink(mountedFolderURL), fm.fileExists(atPath: mountedFolderURL.path) {
+            !SkillMountSync.isSymlink(mountedFolderURL), fm.fileExists(atPath: mountedFolderURL.path)
+        {
             try fm.createDirectory(at: sourceRootURL, withIntermediateDirectories: true)
             var backup: URL?
+
             if fm.fileExists(atPath: folderURL.path) || SkillMountSync.isSymlink(folderURL) {
                 let destination = sourceRootURL.appendingPathComponent(".skillbox-backups/\(UUID().uuidString)/\(installedName)")
+
                 try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try fm.moveItem(at: folderURL, to: destination)
                 backup = destination
             }
-            do { try fm.moveItem(at: mountedFolderURL, to: folderURL) }
-            catch {
+
+            do { try fm.moveItem(at: mountedFolderURL, to: folderURL) } catch {
                 if let backup { try? fm.moveItem(at: backup, to: folderURL) }
+
                 throw error
             }
+
             return folderURL
         }
 
@@ -219,11 +239,13 @@ final class RemoteSkillService {
 
         try fm.createDirectory(at: sourceRootURL, withIntermediateDirectories: true)
         try fm.moveItem(at: mountedFolderURL, to: folderURL)
+
         return folderURL
     }
 
     private func reconcileClaudeMount(sourceURL: URL, mountRootURL: URL) throws {
         let mount = mountRootURL.appendingPathComponent(sourceURL.lastPathComponent)
+
         guard mount != sourceURL else { return }
         _ = try SkillMountSync.ensureMount(sourceURL: sourceURL, mountRoot: mountRootURL)
     }
@@ -232,21 +254,27 @@ final class RemoteSkillService {
         let isTreeURL = URL(string: source)?.path.contains("/tree/") == true
         let scoped = paths.filter { path in
             guard isTreeURL, let scope = coordinates?.path else { return true }
+
             return path == scope || path.hasPrefix(scope + "/")
         }
         let matches = scoped.filter { ($0 as NSString).lastPathComponent == name }
+
         if matches.count == 1 { return .resolved(matches[0]) }
+
         if scoped.count == 1 { return .resolved(scoped[0]) }
+
         // Exact folder URLs remain usable when GitHub tree lookup is unavailable.
         if paths.isEmpty, isTreeURL, let path = coordinates?.path, (path as NSString).lastPathComponent == name {
             return .resolved(path)
         }
+
         return .unresolved
     }
 
     static func inferName(fromSource source: String) -> String {
         let trimmed = source.trimmingCharacters(in: .whitespaces)
         let last = trimmed.split(separator: "/").last.map(String.init) ?? trimmed
+
         return last.replacingOccurrences(of: ".git", with: "")
     }
 }

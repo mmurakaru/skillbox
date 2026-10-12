@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import ModelInventory
 
 struct HuggingFaceCacheScannerTests {
@@ -12,12 +13,14 @@ struct HuggingFaceCacheScannerTests {
         for blob in blobs {
             try directory.writeFile("\(folder)/blobs/\(blob.name)", bytes: blob.bytes)
         }
+
         if blobs.isEmpty {
             try FileManager.default.createDirectory(
                 at: directory.url.appending(path: "\(folder)/blobs"),
                 withIntermediateDirectories: true
             )
         }
+
         if let snapshotFile {
             try directory.writeFile("\(folder)/snapshots/abc123/\(snapshotFile)", bytes: 1)
         }
@@ -25,8 +28,10 @@ struct HuggingFaceCacheScannerTests {
 
     @Test func readsRepositoryIDSizeAndFormat() throws {
         let hub = try ModelInventoryTestDirectory()
-        try makeRepository(in: hub, folder: "models--Qwen--Qwen3-8B",
-                           blobs: [("aaa", 1000), ("bbb", 4000)], snapshotFile: "model.safetensors")
+
+        try makeRepository(
+            in: hub, folder: "models--Qwen--Qwen3-8B",
+            blobs: [("aaa", 1000), ("bbb", 4000)], snapshotFile: "model.safetensors")
 
         let models = HuggingFaceCacheScanner(root: hub.url).scan()
 
@@ -40,12 +45,14 @@ struct HuggingFaceCacheScannerTests {
 
     @Test func detectsGGUFFormat() throws {
         let hub = try ModelInventoryTestDirectory()
+
         try makeRepository(in: hub, folder: "models--Example--Foo-GGUF", blobs: [("x", 10)], snapshotFile: "foo.Q4_K_M.gguf")
         #expect(HuggingFaceCacheScanner(root: hub.url).scan().first?.format == .gguf)
     }
 
     @Test func ignoresNonRepositoryFoldersAndEmptyRepositories() throws {
         let hub = try ModelInventoryTestDirectory()
+
         try makeRepository(in: hub, folder: "models--Empty--Repo", blobs: [], snapshotFile: nil)
         try FileManager.default.createDirectory(at: hub.url.appending(path: "version-folder"), withIntermediateDirectories: true)
         #expect(HuggingFaceCacheScanner(root: hub.url).scan().isEmpty)
@@ -53,6 +60,7 @@ struct HuggingFaceCacheScannerTests {
 
     @Test func defaultRootHonorsEnvironmentOverrides() {
         let home = URL(fileURLWithPath: "/tmp/example-home")
+
         #expect(HuggingFaceCacheScanner.defaultRoot(environment: [:], home: home).path == "/tmp/example-home/.cache/huggingface/hub")
         #expect(HuggingFaceCacheScanner.defaultRoot(environment: ["HF_HOME": "/data/hf"], home: home).path == "/data/hf/hub")
         #expect(HuggingFaceCacheScanner.defaultRoot(environment: ["HF_HUB_CACHE": "/data/hub"], home: home).path == "/data/hub")
@@ -62,6 +70,7 @@ struct HuggingFaceCacheScannerTests {
         let hub = try ModelInventoryTestDirectory()
         let blob = try hub.writeFile("models--Example--Tiny/blobs/weights-blob", bytes: 64)
         let snapshot = hub.url.appending(path: "models--Example--Tiny/snapshots/abc123")
+
         try FileManager.default.createDirectory(at: snapshot, withIntermediateDirectories: true)
         try FileManager.default.createSymbolicLink(at: snapshot.appending(path: "model.gguf"), withDestinationURL: blob)
         try FileManager.default.createSymbolicLink(at: snapshot.appending(path: "copy.gguf"), withDestinationURL: blob)

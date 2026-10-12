@@ -1,6 +1,6 @@
+import AppKit
 import Foundation
 import Observation
-import AppKit
 
 /// App-level state lets Insights finish after Settings closes.
 @MainActor
@@ -29,6 +29,7 @@ final class InsightsModel {
     private func spawn(claudePath: String) {
         // /insights aggregates from ~/.claude/usage-data/, so cwd is irrelevant.
         let cwd = URL(fileURLWithPath: NSHomeDirectory())
+
         Task { @MainActor in
             defer { isRunning = false }
             do {
@@ -37,9 +38,11 @@ final class InsightsModel {
                     cwd: cwd,
                     onChunk: { _ in }
                 )
+
                 NSWorkspace.shared.open(result.reportURL)
             } catch {
                 let msg = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+
                 presentError(msg)
             }
         }

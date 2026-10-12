@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import Skillbox
 
 @MainActor
@@ -20,6 +21,7 @@ struct RemoteSkillServiceTests {
 
         let folder = URL(fileURLWithPath: "/Users/test/skills/find-skills")
         let stored = try #require(fs.readProvenance(at: folder))
+
         #expect(stored.source == "https://github.com/vercel-labs/agent-skills/tree/main/skills/find-skills")
         #expect(stored.skill == "find-skills")
         #expect(stored.sha == "sha-abc")
@@ -31,6 +33,7 @@ struct RemoteSkillServiceTests {
         let service = RemoteSkillService(cli: cli, registry: FakeRegistry(), fileSystem: InMemoryFileSystem())
 
         var captured = ""
+
         _ = try await service.install(
             source: "https://github.com/owner/repo/tree/main/skills/frontend-design",
             rootPath: "/tmp/skills"
@@ -96,6 +99,7 @@ struct RemoteSkillServiceTests {
 
         let folder = URL(fileURLWithPath: "/tmp/skills/x")
         let stored = try #require(fs.readProvenance(at: folder))
+
         #expect(stored.sha == nil)
         #expect(stored.latestKnownSHA == nil)
     }
@@ -110,12 +114,14 @@ struct RemoteSkillServiceTests {
 
         let folder = URL(fileURLWithPath: "/tmp/skills/x")
         let initial = SkillProvenance(source: "owner/repo", skill: "x", ref: "main", sha: "sha-old", latestKnownSHA: "sha-old")
+
         try fs.writeProvenance(initial, to: folder)
         let skill = Skill(name: "x", description: "", folderURL: folder, modifiedAt: Date(), provenance: initial)
 
         try await service.update(skill) { _ in }
 
         let stored = try #require(fs.readProvenance(at: folder))
+
         #expect(stored.sha == "sha-new")
         #expect(stored.latestKnownSHA == "sha-new")
     }
@@ -127,6 +133,7 @@ struct RemoteSkillServiceTests {
 
         let folder = URL(fileURLWithPath: "/tmp/skills/x")
         let initial = SkillProvenance(source: "owner/repo", skill: "x", sha: "sha-old", latestKnownSHA: "sha-old")
+
         try fs.writeProvenance(initial, to: folder)
         let skill = Skill(name: "x", description: "", folderURL: folder, modifiedAt: Date(), provenance: initial)
 
@@ -135,6 +142,7 @@ struct RemoteSkillServiceTests {
         }
 
         let stored = try #require(fs.readProvenance(at: folder))
+
         #expect(stored.sha == "sha-old")
     }
 
@@ -163,13 +171,15 @@ struct RemoteSkillServiceTests {
 
         let folder = URL(fileURLWithPath: "/tmp/skills/x")
         let provenance = SkillProvenance(source: "owner/repo", skill: "x", sha: "sha-old", latestKnownSHA: "sha-old")
+
         try fs.writeProvenance(provenance, to: folder)
         let skill = Skill(name: "x", description: "", folderURL: folder, modifiedAt: Date(), provenance: provenance)
 
         await service.checkForUpdates([skill])
 
         let stored = try #require(fs.readProvenance(at: folder))
-        #expect(stored.sha == "sha-old")        // installed SHA is preserved
+
+        #expect(stored.sha == "sha-old")  // installed SHA is preserved
         #expect(stored.latestKnownSHA == "sha-new")  // upstream advance is recorded
         #expect(stored.hasUpdate == true)
     }
@@ -181,6 +191,7 @@ struct RemoteSkillServiceTests {
 
         let folder = URL(fileURLWithPath: "/tmp/skills/x")
         let provenance = SkillProvenance(source: "/local/unparseable", skill: "x")
+
         try fs.writeProvenance(provenance, to: folder)
         let skill = Skill(name: "x", description: "", folderURL: folder, modifiedAt: Date(), provenance: provenance)
 
@@ -199,10 +210,12 @@ struct RemoteSkillServiceTests {
 
         let goodFolder = URL(fileURLWithPath: "/tmp/skills/good")
         let goodProvenance = SkillProvenance(source: "owner/repo", skill: "good", sha: "sha-old")
+
         try fs.writeProvenance(goodProvenance, to: goodFolder)
 
         let badFolder = URL(fileURLWithPath: "/tmp/skills/bad")
         let badProvenance = SkillProvenance(source: "owner/repo", skill: "bad", sha: "sha-bad-old")
+
         try fs.writeProvenance(badProvenance, to: badFolder)
 
         let goodSkill = Skill(name: "good", description: "", folderURL: goodFolder, modifiedAt: Date(), provenance: goodProvenance)
@@ -212,6 +225,7 @@ struct RemoteSkillServiceTests {
 
         let goodStored = try #require(fs.readProvenance(at: goodFolder))
         let badStored = try #require(fs.readProvenance(at: badFolder))
+
         #expect(goodStored.latestKnownSHA == "sha-good")
         #expect(badStored.latestKnownSHA == nil)  // never written, sidecar untouched
     }
@@ -255,6 +269,7 @@ private final class FakeCLI: SkillsCLIRunning, @unchecked Sendable {
     ) async throws -> SkillsCLI.RunResult {
         installCalls.append(options)
         for chunk in installResult.streamChunks { stream(chunk) }
+
         return SkillsCLI.RunResult(exitCode: installResult.exitCode, combinedOutput: installResult.output)
     }
 
@@ -264,6 +279,7 @@ private final class FakeCLI: SkillsCLIRunning, @unchecked Sendable {
     ) async throws -> SkillsCLI.RunResult {
         updateCalls.append(skillName)
         for chunk in updateResult.streamChunks { stream(chunk) }
+
         return SkillsCLI.RunResult(exitCode: updateResult.exitCode, combinedOutput: updateResult.output)
     }
 }
@@ -289,8 +305,11 @@ private final class FakeRegistry: SkillRegistryFetching, @unchecked Sendable {
 
     func latestSHA(repo: String, branch: String, path: String) async throws -> String? {
         let key = "\(repo)/\(path)"
+
         shaCalls.append(key)
+
         if failureMode == .always || failingPaths.contains(key) { throw ForcedFailure() }
+
         return latest[key]
     }
 }

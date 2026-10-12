@@ -19,8 +19,11 @@ public enum ModelRAMFit: Sendable, Equatable {
     /// Fits at 70% of physical memory or less, tight up to 100%, otherwise too big.
     public static func evaluate(estimatedRAMBytes: Int64, physicalMemoryBytes: Int64) -> ModelRAMFit {
         guard physicalMemoryBytes > 0 else { return .tooBig }
+
         if estimatedRAMBytes <= physicalMemoryBytes * 7 / 10 { return .fits }
+
         if estimatedRAMBytes <= physicalMemoryBytes { return .tight }
+
         return .tooBig
     }
 

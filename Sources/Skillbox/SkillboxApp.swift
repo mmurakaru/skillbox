@@ -1,5 +1,5 @@
-import SwiftUI
 import Sparkle
+import SwiftUI
 
 @main
 struct SkillboxApp: App {
@@ -23,23 +23,29 @@ struct SkillboxApp: App {
 
     init() {
         let usageStore = ProviderUsageStore()
+
         self._usageStore = State(initialValue: usageStore)
         let store = SkillStore()
         let classifications = SkillClassificationStore()
         let credentials = TypeSafeSettings()
+
         store.configure(rootPath: UserDefaults.standard.string(forKey: "skillsRootPath") ?? "~/.agents/skills")
         self._store = State(initialValue: store)
         let localModelStore = LocalModelStore()
+
         localModelStore.configure(LocalModelScanSettings.configuration())
         self._localModelStore = State(initialValue: localModelStore)
         self._classificationStore = State(initialValue: classifications)
         self._typeSafeSettings = State(initialValue: credentials)
-        self._classificationAutomation = State(initialValue: SkillClassificationAutomation(
-            store: store, classifications: classifications, apiKey: { credentials.apiKey }
-        ))
+        self._classificationAutomation = State(
+            initialValue: SkillClassificationAutomation(
+                store: store, classifications: classifications, apiKey: { credentials.apiKey }
+            ))
         let model = InsightsModel()
+
         model.presentError = { msg in
             let alert = NSAlert()
+
             alert.messageText = "Insights failed"
             alert.informativeText = msg
             alert.alertStyle = .warning

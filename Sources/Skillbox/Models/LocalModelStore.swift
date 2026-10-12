@@ -1,6 +1,6 @@
 import Foundation
-import Observation
 import ModelInventory
+import Observation
 
 /// Local AI model inventory behind the Models tab. Scans at launch and again when a watched model folder changes.
 @MainActor
@@ -43,7 +43,9 @@ final class LocalModelStore {
 
     var filteredModels: [LocalModel] {
         let query = searchQuery.trimmingCharacters(in: .whitespaces).lowercased()
+
         guard !query.isEmpty else { return models }
+
         return models.filter {
             $0.name.lowercased().contains(query) || $0.source.displayName.lowercased().contains(query)
         }
@@ -72,14 +74,18 @@ final class LocalModelStore {
         inventoryGeneration += 1
         let generation = inventoryGeneration
         let scanners = self.scanners
+
         isScanning = true
         scanTask?.cancel()
         let scan = Task.detached(priority: .utility) {
             LocalModelInventory.aggregate(scanners)
         }
+
         scanTask = scan
+
         return Task {
             let found = await scan.value
+
             guard generation == inventoryGeneration else { return }
             models = found
             duplicateGroups = []
@@ -94,8 +100,10 @@ final class LocalModelStore {
         isDetectingDuplicates = true
         let generation = inventoryGeneration
         let snapshot = models
+
         return Task {
             let groups = await duplicateDetector.findDuplicates(in: snapshot)
+
             isDetectingDuplicates = false
             guard generation == inventoryGeneration else { return }
             duplicateGroups = groups
@@ -131,7 +139,8 @@ final class LocalModelStore {
         try moveItemToTrash(model.path)
         models.removeAll { $0.id == model.id }
         runtimeStates[model.id] = nil
-        duplicateGroups = duplicateGroups
+        duplicateGroups =
+            duplicateGroups
             .map { DuplicateModelGroup(id: $0.id, models: $0.models.filter { $0.id != model.id }) }
             .filter { $0.models.count > 1 }
     }
@@ -142,19 +151,24 @@ final class LocalModelStore {
         guard missingWatchRoots.contains(where: { FileManager.default.fileExists(atPath: $0.path) }) else { return false }
         startWatching()
         rescan()
+
         return true
     }
 
     private func startWatching() {
         let roots = scanners.flatMap(\.watchRoots)
+
         missingWatchRoots = roots.filter { !FileManager.default.fileExists(atPath: $0.path) }
-        watcher = roots.isEmpty ? nil : DirectoryWatcher(
-            urls: roots,
-            watchesMissingPathsThroughAncestors: false,
-            eventQueue: Self.watcherEventQueue
-        ) { [weak self] in
-            Task { @MainActor in self?.rescan() }
-        }
+        watcher =
+            roots.isEmpty
+            ? nil
+            : DirectoryWatcher(
+                urls: roots,
+                watchesMissingPathsThroughAncestors: false,
+                eventQueue: Self.watcherEventQueue
+            ) { [weak self] in
+                Task { @MainActor in self?.rescan() }
+            }
         scheduleRootAppearanceCheck()
     }
 
@@ -166,6 +180,7 @@ final class LocalModelStore {
             while !Task.isCancelled {
                 try? await Task.sleep(for: Self.rootAppearanceCheckInterval)
                 guard !Task.isCancelled, let self else { return }
+
                 if self.watchModelFoldersCreatedSinceLastCheck() { return }
             }
         }

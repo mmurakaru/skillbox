@@ -1,25 +1,30 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import ModelInventory
 
 struct HuggingFaceHubClientTests {
-    private func queryItems(_ query: HuggingFaceHubQuery) -> [String: String] {
-        let url = HuggingFaceHubClient().makeRequest(query).url!
+    private func queryItems(_ query: HuggingFaceHubQuery) throws -> [String: String] {
+        let url = try #require(HuggingFaceHubClient().makeRequest(query).url)
         let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+
         return Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0.value ?? "") })
     }
 
-    @Test func requestIncludesSearchAuthorFormatTagAndSort() {
-        let request = HuggingFaceHubClient().makeRequest(HuggingFaceHubQuery(search: "qwen", author: "Qwen", formatFilter: "gguf", sort: .recent))
+    @Test func requestIncludesSearchAuthorFormatTagAndSort() throws {
+        let request = HuggingFaceHubClient().makeRequest(
+            HuggingFaceHubQuery(search: "qwen", author: "Qwen", formatFilter: "gguf", sort: .recent))
+
         #expect(request.url?.absoluteString.hasPrefix("https://huggingface.co/api/models?") == true)
-        #expect(queryItems(HuggingFaceHubQuery(search: "qwen", author: "Qwen", formatFilter: "gguf", sort: .recent)) == [
-            "limit": "50", "sort": "lastModified", "direction": "-1",
-            "search": "qwen", "author": "Qwen", "filter": "gguf",
-        ])
+        #expect(
+            try queryItems(HuggingFaceHubQuery(search: "qwen", author: "Qwen", formatFilter: "gguf", sort: .recent)) == [
+                "limit": "50", "sort": "lastModified", "direction": "-1",
+                "search": "qwen", "author": "Qwen", "filter": "gguf",
+            ])
     }
 
-    @Test func requestOmitsBlankFilters() {
-        #expect(queryItems(HuggingFaceHubQuery(search: "  ", author: "")) == ["limit": "50", "sort": "downloads", "direction": "-1"])
+    @Test func requestOmitsBlankFilters() throws {
+        #expect(try queryItems(HuggingFaceHubQuery(search: "  ", author: "")) == ["limit": "50", "sort": "downloads", "direction": "-1"])
     }
 
     @Test func requestIsAnonymous() {
@@ -31,13 +36,14 @@ struct HuggingFaceHubClientTests {
     }
 
     @Test func decodesListIgnoringUnknownFields() throws {
-        let json = Data("""
-        [
-          {"_id":"abc","id":"Qwen/Qwen3-8B","likes":10,"downloads":12345,
-           "pipeline_tag":"text-generation","library_name":"transformers","tags":["x"]},
-          {"_id":"def","id":"mistralai/Mixtral-8x7B-Instruct-v0.1","downloads":999}
-        ]
-        """.utf8)
+        let json = Data(
+            """
+            [
+              {"_id":"abc","id":"Qwen/Qwen3-8B","likes":10,"downloads":12345,
+               "pipeline_tag":"text-generation","library_name":"transformers","tags":["x"]},
+              {"_id":"def","id":"mistralai/Mixtral-8x7B-Instruct-v0.1","downloads":999}
+            ]
+            """.utf8)
 
         let models = try JSONDecoder().decode([HuggingFaceHubModel].self, from: json)
 

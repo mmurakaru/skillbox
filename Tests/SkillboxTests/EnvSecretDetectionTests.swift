@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import Skillbox
 
 struct EnvSecretDetectionTests {
@@ -25,6 +26,7 @@ struct EnvSecretDetectionTests {
     @Test func secretMarksFile_roundTripsNames() throws {
         let fileURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("skillbox-secret-marks-\(UUID().uuidString).json")
+
         defer { try? FileManager.default.removeItem(at: fileURL) }
         let marksFile = EnvSecretMarksFile(fileURL: fileURL)
 

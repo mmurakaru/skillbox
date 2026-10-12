@@ -1,5 +1,7 @@
 import Foundation
 
+// swiftlint:disable no_untyped_dictionaries - JSON trust boundary: reads settings.json hook entries, which may be any JSON type.
+
 enum HookScanner {
     /// Parses one settings.json file. For every entry in
     /// `hooks.<EventName>[*].hooks[*]`, yields one `Hook` with a stable
@@ -8,27 +10,34 @@ enum HookScanner {
     static func scan(fileURL: URL, scope: HookScope) throws -> [Hook] {
         let data = try Data(contentsOf: fileURL)
         let parsed = try JSONSerialization.jsonObject(with: data, options: [])
+
         guard let root = parsed as? [String: Any],
-              let hooksMap = root["hooks"] as? [String: Any] else {
+            let hooksMap = root["hooks"] as? [String: Any]
+        else {
             return []
         }
 
-        let modifiedAt = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]))?
+        let modifiedAt =
+            (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]))?
             .contentModificationDate ?? Date()
 
         var result: [Hook] = []
+
         for (eventKey, eventValueAny) in hooksMap {
             guard let ruleGroups = eventValueAny as? [Any] else { continue }
             let event = HookEventName.parse(eventKey)
+
             for (ruleIdx, ruleAny) in ruleGroups.enumerated() {
                 guard let rule = ruleAny as? [String: Any] else { continue }
                 let matcher = rule["matcher"] as? String
                 let ifCondition = rule["if"] as? String
+
                 guard let inner = rule["hooks"] as? [Any] else { continue }
                 for (innerIdx, hookAny) in inner.enumerated() {
                     guard let hookDict = hookAny as? [String: Any] else { continue }
                     let kind = HookKind.parse((hookDict["type"] as? String) ?? "")
                     let pointer = "/hooks/\(escape(eventKey))/\(ruleIdx)/hooks/\(innerIdx)"
+
                     result.append(
                         Hook(
                             eventName: event,
@@ -47,6 +56,7 @@ enum HookScanner {
                 }
             }
         }
+
         return result
     }
 
@@ -62,6 +72,7 @@ enum HookScanner {
             if let names = dict["hooks"] as? [String], !names.isEmpty {
                 return names.joined(separator: ", ")
             }
+
             return (dict["prompt"] as? String) ?? ""
         case .other:
             return (dict["command"] as? String)

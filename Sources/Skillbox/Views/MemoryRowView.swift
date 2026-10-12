@@ -48,6 +48,7 @@ struct MemoryRowView: View {
             if rowState != .normal {
                 normalContent.hidden()
             }
+
             if rowState == .confirmingDelete {
                 confirmContent
             } else {
@@ -70,7 +71,9 @@ struct MemoryRowView: View {
 
     private var rowBackground: Color {
         if isSelected { return Color.accentColor.opacity(0.18) }
+
         if isHoveringRow { return Color.primary.opacity(0.06) }
+
         return .clear
     }
 
@@ -124,6 +127,7 @@ struct MemoryRowView: View {
         if memory.description.isEmpty {
             return memory.projectDisplayName
         }
+
         return "\(memory.projectDisplayName) · \(memory.description)"
     }
 
@@ -161,10 +165,10 @@ struct MemoryRowView: View {
                 .frame(width: 18)
 
             Text("Delete ")
-                .font(.system(size: 12)) +
-            Text(memory.name)
-                .font(.system(size: 12, weight: .semibold)) +
-            Text("?")
+                .font(.system(size: 12))
+                + Text(memory.name)
+                .font(.system(size: 12, weight: .semibold))
+                + Text("?")
                 .font(.system(size: 12))
 
             Spacer()

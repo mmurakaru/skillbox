@@ -7,8 +7,7 @@ extension FileBackedItemStore where Item == Skill {
         self.init(
             scan: { try SkillScanner.scan(rootURL: $0) },
             matchesQuery: { skill, query in
-                skill.name.localizedCaseInsensitiveContains(query) ||
-                skill.description.localizedCaseInsensitiveContains(query)
+                skill.name.localizedCaseInsensitiveContains(query) || skill.description.localizedCaseInsensitiveContains(query)
             },
             sort: { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         )

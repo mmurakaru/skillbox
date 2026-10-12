@@ -16,21 +16,24 @@ final class ProviderUsageStore {
     init(fetcher: any ProviderUsageFetching = ProviderUsageService(), defaults: UserDefaults = .standard) {
         self.fetcher = fetcher
         self.defaults = defaults
+
         if let data = defaults.data(forKey: storageKey),
-           let saved = try? JSONDecoder().decode([ProviderUsageSnapshot].self, from: data) {
+            let saved = try? JSONDecoder().decode([ProviderUsageSnapshot].self, from: data)
+        {
             for snapshot in saved { snapshots[snapshot.provider] = snapshot.normalizingUsageLabels() }
         }
     }
 
     /// Refreshes live providers in the background; manual snapshots remain explicitly user-owned.
-    func startAutoRefresh(interval: Duration = .seconds(300),
-                          sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }) {
+    func startAutoRefresh(
+        interval: Duration = .seconds(300),
+        sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+    ) {
         guard autoRefreshTask == nil else { return }
         autoRefreshTask = Task { [weak self] in
             while !Task.isCancelled {
                 await self?.refreshAll()
-                do { try await sleep(interval) }
-                catch { return }
+                do { try await sleep(interval) } catch { return }
             }
         }
     }
@@ -56,21 +59,25 @@ final class ProviderUsageStore {
         defer { refreshing.remove(provider) }
         do {
             let snapshot = try await fetcher.fetchUsage(for: provider, allowKeychainPrompt: allowKeychainPrompt)
+
             // A user may save a manual snapshot while an earlier refresh is still running.
             if !useLive, snapshots[provider]?.source == .manual { return }
+
             snapshots[provider] = snapshot.normalizingUsageLabels()
             errors[provider] = nil
             persistUsageSnapshots()
         } catch is CancellationError {
             return
         } catch {
-            errors[provider] = (error as? UsageFetchError)?.localizedDescription
+            errors[provider] =
+                (error as? UsageFetchError)?.localizedDescription
                 ?? "Could not refresh usage. Check your connection and try again."
         }
     }
 
     func saveManualSnapshot(_ snapshot: ProviderUsageSnapshot) {
         var snapshot = snapshot
+
         snapshot.source = .manual
         snapshot.updatedAt = Date()
         snapshots[snapshot.provider] = snapshot.normalizingUsageLabels()

@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 /// Bundled provider logos are vector templates rendered white, with no network fetch during launch.
 struct ProviderUsageLogo: View {
@@ -8,14 +8,18 @@ struct ProviderUsageLogo: View {
     nonisolated static func logoURL(for provider: UsageProvider, appResourceURL: URL? = Bundle.main.resourceURL) -> URL? {
         if let appResourceURL {
             let bundled = appResourceURL.appendingPathComponent("Skillbox_Skillbox.bundle/ProviderLogos/\(provider.rawValue).pdf")
+
             if FileManager.default.fileExists(atPath: bundled.path) { return bundled }
         }
+
         return Bundle.module.url(forResource: provider.rawValue, withExtension: "pdf", subdirectory: "ProviderLogos")
     }
 
     private var logo: NSImage {
         guard let url = Self.logoURL(for: provider),
-              let image = NSImage(contentsOf: url) else { return NSImage() }
+            let image = NSImage(contentsOf: url)
+        else { return NSImage() }
+
         return image
     }
 

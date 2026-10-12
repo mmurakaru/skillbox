@@ -29,6 +29,7 @@ enum MemoryType: String, CaseIterable {
 
     static func parse(_ raw: String?) -> MemoryType {
         guard let raw = raw?.lowercased() else { return .other }
+
         return MemoryType(rawValue: raw) ?? .other
     }
 }
@@ -59,6 +60,7 @@ struct Memory: Identifiable, Hashable {
         self.fileURL = fileURL
         self.projectFolderURL = projectFolderURL
         let decoded = Self.decodeProjectPath(projectFolderURL.lastPathComponent)
+
         self.projectDisplayName = decoded.last
         self.projectFullPath = decoded.full
         self.modifiedAt = modifiedAt
@@ -73,11 +75,13 @@ struct Memory: Identifiable, Hashable {
 
         if let resolved = resolveAgainstFilesystem(parts: parts, base: "", validator: validator) {
             let last = (resolved as NSString).lastPathComponent
+
             return (resolved, last)
         }
 
         let full = "/" + parts.joined(separator: "/")
         let last = parts.last ?? encoded
+
         return (full, last)
     }
 
@@ -92,18 +96,23 @@ struct Memory: Identifiable, Hashable {
         // as the separator (since the encoding loses both `/` and `.`).
         for prefixLen in stride(from: parts.count, to: 0, by: -1) {
             let prefix = parts[0..<prefixLen]
+
             for sep in ["-", "."] {
                 let candidate = prefix.joined(separator: sep)
                 let trial = base + "/" + candidate
+
                 guard validator(trial) else { continue }
 
                 let remaining = Array(parts[prefixLen...])
+
                 if remaining.isEmpty { return trial }
+
                 if let result = resolveAgainstFilesystem(parts: remaining, base: trial, validator: validator) {
                     return result
                 }
             }
         }
+
         return nil
     }
 }

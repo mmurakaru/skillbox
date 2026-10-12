@@ -19,6 +19,7 @@ struct KeychainSecretRowView: View {
     var body: some View {
         ZStack {
             if isConfirmingDelete { normalContent.hidden() }
+
             if isConfirmingDelete { confirmDeleteContent } else { normalContent }
         }
         .padding(.horizontal, 10)
@@ -98,10 +99,10 @@ struct KeychainSecretRowView: View {
                 .foregroundStyle(.orange)
                 .frame(width: 18)
             Text("Delete ")
-                .font(.system(size: 12)) +
-            Text(secretName)
-                .font(.system(size: 12, weight: .semibold, design: .monospaced)) +
-            Text(" from the Keychain?")
+                .font(.system(size: 12))
+                + Text(secretName)
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                + Text(" from the Keychain?")
                 .font(.system(size: 12))
             Spacer()
             Button("Cancel") { isConfirmingDelete = false }
@@ -120,8 +121,10 @@ struct KeychainSecretRowView: View {
     private func toggleReveal() {
         if revealedValue != nil {
             revealedValue = nil
+
             return
         }
+
         do { revealedValue = try readValue() } catch { onError(error) }
     }
 

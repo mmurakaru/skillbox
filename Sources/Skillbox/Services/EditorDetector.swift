@@ -22,11 +22,13 @@ enum EditorDetector {
     static func detect() -> [DetectedEditor] {
         let searchPaths = pathDirs()
         var found: [DetectedEditor] = []
+
         for entry in knownEditors {
             if let resolved = resolve(command: entry.command, in: searchPaths) {
                 found.append(DetectedEditor(displayName: entry.displayName, command: entry.command, path: resolved))
             }
         }
+
         return found
     }
 
@@ -40,16 +42,21 @@ enum EditorDetector {
             "/Applications/Visual Studio Code.app/Contents/Resources/app/bin",
             "/Applications/Cursor.app/Contents/Resources/app/bin",
         ]
+
         for e in extras where !dirs.contains(e) { dirs.append(e) }
+
         return dirs
     }
 
     private static func resolve(command: String, in dirs: [String]) -> String? {
         let fm = FileManager.default
+
         for dir in dirs {
             let candidate = "\(dir)/\(command)"
+
             if fm.isExecutableFile(atPath: candidate) { return candidate }
         }
+
         return nil
     }
 }

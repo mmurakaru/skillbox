@@ -1,12 +1,15 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import Skillbox
 
 struct SkillProvenanceTests {
     private func makeFolder() throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("skillbox-provenance-\(UUID().uuidString)")
+
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+
         return url
     }
 
@@ -16,6 +19,7 @@ struct SkillProvenanceTests {
 
     @Test func roundTrip_preservesAllFields() throws {
         let folder = try makeFolder()
+
         defer { cleanup(folder) }
 
         let installedAt = Date(timeIntervalSince1970: 1_700_000_000)
@@ -38,6 +42,7 @@ struct SkillProvenanceTests {
 
     @Test func read_returnsNilWhenSidecarMissing() throws {
         let folder = try makeFolder()
+
         defer { cleanup(folder) }
 
         #expect(SkillProvenanceStore.read(from: folder) == nil)
@@ -45,6 +50,7 @@ struct SkillProvenanceTests {
 
     @Test func hasUpdate_trueOnlyWhenLatestSHADiffersFromSHA() {
         var p = SkillProvenance(source: "owner/repo", sha: "aaa", latestKnownSHA: "aaa")
+
         #expect(p.hasUpdate == false)
 
         p.latestKnownSHA = "bbb"
@@ -59,11 +65,14 @@ struct SkillProvenanceTests {
 
     @Test func scanner_attachesProvenanceWhenSidecarPresent() throws {
         let root = try makeFolder()
+
         defer { cleanup(root) }
 
         let skillFolder = root.appendingPathComponent("frontend-design")
+
         try FileManager.default.createDirectory(at: skillFolder, withIntermediateDirectories: true)
         let skillMd = skillFolder.appendingPathComponent("SKILL.md")
+
         try """
         ---
         name: frontend-design
@@ -77,9 +86,11 @@ struct SkillProvenanceTests {
             source: "vercel-labs/agent-skills",
             skill: "frontend-design"
         )
+
         try SkillProvenanceStore.write(provenance, to: skillFolder)
 
         let result = try SkillScanner.scan(rootURL: root)
+
         #expect(result.count == 1)
         #expect(result.first?.provenance?.source == "vercel-labs/agent-skills")
         #expect(result.first?.provenance?.skill == "frontend-design")
@@ -87,11 +98,14 @@ struct SkillProvenanceTests {
 
     @Test func scanner_leavesProvenanceNilWhenSidecarMissing() throws {
         let root = try makeFolder()
+
         defer { cleanup(root) }
 
         let skillFolder = root.appendingPathComponent("local-skill")
+
         try FileManager.default.createDirectory(at: skillFolder, withIntermediateDirectories: true)
         let skillMd = skillFolder.appendingPathComponent("SKILL.md")
+
         try """
         ---
         name: local-skill
@@ -100,6 +114,7 @@ struct SkillProvenanceTests {
         """.write(to: skillMd, atomically: true, encoding: .utf8)
 
         let result = try SkillScanner.scan(rootURL: root)
+
         #expect(result.count == 1)
         #expect(result.first?.provenance == nil)
     }

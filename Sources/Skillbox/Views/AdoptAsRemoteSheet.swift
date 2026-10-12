@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 /// Adopt an existing local skill as remote-tracked by writing a `.skillbox.json` sidecar
 /// and immediately syncing the folder from the source.
@@ -89,9 +89,11 @@ struct AdoptAsRemoteSheet: View {
             VStack(alignment: .leading, spacing: 4) {
                 TextField("Skill name in repo (optional)", text: $skillSubpath)
                     .textFieldStyle(.roundedBorder)
-                Text("Required for multi-skill repos when the URL doesn't include a tree path. Leave blank if the source already points at the skill folder.")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
+                Text(
+                    "Required for multi-skill repos when the URL doesn't include a tree path. Leave blank if the source already points at the skill folder."
+                )
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -178,9 +180,11 @@ struct AdoptAsRemoteSheet: View {
 
     private func runAdopt() {
         let trimmedSource = rawSource.trimmingCharacters(in: .whitespaces)
+
         guard !trimmedSource.isEmpty else { return }
         let trimmedSkill = skillSubpath.trimmingCharacters(in: .whitespaces)
-        let trimmedBranch = branch.trimmingCharacters(in: .whitespaces).isEmpty
+        let trimmedBranch =
+            branch.trimmingCharacters(in: .whitespaces).isEmpty
             ? "main"
             : branch.trimmingCharacters(in: .whitespaces)
 
@@ -197,6 +201,7 @@ struct AdoptAsRemoteSheet: View {
 
         guard SkillSourceCoordinates.parse(provenance: provisional) != nil else {
             errorText = "Couldn't resolve \"\(trimmedSource)\" into owner/repo coordinates."
+
             return
         }
 
@@ -217,6 +222,7 @@ struct AdoptAsRemoteSheet: View {
                     authorLocked: skill.authorLocked
                 )
                 let outcome = try await sync.sync(adoptedSkill)
+
                 switch outcome {
                 case .upToDate(let sha):
                     logText += "Already at upstream SHA \(sha.prefix(8)).\n"
@@ -228,6 +234,7 @@ struct AdoptAsRemoteSheet: View {
                 phase = .done
             } catch {
                 let msg = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+
                 logText += "Failed: \(msg)\n"
                 errorText = msg
                 phase = .input

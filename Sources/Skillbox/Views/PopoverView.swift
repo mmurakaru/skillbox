@@ -1,5 +1,5 @@
-import SwiftUI
 import AppKit
+import SwiftUI
 
 enum AppTab: String, CaseIterable, Identifiable {
     case skills
@@ -56,7 +56,6 @@ struct PopoverView: View {
     @Environment(SkillFolderSync.self) private var skillFolderSync
     @Environment(SkillClassificationStore.self) private var classificationStore
     @Environment(\.openSettings) private var openSettings
-
 
     @AppStorage("editorCommand") private var editorCommand: String = ""
     @AppStorage("openTarget") private var openTargetRaw: String = OpenTarget.folder.rawValue
@@ -119,13 +118,17 @@ struct PopoverView: View {
             envStore.configure(claudeHomePath: hooksClaudeHomePath)
             overridesStore.configure(claudeHomePath: hooksClaudeHomePath)
             ensureEditorDefault()
+
             if selectedSkillID == nil {
                 selectedSkillID = visibleSkills.first?.id
             }
+
             try? await Task.sleep(for: .milliseconds(80))
             searchFocused = true
+
             if syncRemoteSkillsOnLaunch {
                 let remoteSkills = store.items.filter { $0.provenance != nil }
+
                 Task.detached(priority: .background) { [weak skillFolderSync] in
                     await skillFolderSync?.syncAll(remoteSkills)
                     await MainActor.run {
@@ -153,10 +156,14 @@ struct PopoverView: View {
         .onKeyPress(.escape) {
             if skillsRoute != .list {
                 skillsRoute = .list
+
                 return .handled
             }
+
             if cancelAnyConfirm() { return .handled }
+
             NSApp.deactivate()
+
             return .handled
         }
     }
@@ -225,6 +232,7 @@ struct PopoverView: View {
 
     private func tabButton(for tab: AppTab) -> some View {
         let isSelected = activeTab == tab
+
         return Button(action: { activeTabRaw = tab.rawValue }) {
             Image(systemName: tab.symbol)
                 .font(.system(size: 18, weight: isSelected ? .semibold : .regular))
@@ -266,16 +274,28 @@ struct PopoverView: View {
 
             skillsList
         }
-        .onKeyPress(.upArrow) { moveSelection(by: -1); return .handled }
-        .onKeyPress(.downArrow) { moveSelection(by: 1); return .handled }
+        .onKeyPress(.upArrow) {
+            moveSelection(by: -1)
+
+            return .handled
+        }
+        .onKeyPress(.downArrow) {
+            moveSelection(by: 1)
+
+            return .handled
+        }
         .onKeyPress(.return) {
             if searchFocused { return .ignored }
+
             triggerEditOnSelected()
+
             return .handled
         }
         .onKeyPress(.delete) {
             if searchFocused { return .ignored }
+
             triggerDeleteConfirmOnSelected()
+
             return .handled
         }
     }
@@ -286,6 +306,7 @@ struct PopoverView: View {
 
     private var classificationControls: some View {
         @Bindable var classifications = classificationStore
+
         return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 4) {
                 Picker("Category", selection: $classifications.selectedCategory) {
@@ -362,6 +383,7 @@ struct PopoverView: View {
 
     private var searchBar: some View {
         @Bindable var store = store
+
         return HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
@@ -369,6 +391,7 @@ struct PopoverView: View {
                 .textFieldStyle(.plain)
                 .focused($searchFocused)
                 .onSubmit { triggerEditOnSelected() }
+
             if !store.searchQuery.isEmpty {
                 Button(action: { store.searchQuery = "" }) {
                     Image(systemName: "xmark.circle.fill")
@@ -428,6 +451,7 @@ struct PopoverView: View {
             Image(systemName: "tray")
                 .font(.system(size: 32))
                 .foregroundStyle(.tertiary)
+
             if let err = store.lastError {
                 Text(err)
                     .font(.system(size: 11))
@@ -479,14 +503,14 @@ struct PopoverView: View {
         .frame(width: 0, height: 0)
     }
 
-
     private var activeCount: Int {
         switch activeTab {
         case .skills: visibleSkills.count
         case .memory: memoryStore.filteredMemories.count
         case .hooks: hookStore.filteredHooks.count
-        case .env: envStore.filteredEnvVars.count
-            + keychainSecrets.visibleSecretNames(scopeKey: envStore.selectedScopeKey, searchQuery: envStore.searchQuery).count
+        case .env:
+            envStore.filteredEnvVars.count
+                + keychainSecrets.visibleSecretNames(scopeKey: envStore.selectedScopeKey, searchQuery: envStore.searchQuery).count
         case .usage: UsageProvider.allCases.count
         case .models: localModelStore.filteredModels.count
         case .explore: modelExplorerStore.displayedResults.count
@@ -521,6 +545,7 @@ struct PopoverView: View {
         let legacy = ("~/.claude/skills" as NSString).expandingTildeInPath
         let current = (skillsRootPath as NSString).expandingTildeInPath
         let agents = ("~/.agents/skills" as NSString).expandingTildeInPath
+
         if current == legacy, FileManager.default.fileExists(atPath: agents) {
             skillsRootPath = "~/.agents/skills"
         }
@@ -541,6 +566,7 @@ struct PopoverView: View {
         let target = OpenTarget(rawValue: openTargetRaw) ?? .folder
         let cmd = editorCommand.isEmpty ? EditorDetector.preferredCommand : editorCommand
         let path = target == .folder ? skill.folderURL.path : skill.skillFileURL.path
+
         EditorLauncher.openAsWorkspace(path, command: cmd)
         NSApp.deactivate()
     }
@@ -550,6 +576,7 @@ struct PopoverView: View {
             try FileManager.default.trashItem(at: skill.folderURL, resultingItemURL: nil)
             try? SkillMountSync.removeMount(named: skill.folderURL.lastPathComponent, mountRootPath: claudeSkillsMountPath)
             store.remove(skill)
+
             if selectedSkillID == skill.id {
                 selectedSkillID = visibleSkills.first?.id
             }
@@ -584,29 +611,40 @@ struct PopoverView: View {
     private func cancelAnyConfirm() -> Bool {
         if let active = rowStates.first(where: { $0.value == .confirmingDelete }) {
             rowStates[active.key] = .normal
+
             return true
         }
+
         if let active = memoryRowStates.first(where: { $0.value == .confirmingDelete }) {
             memoryRowStates[active.key] = .normal
+
             return true
         }
+
         if let active = hookRowStates.first(where: { $0.value == .confirmingDelete }) {
             hookRowStates[active.key] = .normal
+
             return true
         }
+
         if let active = envRowStates.first(where: { $0.value == .confirmingDelete }) {
             envRowStates[active.key] = .normal
+
             return true
         }
+
         return false
     }
 
     private func moveSelection(by delta: Int) {
         let items = visibleSkills
+
         guard !items.isEmpty else { return }
         searchFocused = false
+
         if let current = selectedSkillID, let idx = items.firstIndex(where: { $0.id == current }) {
             let next = max(0, min(items.count - 1, idx + delta))
+
             selectedSkillID = items[next].id
         } else {
             selectedSkillID = items.first?.id
@@ -615,7 +653,8 @@ struct PopoverView: View {
 
     private func triggerEditOnSelected() {
         guard let id = selectedSkillID,
-              let skill = visibleSkills.first(where: { $0.id == id }) else { return }
+            let skill = visibleSkills.first(where: { $0.id == id })
+        else { return }
         open(skill: skill)
     }
 
@@ -640,6 +679,7 @@ struct PopoverView: View {
 
     private func isSettingsWindow(_ window: NSWindow) -> Bool {
         let id = window.identifier?.rawValue ?? ""
+
         return id.contains("Settings") || id.contains("settings") || window.title == "Settings"
     }
 

@@ -24,17 +24,20 @@ public struct HuggingFaceHubModel: Sendable, Codable, Identifiable, Equatable {
 
     public var lab: String {
         guard let slash = id.firstIndex(of: "/") else { return "" }
+
         return String(id[..<slash])
     }
 
     public var name: String {
         guard let slash = id.firstIndex(of: "/") else { return id }
+
         return String(id[id.index(after: slash)...])
     }
 
     /// Parameter count parsed from the name, such as "135M", "8B", "8X7B", or "70B"; a hint, not an exact size.
     public var parameterHint: String? {
         guard let match = name.firstMatch(of: /(\d+(?:\.\d+)?(?:[xX]\d+)?)([bBmM])(?:[-_. ]|$)/) else { return nil }
+
         return String(match.1).uppercased() + String(match.2).uppercased()
     }
 }
@@ -99,36 +102,50 @@ public struct HuggingFaceHubClient: HuggingFaceHubSearching {
     }
 
     public func makeRequest(_ query: HuggingFaceHubQuery) -> URLRequest {
-        var components = URLComponents(string: "https://huggingface.co/api/models")!
+        var components = URLComponents()
+
+        components.scheme = "https"
+        components.host = "huggingface.co"
+        components.path = "/api/models"
         var items = [
             URLQueryItem(name: "limit", value: String(Self.resultLimit)),
             URLQueryItem(name: "sort", value: query.sort.apiValue),
             URLQueryItem(name: "direction", value: "-1"),
         ]
         let search = query.search.trimmingCharacters(in: .whitespaces)
+
         if !search.isEmpty {
             items.append(URLQueryItem(name: "search", value: search))
         }
+
         let author = query.author.trimmingCharacters(in: .whitespaces)
+
         if !author.isEmpty {
             items.append(URLQueryItem(name: "author", value: author))
         }
+
         // The list API ignores `library`; format repos are tagged, and `filter` matches tags.
         if let formatFilter = query.formatFilter, !formatFilter.isEmpty {
             items.append(URLQueryItem(name: "filter", value: formatFilter))
         }
+
         components.queryItems = items
 
+        // swiftlint:disable:next force_unwrapping - SAFETY: a scheme, a host, and an absolute path always form a URL.
         var request = URLRequest(url: components.url!)
+
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+
         return request
     }
 
     public func search(_ query: HuggingFaceHubQuery) async throws -> [HuggingFaceHubModel] {
         let (data, response) = try await session.data(for: makeRequest(query))
+
         if let httpResponse = response as? HTTPURLResponse, !(200..<300).contains(httpResponse.statusCode) {
             throw HuggingFaceHubError.unexpectedStatus(httpResponse.statusCode)
         }
+
         return try JSONDecoder().decode([HuggingFaceHubModel].self, from: data)
     }
 }

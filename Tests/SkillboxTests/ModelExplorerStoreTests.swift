@@ -1,6 +1,7 @@
-import Testing
 import Foundation
 import ModelInventory
+import Testing
+
 @testable import Skillbox
 
 @MainActor
@@ -10,6 +11,7 @@ struct ModelExplorerStoreTests {
         var delaySeconds: Double = 0
         func search(_ query: HuggingFaceHubQuery) async throws -> [HuggingFaceHubModel] {
             if delaySeconds > 0 { try await Task.sleep(for: .seconds(delaySeconds)) }
+
             return try result.get()
         }
     }
@@ -18,6 +20,7 @@ struct ModelExplorerStoreTests {
     private struct QueryEchoSearch: HuggingFaceHubSearching {
         func search(_ query: HuggingFaceHubQuery) async throws -> [HuggingFaceHubModel] {
             if query.search == "slow" { try await Task.sleep(for: .milliseconds(300)) }
+
             return [HuggingFaceHubModel(id: "org/\(query.search)")]
         }
     }
@@ -28,8 +31,10 @@ struct ModelExplorerStoreTests {
 
     @Test func successfulSearchStoresResultsAndTimestamp() async {
         let cacheURL = temporaryCacheURL()
+
         defer { try? FileManager.default.removeItem(at: cacheURL.deletingLastPathComponent()) }
-        let store = ModelExplorerStore(client: StubHubSearch(result: .success([HuggingFaceHubModel(id: "Qwen/Qwen3-8B")])), cacheURL: cacheURL)
+        let store = ModelExplorerStore(
+            client: StubHubSearch(result: .success([HuggingFaceHubModel(id: "Qwen/Qwen3-8B")])), cacheURL: cacheURL)
 
         await store.search()
 
@@ -41,10 +46,13 @@ struct ModelExplorerStoreTests {
 
     @Test func failedSearchKeepsCachedResultsAndShowsError() async {
         let cacheURL = temporaryCacheURL()
+
         defer { try? FileManager.default.removeItem(at: cacheURL.deletingLastPathComponent()) }
-        await ModelExplorerStore(client: StubHubSearch(result: .success([HuggingFaceHubModel(id: "Qwen/Qwen3-8B")])), cacheURL: cacheURL).search()
+        await ModelExplorerStore(client: StubHubSearch(result: .success([HuggingFaceHubModel(id: "Qwen/Qwen3-8B")])), cacheURL: cacheURL)
+            .search()
 
         let offline = ModelExplorerStore(client: StubHubSearch(result: .failure(.unexpectedStatus(503))), cacheURL: cacheURL)
+
         #expect(offline.results.map(\.id) == ["Qwen/Qwen3-8B"])
         await offline.search()
 
@@ -54,8 +62,10 @@ struct ModelExplorerStoreTests {
 
     @Test func cachedResultsComeBackWithTheirSearch() async {
         let cacheURL = temporaryCacheURL()
+
         defer { try? FileManager.default.removeItem(at: cacheURL.deletingLastPathComponent()) }
         let online = ModelExplorerStore(client: QueryEchoSearch(), cacheURL: cacheURL)
+
         online.query.search = "qwen"
         await online.search()
 
@@ -67,12 +77,15 @@ struct ModelExplorerStoreTests {
 
     @Test func offlineSearchForAnotherQueryShowsNoStaleResults() async {
         let cacheURL = temporaryCacheURL()
+
         defer { try? FileManager.default.removeItem(at: cacheURL.deletingLastPathComponent()) }
         let online = ModelExplorerStore(client: QueryEchoSearch(), cacheURL: cacheURL)
+
         online.query.search = "qwen"
         await online.search()
 
         let offline = ModelExplorerStore(client: StubHubSearch(result: .failure(.unexpectedStatus(503))), cacheURL: cacheURL)
+
         offline.query.search = "llama"
         await offline.search()
 
@@ -82,12 +95,16 @@ struct ModelExplorerStoreTests {
 
     @Test func sizeBucketFiltersDisplayedResults() async {
         let cacheURL = temporaryCacheURL()
+
         defer { try? FileManager.default.removeItem(at: cacheURL.deletingLastPathComponent()) }
-        let store = ModelExplorerStore(client: StubHubSearch(result: .success([
-            HuggingFaceHubModel(id: "Qwen/Qwen3-4B"),
-            HuggingFaceHubModel(id: "meta/Llama-3-8B"),
-            HuggingFaceHubModel(id: "meta/Llama-3-70B"),
-        ])), cacheURL: cacheURL)
+        let store = ModelExplorerStore(
+            client: StubHubSearch(
+                result: .success([
+                    HuggingFaceHubModel(id: "Qwen/Qwen3-4B"),
+                    HuggingFaceHubModel(id: "meta/Llama-3-8B"),
+                    HuggingFaceHubModel(id: "meta/Llama-3-70B"),
+                ])), cacheURL: cacheURL)
+
         await store.search()
 
         #expect(store.displayedResults.count == 3)
@@ -99,12 +116,15 @@ struct ModelExplorerStoreTests {
 
     @Test func offlineReturnToTheCachedQueryShowsItsResultsAgain() async {
         let cacheURL = temporaryCacheURL()
+
         defer { try? FileManager.default.removeItem(at: cacheURL.deletingLastPathComponent()) }
         let online = ModelExplorerStore(client: QueryEchoSearch(), cacheURL: cacheURL)
+
         online.query.search = "qwen"
         await online.search()
 
         let offline = ModelExplorerStore(client: StubHubSearch(result: .failure(.unexpectedStatus(503))), cacheURL: cacheURL)
+
         offline.query.search = "llama"
         await offline.search()
         offline.query.search = "qwen"
@@ -117,11 +137,13 @@ struct ModelExplorerStoreTests {
 
     @Test func queryEditedDuringASearchDoesNotRelabelItsResults() async {
         let cacheURL = temporaryCacheURL()
+
         defer { try? FileManager.default.removeItem(at: cacheURL.deletingLastPathComponent()) }
         let store = ModelExplorerStore(client: QueryEchoSearch(), cacheURL: cacheURL)
 
         store.query.search = "slow"
         let search = Task { await store.search() }
+
         try? await Task.sleep(for: .milliseconds(50))
         store.query.search = "typing"
         await search.value
@@ -132,11 +154,13 @@ struct ModelExplorerStoreTests {
 
     @Test func slowOlderSearchDoesNotReplaceNewerResults() async {
         let cacheURL = temporaryCacheURL()
+
         defer { try? FileManager.default.removeItem(at: cacheURL.deletingLastPathComponent()) }
         let store = ModelExplorerStore(client: QueryEchoSearch(), cacheURL: cacheURL)
 
         store.query.search = "slow"
         let slowSearch = Task { await store.search() }
+
         try? await Task.sleep(for: .milliseconds(50))
         store.query.search = "fast"
         await store.search()
@@ -148,10 +172,13 @@ struct ModelExplorerStoreTests {
 
     @Test func searchesLiveOnlyOncePerSessionEvenWithCache() async {
         let cacheURL = temporaryCacheURL()
+
         defer { try? FileManager.default.removeItem(at: cacheURL.deletingLastPathComponent()) }
-        await ModelExplorerStore(client: StubHubSearch(result: .success([HuggingFaceHubModel(id: "org/cached")])), cacheURL: cacheURL).search()
+        await ModelExplorerStore(client: StubHubSearch(result: .success([HuggingFaceHubModel(id: "org/cached")])), cacheURL: cacheURL)
+            .search()
 
         let store = ModelExplorerStore(client: QueryEchoSearch(), cacheURL: cacheURL)
+
         store.query.search = "live"
         await store.searchOncePerSession()
         #expect(store.results.map(\.id) == ["org/live"])

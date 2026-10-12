@@ -1,6 +1,8 @@
 import Foundation
 import Security
 
+// swiftlint:disable no_untyped_dictionaries - JSON trust boundary: parses a credentials JSON file owned by another tool.
+
 /// Claude usage reads suppress Keychain ACL dialogs except after an explicit Connect action.
 struct ClaudeUsageCredentials {
     struct ReadResult {
@@ -15,7 +17,9 @@ struct ClaudeUsageCredentials {
         allowPrompt: Bool,
         keychainReader: (Bool) throws -> [String: Any] = ClaudeUsageCredentials.readKeychainCredentials
     ) throws -> [String: Any] {
-        try readCredentials(configuredHome: configuredHome, defaultHome: defaultHome, allowPrompt: allowPrompt, keychainReader: keychainReader).values
+        try readCredentials(
+            configuredHome: configuredHome, defaultHome: defaultHome, allowPrompt: allowPrompt, keychainReader: keychainReader
+        ).values
     }
 
     /// Automatic refresh reads only credential files. Foreign Keychain access requires Connect.
@@ -26,19 +30,24 @@ struct ClaudeUsageCredentials {
         keychainReader: (Bool) throws -> [String: Any] = ClaudeUsageCredentials.readKeychainCredentials
     ) throws -> ReadResult {
         let home = configuredHome ?? defaultHome
+
         if FileManager.default.fileExists(atPath: "\(home)/.credentials.json") {
             guard let data = try? Data(contentsOf: URL(fileURLWithPath: "\(home)/.credentials.json")),
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else {
                 throw UsageFetchError.unavailable("Claude Code credentials file could not be read. Sign in with Claude Code again.")
             }
+
             return .init(values: json, source: .file)
         }
+
         guard configuredHome == nil else {
             throw UsageFetchError.unavailable("Sign in with Claude Code in your configured profile, then refresh.")
         }
         guard allowPrompt else {
             throw UsageFetchError.claudeKeychainPermissionRequired
         }
+
         return .init(values: try keychainReader(true), source: .keychain)
     }
 
@@ -56,19 +65,24 @@ struct ClaudeUsageCredentials {
     static func readKeychainCredentials(allowPrompt: Bool) throws -> [String: Any] {
         var result: CFTypeRef?
         let status = SecItemCopyMatching(keychainQuery(allowPrompt: allowPrompt) as CFDictionary, &result)
+
         switch status {
         case errSecSuccess: break
         case errSecItemNotFound:
             throw UsageFetchError.unavailable("No Claude Code sign-in found. Sign in with Claude Code, then connect.")
         case errSecInteractionNotAllowed, errSecAuthFailed, errSecUserCanceled:
-            throw UsageFetchError.unavailable("Claude Code credentials need Keychain permission. Click Connect Claude Code to grant access. Background refresh will not prompt.")
+            throw UsageFetchError.unavailable(
+                "Claude Code credentials need Keychain permission. Click Connect Claude Code to grant access. Background refresh will not prompt."
+            )
         default:
             throw UsageFetchError.unavailable("Claude Code Keychain access failed (\(status)). Click Connect Claude Code to retry.")
         }
         guard let data = result as? Data,
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else {
             throw UsageFetchError.unavailable("Claude Code credentials could not be decoded. Sign in with Claude Code again.")
         }
+
         return json
     }
 }

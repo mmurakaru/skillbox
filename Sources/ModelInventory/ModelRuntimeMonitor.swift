@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 
 /// Reads which local models are loaded in memory and unloads the ones that can be stopped cleanly.
 public protocol ModelRuntimeMonitoring: Sendable {
@@ -20,20 +20,25 @@ public struct ModelRuntimeMonitor: ModelRuntimeMonitoring {
     public func runtimeStates(for models: [LocalModel]) async -> [String: ModelRuntimeState] {
         let hasOllamaModels = models.contains { $0.source == .ollama }
         let loadedOllamaNames = hasOllamaModels ? await loadedOllamaModelNames() : []
-        let weightFilePathsByModelID = Dictionary(uniqueKeysWithValues: models
-            .filter { $0.source != .ollama && Self.isWeightFile($0) }
-            .map { ($0.id, $0.weightFileURLs.map(CanonicalFilePath.of)) })
+        let weightFilePathsByModelID = Dictionary(
+            uniqueKeysWithValues:
+                models
+                .filter { $0.source != .ollama && Self.isWeightFile($0) }
+                .map { ($0.id, $0.weightFileURLs.map(CanonicalFilePath.of)) })
         let holders = await Self.fileHolders(forPaths: Array(Set(weightFilePathsByModelID.values.joined())).sorted())
 
         var states: [String: ModelRuntimeState] = [:]
+
         for model in models {
             let state = ModelRuntimeDecision.evaluate(
                 model: model,
                 loadedOllamaModelName: ModelRuntimeDecision.loadedOllamaName(for: model, among: loadedOllamaNames),
                 fileHolder: weightFilePathsByModelID[model.id]?.lazy.compactMap { holders[$0] }.first
             )
+
             if let state { states[model.id] = state }
         }
+
         return states
     }
 
@@ -45,6 +50,7 @@ public struct ModelRuntimeMonitor: ModelRuntimeMonitoring {
             // The pid may have been reused since the last refresh, so confirm it still holds one of these files.
             let paths = weightFileURLs.map(CanonicalFilePath.of)
             let holders = await Self.fileHolders(forPaths: paths)
+
             guard paths.contains(where: { holders[$0] == ModelFileHolder(pid: pid, commandName: commandName) }) else { return }
             kill(pid, SIGTERM)
         }
@@ -56,14 +62,17 @@ public struct ModelRuntimeMonitor: ModelRuntimeMonitoring {
 
     private func loadedOllamaModelNames() async -> [String] {
         var request = URLRequest(url: ollamaBaseURL.appending(path: "api/ps"))
+
         request.timeoutInterval = 2
         guard let (data, _) = try? await session.data(for: request) else { return [] }
+
         return OllamaRunningModels.names(fromPSResponse: data)
     }
 
     /// Ollama unloads a model when a request sets `keep_alive` to 0.
     private func unloadOllamaModel(named modelName: String) async {
         var request = URLRequest(url: ollamaBaseURL.appending(path: "api/generate"))
+
         request.httpMethod = "POST"
         request.timeoutInterval = 5
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -73,10 +82,12 @@ public struct ModelRuntimeMonitor: ModelRuntimeMonitoring {
 
     private static func fileHolders(forPaths paths: [String]) async -> [String: ModelFileHolder] {
         guard !paths.isEmpty else { return [:] }
+
         // Waiting on lsof blocks its thread, so keep it off the Swift concurrency pool.
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .utility).async {
                 let output = runTool("/usr/sbin/lsof", ["-F", "pcfn", "--"] + paths)
+
                 continuation.resume(returning: output.map(LsofFileHolders.parse(fieldOutput:)) ?? [:])
             }
         }
@@ -84,14 +95,18 @@ public struct ModelRuntimeMonitor: ModelRuntimeMonitoring {
 
     private static func runTool(_ executablePath: String, _ arguments: [String]) -> String? {
         let process = Process()
+
         process.executableURL = URL(fileURLWithPath: executablePath)
         process.arguments = arguments
         let output = Pipe()
+
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice
         do { try process.run() } catch { return nil }
         let data = output.fileHandleForReading.readDataToEndOfFile()
+
         process.waitUntilExit()
+
         return String(data: data, encoding: .utf8)
     }
 }
@@ -113,6 +128,7 @@ public enum CanonicalFilePath {
     public static func of(_ url: URL) -> String {
         guard let resolved = realpath(url.path, nil) else { return url.path }
         defer { free(resolved) }
+
         return String(cString: resolved)
     }
 }
@@ -127,9 +143,11 @@ public enum LsofFileHolders {
         var currentPID: Int32?
         var currentCommandName = ""
         var currentDescriptor = ""
+
         for line in fieldOutput.split(separator: "\n") {
             guard let field = line.first else { continue }
             let value = String(line.dropFirst())
+
             switch field {
             case "p":
                 currentPID = Int32(value)
@@ -146,6 +164,7 @@ public enum LsofFileHolders {
                 break
             }
         }
+
         return holders
     }
 }

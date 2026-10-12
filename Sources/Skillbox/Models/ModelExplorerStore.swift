@@ -1,6 +1,6 @@
 import Foundation
-import Observation
 import ModelInventory
+import Observation
 
 /// Hugging Face Hub search behind the Explore tab. Caches the last results so the tab still shows them offline.
 @MainActor
@@ -39,18 +39,22 @@ final class ModelExplorerStore {
         searchGeneration += 1
         let generation = searchGeneration
         let submittedQuery = query
+
         hasSearchedThisSession = true
         isLoading = true
         errorMessage = nil
         do {
             let found = try await client.search(submittedQuery)
+
             guard generation == searchGeneration else { return }
             let synced = CachePayload(models: found, lastSynced: Date(), query: submittedQuery)
+
             show(synced)
             lastSyncedSearch = synced
             saveCache(synced)
         } catch {
             guard generation == searchGeneration else { return }
+
             if let lastSyncedSearch, lastSyncedSearch.query == submittedQuery {
                 show(lastSyncedSearch)
                 errorMessage = "Could not reach Hugging Face. Showing the last synced results."
@@ -85,7 +89,8 @@ final class ModelExplorerStore {
     /// Restores the cached search as well, so the filters on screen describe the cached results.
     private func loadCache() {
         guard let data = try? Data(contentsOf: cacheURL),
-              let payload = try? JSONDecoder().decode(CachePayload.self, from: data) else { return }
+            let payload = try? JSONDecoder().decode(CachePayload.self, from: data)
+        else { return }
         show(payload)
         query = payload.query
         lastSyncedSearch = payload
@@ -98,8 +103,10 @@ final class ModelExplorerStore {
     }
 
     nonisolated static func defaultCacheURL() -> URL {
-        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+        let caches =
+            FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
+
         return caches.appending(path: "Skillbox/model-explorer-cache.json")
     }
 }

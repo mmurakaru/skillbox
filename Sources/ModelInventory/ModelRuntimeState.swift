@@ -40,10 +40,13 @@ public enum ModelRuntimeDecision {
     ) -> ModelRuntimeState? {
         if model.source == .ollama {
             guard let loadedOllamaModelName else { return nil }
+
             return ModelRuntimeState(stopTarget: .ollama(modelName: loadedOllamaModelName), hostName: "Ollama")
         }
+
         guard let fileHolder else { return nil }
         let stoppable = stoppableServerCommandNames.contains(fileHolder.commandName)
+
         return ModelRuntimeState(
             stopTarget: stoppable ? .process(pid: fileHolder.pid, commandName: fileHolder.commandName) : nil,
             hostName: fileHolder.commandName

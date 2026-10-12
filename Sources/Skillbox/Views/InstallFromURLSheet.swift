@@ -26,6 +26,7 @@ struct InstallFromURLSheet: View {
                 .help("Close")
                 .accessibilityLabel("Close installation")
             }
+
             if model.phase == .input {
                 TextField("Repository or skill folder URL", text: $rawSource)
                     .textFieldStyle(.roundedBorder)
@@ -33,6 +34,7 @@ struct InstallFromURLSheet: View {
                     .onSubmit { runInstall() }
                 Text("Paste owner/repo or a GitHub URL. For one skill from a collection, paste its folder URL.")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
+
                 if let error = model.errorMessage {
                     Text(error).font(.system(size: 12)).foregroundStyle(.red)
                         .textSelection(.enabled)
@@ -40,6 +42,7 @@ struct InstallFromURLSheet: View {
             } else {
                 SkillInstallProgressView(source: model.source, stage: model.output.stage, installedNames: model.installedNames)
             }
+
             Spacer()
             HStack {
                 Spacer()
@@ -65,6 +68,7 @@ struct InstallFromURLSheet: View {
         .task { sourceFocused = true }
         .onKeyPress(.escape) {
             if model.phase != .running { onCancel() }
+
             return .handled
         }
     }

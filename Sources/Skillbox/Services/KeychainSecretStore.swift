@@ -1,6 +1,8 @@
 import Foundation
 import Security
 
+// swiftlint:disable no_untyped_dictionaries - JSON trust boundary: builds Security framework queries, which take untyped dictionaries.
+
 /// Keychain service under which Skillbox stores env secrets; the account is the variable name.
 let keychainSecretServiceName = "ai.skillbox.secret"
 
@@ -45,7 +47,8 @@ enum KeychainSecretValidation {
         }
         // `security find-generic-password -w` prints any value outside printable ASCII as hex, so helpers would read the wrong bytes.
         guard value.unicodeScalars.allSatisfy({ (0x20...0x7E).contains($0.value) }) else {
-            throw KeychainSecretError.invalidSecretValue("the value has characters outside printable ASCII, such as accented letters, emoji, tabs, or newlines")
+            throw KeychainSecretError.invalidSecretValue(
+                "the value has characters outside printable ASCII, such as accented letters, emoji, tabs, or newlines")
         }
     }
 }
@@ -71,22 +74,29 @@ protocol ProcessRunning: Sendable {
 struct SystemProcessRunner: ProcessRunning {
     func run(executablePath: String, arguments: [String], standardInput: String?) throws -> ProcessRunResult {
         let process = Process()
+
         process.executableURL = URL(fileURLWithPath: executablePath)
         process.arguments = arguments
         let outputPipe = Pipe()
+
         process.standardOutput = outputPipe
         process.standardError = FileHandle.nullDevice
         let inputPipe = Pipe()
+
         process.standardInput = standardInput == nil ? FileHandle.nullDevice : inputPipe
         // A tool that exits before reading stdin would otherwise kill the app with SIGPIPE.
         _ = fcntl(inputPipe.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
         try process.run()
+
         if let standardInput {
             try inputPipe.fileHandleForWriting.write(contentsOf: Data(standardInput.utf8))
             try inputPipe.fileHandleForWriting.close()
         }
+
         let output = outputPipe.fileHandleForReading.readDataToEndOfFile()
+
         process.waitUntilExit()
+
         return ProcessRunResult(exitCode: process.terminationStatus, standardOutput: String(decoding: output, as: UTF8.self))
     }
 }
@@ -112,10 +122,13 @@ struct SystemKeychainSecretStore: KeychainSecretStoring {
         ]
         var result: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
+
         if status == errSecItemNotFound { return [] }
+
         guard status == errSecSuccess, let items = result as? [[String: Any]] else {
             throw KeychainSecretError.keychainListFailed(status)
         }
+
         return items.compactMap { $0[kSecAttrAccount as String] as? String }.sorted()
     }
 
@@ -126,10 +139,13 @@ struct SystemKeychainSecretStore: KeychainSecretStoring {
             arguments: ["find-generic-password", "-s", keychainSecretServiceName, "-a", name, "-w"],
             standardInput: nil
         )
+
         if result.exitCode == Self.itemNotFoundExitCode { throw KeychainSecretError.secretNotFound(name) }
+
         guard result.exitCode == 0 else {
             throw KeychainSecretError.securityToolFailed(operation: "read", exitCode: result.exitCode)
         }
+
         return String(result.standardOutput.dropLast(result.standardOutput.hasSuffix("\n") ? 1 : 0))
     }
 
@@ -138,8 +154,10 @@ struct SystemKeychainSecretStore: KeychainSecretStoring {
         try KeychainSecretValidation.validateName(name)
         try KeychainSecretValidation.validateValue(value)
         let hexValue = value.utf8.map { String(format: "%02x", $0) }.joined()
-        let command = "add-generic-password -U -s \"\(keychainSecretServiceName)\" -a \"\(name)\" -l \"Skillbox secret: \(name)\" -X \"\(hexValue)\"\n"
+        let command =
+            "add-generic-password -U -s \"\(keychainSecretServiceName)\" -a \"\(name)\" -l \"Skillbox secret: \(name)\" -X \"\(hexValue)\"\n"
         let result = try processRunner.run(executablePath: Self.securityToolPath, arguments: ["-i"], standardInput: command)
+
         guard result.exitCode == 0 else {
             throw KeychainSecretError.securityToolFailed(operation: "write", exitCode: result.exitCode)
         }
@@ -152,6 +170,7 @@ struct SystemKeychainSecretStore: KeychainSecretStoring {
             arguments: ["delete-generic-password", "-s", keychainSecretServiceName, "-a", name],
             standardInput: nil
         )
+
         guard result.exitCode == 0 || result.exitCode == Self.itemNotFoundExitCode else {
             throw KeychainSecretError.securityToolFailed(operation: "delete", exitCode: result.exitCode)
         }

@@ -39,6 +39,7 @@ enum MCPSecretHeadersHelper {
 
     static func command(secretName: String, headerName: String, valuePrefix: String) throws -> String {
         try KeychainSecretValidation.validateName(secretName)
+
         return try command(
             secretReadCommand: SystemKeychainSecretStore.readCommand(forSecretNamed: secretName),
             headerName: headerName,
@@ -50,7 +51,9 @@ enum MCPSecretHeadersHelper {
     static func command(secretReadCommand: String, headerName: String, valuePrefix: String) throws -> String {
         try validateHeaderName(headerName)
         try validateValuePrefix(valuePrefix)
-        return "value=$(\(secretReadCommand) 2>/dev/null) && [ -n \"$value\" ] && case \"$value\" in *[\\\"\\\\]*) false ;; *) printf '{\"\(headerName)\":\"\(valuePrefix)%s\"}' \"$value\" ;; esac"
+
+        return
+            "value=$(\(secretReadCommand) 2>/dev/null) && [ -n \"$value\" ] && case \"$value\" in *[\\\"\\\\]*) false ;; *) printf '{\"\(headerName)\":\"\(valuePrefix)%s\"}' \"$value\" ;; esac"
     }
 
     /// True when the command names this Keychain secret, so Skillbox can show which servers use it.
@@ -61,9 +64,11 @@ enum MCPSecretHeadersHelper {
     /// Runs the command in a shell like Claude Code does; the output is parsed, never shown or logged.
     static func verifyCommandPrintsHeader(_ command: String, headerName: String, processRunner: any ProcessRunning) throws {
         let result = try processRunner.run(executablePath: "/bin/sh", arguments: ["-c", command], standardInput: nil)
+
         guard result.exitCode == 0,
-              let object = try? JSONSerialization.jsonObject(with: Data(result.standardOutput.utf8)) as? [String: String],
-              let headerValue = object[headerName], !headerValue.isEmpty else {
+            let object = try? JSONSerialization.jsonObject(with: Data(result.standardOutput.utf8)) as? [String: String],
+            let headerValue = object[headerName], !headerValue.isEmpty
+        else {
             throw MCPSecretHeadersHelperError.helperOutputInvalid
         }
     }

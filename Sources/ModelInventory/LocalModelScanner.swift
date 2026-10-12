@@ -29,30 +29,39 @@ public struct FlatFileModelScanner: LocalModelScanner {
 
         for root in roots {
             var isDirectory: ObjCBool = false
+
             guard fileManager.fileExists(atPath: root.path, isDirectory: &isDirectory), isDirectory.boolValue else { continue }
-            guard let enumerator = fileManager.enumerator(
-                at: root,
-                includingPropertiesForKeys: keys,
-                options: [.skipsHiddenFiles]
-            ) else { continue }
+            guard
+                let enumerator = fileManager.enumerator(
+                    at: root,
+                    includingPropertiesForKeys: keys,
+                    options: [.skipsHiddenFiles]
+                )
+            else { continue }
 
             for case let url as URL in enumerator {
                 if Task.isCancelled { return results }
+
                 let fileExtension = url.pathExtension.lowercased()
+
                 guard Self.weightFileExtensions.contains(fileExtension) else { continue }
                 let values = try? url.resourceValues(forKeys: Set(keys))
+
                 if values?.isRegularFile == false { continue }
-                results.append(LocalModel(
-                    id: "\(source.rawValue):\(url.path)",
-                    name: url.deletingPathExtension().lastPathComponent,
-                    source: source,
-                    path: url,
-                    format: fileExtension == "safetensors" ? .safetensors : .gguf,
-                    sizeBytes: Int64(values?.fileSize ?? 0),
-                    modifiedAt: values?.contentModificationDate
-                ))
+
+                results.append(
+                    LocalModel(
+                        id: "\(source.rawValue):\(url.path)",
+                        name: url.deletingPathExtension().lastPathComponent,
+                        source: source,
+                        path: url,
+                        format: fileExtension == "safetensors" ? .safetensors : .gguf,
+                        sizeBytes: Int64(values?.fileSize ?? 0),
+                        modifiedAt: values?.contentModificationDate
+                    ))
             }
         }
+
         return results
     }
 }

@@ -13,6 +13,7 @@ final class TypeSafeSettings {
 
     init(readKey: ((Bool) throws -> String)? = nil) {
         let credentials = TypeSafeCredentials()
+
         self.readKey = readKey ?? { try credentials.readAPIKey(allowPrompt: $0) }
         loadSavedAPIKey(allowPrompt: false)
     }
@@ -29,13 +30,17 @@ final class TypeSafeSettings {
             needsUnlock = false
         } catch {
             needsUnlock = true
-            lastError = allowPrompt ? error.localizedDescription : "Saved TypeSafe key needs permission. Unlock it in Settings to resume automatic classification."
+            lastError =
+                allowPrompt
+                ? error.localizedDescription
+                : "Saved TypeSafe key needs permission. Unlock it in Settings to resume automatic classification."
         }
     }
 
     func saveAPIKey(_ value: String) {
         do {
             let key = value.trimmingCharacters(in: .whitespacesAndNewlines)
+
             try credentials.saveAPIKey(key)
             apiKey = key
             needsUnlock = false

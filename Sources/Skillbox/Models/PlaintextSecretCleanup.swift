@@ -11,6 +11,7 @@ struct PlaintextSecretCleanup {
         if let mismatchedCopy = plaintextCopies.first(where: { !keychainHoldsSameValue($0) }) {
             throw KeychainSecretsModelError.keychainHoldsDifferentValue(mismatchedCopy.key)
         }
+
         try removeStaticHeader?()
         for plaintextCopy in plaintextCopies {
             try removePlaintextCopy(plaintextCopy)

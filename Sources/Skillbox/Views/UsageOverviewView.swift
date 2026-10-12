@@ -29,6 +29,7 @@ struct UsageOverviewView: View {
                             isRefreshing: store.refreshing.contains(provider),
                             onEdit: {
                                 let panel = hostingWindow.window
+
                                 NSApp.activate(ignoringOtherApps: true)
                                 openWindow(id: "usage-snapshot", value: provider)
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak panel] in
@@ -65,18 +66,30 @@ private struct ProviderUsageCard: View {
                 ProviderUsageLogo(provider: provider)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(provider.name).font(.system(size: 13, weight: .semibold))
+
                     if let plan = snapshot?.plan, !plan.isEmpty {
                         Text(plan).font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 Spacer()
+
                 if isRefreshing { ProgressView().controlSize(.small) }
-                Text(snapshot?.source == .manual ? "Manual" : snapshot == nil ? "Not connected" : error != nil ? "Last known" : Date().timeIntervalSince(snapshot!.updatedAt) > 300 ? "Cached" : "Live snapshot")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 7).padding(.vertical, 4)
-                    .background(Color.primary.opacity(0.05), in: Capsule())
+
+                Text(
+                    snapshot?.source == .manual
+                        ? "Manual"
+                        : snapshot == nil
+                            ? "Not connected"
+                            : error != nil
+                                ? "Last known"
+                                : Date().timeIntervalSince(snapshot?.updatedAt ?? .distantPast) > 300 ? "Cached" : "Live snapshot"
+                )
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 7).padding(.vertical, 4)
+                .background(Color.primary.opacity(0.05), in: Capsule())
             }
+
             if let email = snapshot?.accountEmail, !email.isEmpty {
                 Text(email).font(.caption).foregroundStyle(.secondary)
                     .textSelection(.enabled)
@@ -84,12 +97,17 @@ private struct ProviderUsageCard: View {
             } else if snapshot?.source == .live {
                 Text("Account email unavailable").font(.caption).foregroundStyle(.secondary)
             }
-            let windows = snapshot?.windows.isEmpty == false ? snapshot!.windows : provider.windowLabels.map {
-                ProviderUsageWindow(label: $0, usedPercent: nil, resetsAt: nil)
-            }
+
+            let windows =
+                snapshot.flatMap { $0.windows.isEmpty ? nil : $0.windows }
+                ?? provider.windowLabels.map {
+                    ProviderUsageWindow(label: $0, usedPercent: nil, resetsAt: nil)
+                }
+
             ForEach(windows) { window in
                 usageWindow(window)
             }
+
             if let snapshot, !snapshot.details.isEmpty {
                 Divider()
                 VStack(spacing: 5) {
@@ -103,25 +121,31 @@ private struct ProviderUsageCard: View {
                     }
                 }
             }
+
             if let error {
                 Text(error).font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
             HStack(alignment: .center, spacing: 10) {
                 if let snapshot {
                     Text(snapshot.updatedAt, format: .dateTime.month(.abbreviated).day().hour().minute())
                         .font(.system(size: 10)).foregroundStyle(.secondary)
                         .help("Snapshot captured at \(snapshot.updatedAt.formatted())")
                 }
+
                 Spacer(minLength: 0)
+
                 if provider == .grok, snapshot == nil {
                     Link("Connect Grok", destination: URL(string: "https://docs.x.ai/build/overview")!)
                         .help("Install the official Grok CLI and run grok login, then refresh")
                 }
+
                 Button("Refresh", action: onRefresh).disabled(isRefreshing)
                     .accessibilityIdentifier("usage-\(provider.rawValue)-refresh")
                 Button(snapshot == nil ? "Add snapshot" : "Edit", action: onEdit)
                     .accessibilityIdentifier("usage-\(provider.rawValue)-edit")
+
                 if provider == .claude, snapshot == nil || error != nil {
                     Button("Connect Claude Code", action: onUseLive).disabled(isRefreshing)
                 }
@@ -139,6 +163,7 @@ private struct ProviderUsageCard: View {
             HStack {
                 Text(window.label).font(.system(size: 12, weight: .medium))
                 Spacer()
+
                 if let percent = window.usedPercent {
                     Text("\(percent.formatted(.number.precision(.fractionLength(0...1))))% used")
                         .monospacedDigit()
@@ -154,11 +179,15 @@ private struct ProviderUsageCard: View {
                 .accessibilityValue(window.usedPercent.map { "\($0.formatted()) percent used" } ?? "Usage unavailable")
             HStack {
                 if let reset = window.resetsAt {
-                    Text("\(reset <= Date() ? "Reset was" : "Resets") \(reset.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).hour().minute()))")
+                    Text(
+                        "\(reset <= Date() ? "Reset was" : "Resets") \(reset.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).hour().minute()))"
+                    )
                 } else {
                     Text("Reset time unavailable")
                 }
+
                 Spacer()
+
                 if let percent = window.usedPercent {
                     Text("\((100 - percent).formatted(.number.precision(.fractionLength(0...1))))% left")
                 }
@@ -168,13 +197,14 @@ private struct ProviderUsageCard: View {
     }
 }
 
-
 /// Captures the containing menu bar window so opening an editor can dismiss that specific panel.
 private struct UsageHostingWindowReader: NSViewRepresentable {
     let onWindow: (NSWindow?) -> Void
     func makeNSView(context: Context) -> WindowView {
         let view = WindowView()
+
         view.onWindow = onWindow
+
         return view
     }
     func updateNSView(_ nsView: WindowView, context: Context) { nsView.onWindow = onWindow }
@@ -183,11 +213,11 @@ private struct UsageHostingWindowReader: NSViewRepresentable {
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             let capturedWindow = window
+
             DispatchQueue.main.async { [weak self] in self?.onWindow?(capturedWindow) }
         }
     }
 }
-
 
 @MainActor
 private final class UsageWindowReference {

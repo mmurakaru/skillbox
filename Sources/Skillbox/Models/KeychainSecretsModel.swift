@@ -55,9 +55,12 @@ final class KeychainSecretsModel {
     /// Keychain secrets show under "All scopes" and the Keychain filter, never under a settings scope.
     func visibleSecretNames(scopeKey: String?, searchQuery: String) -> [String] {
         let key = scopeKey ?? ""
+
         guard key.isEmpty || key == EnvVarStore.keychainScopeKey else { return [] }
         let trimmed = searchQuery.trimmingCharacters(in: .whitespaces)
+
         guard !trimmed.isEmpty else { return secretNames }
+
         return secretNames.filter { $0.localizedCaseInsensitiveContains(trimmed) }
     }
 
@@ -65,9 +68,11 @@ final class KeychainSecretsModel {
     func addSecret(named name: String, value: String) throws {
         try KeychainSecretValidation.validateName(name)
         try KeychainSecretValidation.validateValue(value)
+
         if try secretStore.secretNames().contains(name) {
             throw KeychainSecretsModelError.secretAlreadyExists(name)
         }
+
         try writeAndVerifyNewSecret(named: name, value: value)
         reload()
     }
@@ -86,13 +91,16 @@ final class KeychainSecretsModel {
     func copyEnvSecretToKeychain(_ envVar: EnvVar) throws {
         try KeychainSecretValidation.validateName(envVar.key)
         try KeychainSecretValidation.validateValue(envVar.value)
+
         if try secretStore.secretNames().contains(envVar.key) {
             guard try secretStore.readSecretValue(named: envVar.key) == envVar.value else {
                 throw KeychainSecretsModelError.keychainHoldsDifferentValue(envVar.key)
             }
             reload()
+
             return
         }
+
         try writeAndVerifyNewSecret(named: envVar.key, value: envVar.value)
         reload()
     }
@@ -100,6 +108,7 @@ final class KeychainSecretsModel {
     /// True when the Keychain holds this env var's exact value, so removing the plaintext copy loses nothing.
     func keychainHoldsSameValue(as envVar: EnvVar) -> Bool {
         guard containsSecret(named: envVar.key) else { return false }
+
         return (try? secretStore.readSecretValue(named: envVar.key)) == envVar.value
     }
 
@@ -107,6 +116,7 @@ final class KeychainSecretsModel {
     private func writeAndVerifyNewSecret(named name: String, value: String) throws {
         try secretStore.writeSecretValue(value, named: name)
         let storedValue = try? secretStore.readSecretValue(named: name)
+
         guard storedValue == value else {
             try? secretStore.deleteSecret(named: name)
             throw KeychainSecretsModelError.readBackMismatch(name)

@@ -13,6 +13,7 @@ enum EnvScope: Hashable {
     /// The project `settings.json` is meant to be committed, so secrets must never be written there.
     var isSharedWithVersionControl: Bool {
         if case .project = self { return true }
+
         return false
     }
 

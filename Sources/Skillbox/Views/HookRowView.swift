@@ -44,6 +44,7 @@ struct HookRowView: View {
     var body: some View {
         ZStack {
             if rowState != .normal { normalContent.hidden() }
+
             if rowState == .confirmingDelete {
                 confirmContent
             } else {
@@ -66,7 +67,9 @@ struct HookRowView: View {
 
     private var rowBackground: Color {
         if isSelected { return Color.accentColor.opacity(0.18) }
+
         if isHoveringRow { return Color.primary.opacity(0.06) }
+
         return .clear
     }
 
@@ -110,6 +113,7 @@ struct HookRowView: View {
 
     private var secondaryLine: String {
         let payload = hook.payload.isEmpty ? "(no payload)" : hook.payload
+
         if showProjectName {
             switch hook.scope {
             case .userGlobal:
@@ -118,16 +122,23 @@ struct HookRowView: View {
                 return "[\(name)] \(payload)"
             }
         }
+
         return payload
     }
 
     private var helpText: String {
         var lines = [hook.titleLine]
+
         lines.append("type: \(hook.kind.displayLabel)")
+
         if !hook.payload.isEmpty { lines.append(hook.payload) }
+
         if let cond = hook.ifCondition { lines.append("if: \(cond)") }
+
         if let timeout = hook.timeout { lines.append("timeout: \(timeout)s") }
+
         if let msg = hook.statusMessage { lines.append("statusMessage: \(msg)") }
+
         switch hook.scope {
         case .userGlobal:
             lines.append("scope: User Global")
@@ -136,6 +147,7 @@ struct HookRowView: View {
         case .projectLocal(_, let path):
             lines.append("project (local): \(path)")
         }
+
         return lines.joined(separator: "\n")
     }
 
@@ -173,10 +185,10 @@ struct HookRowView: View {
                 .frame(width: 18)
 
             Text("Delete ")
-                .font(.system(size: 12)) +
-            Text(hook.titleLine)
-                .font(.system(size: 12, weight: .semibold)) +
-            Text("?")
+                .font(.system(size: 12))
+                + Text(hook.titleLine)
+                .font(.system(size: 12, weight: .semibold))
+                + Text("?")
                 .font(.system(size: 12))
 
             Spacer()

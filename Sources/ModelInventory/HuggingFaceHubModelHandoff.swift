@@ -7,6 +7,7 @@ public enum HuggingFaceHubModelHandoff {
         let repositoryID = model.id.lowercased()
         let baseName = normalizedIdentity(strippingSuffix("-gguf", from: model.name))
         let labQualifiedName = normalizedIdentity(model.lab + "-" + strippingSuffix("-gguf", from: model.name))
+
         return localModels.contains { local in
             switch local.source {
             case .huggingFaceCache:
@@ -15,9 +16,11 @@ public enum HuggingFaceHubModelHandoff {
                 if let namespacedRepositoryID = ollamaNamespacedRepositoryID(local.name) {
                     return namespacedRepositoryID == repositoryID
                 }
+
                 return ollamaIdentity(local.name) == baseName
             default:
                 let fileIdentity = normalizedIdentity(strippingQuantization(from: local.name))
+
                 return fileIdentity == baseName || fileIdentity == labQualifiedName
             }
         }
@@ -26,6 +29,7 @@ public enum HuggingFaceHubModelHandoff {
     /// The scanner drops the registry, so `ollama pull hf.co/<org>/<repo>:<quant>` lists as `<org>/<repo>:<quant>`.
     private static func ollamaNamespacedRepositoryID(_ ollamaName: String) -> String? {
         let repository = ollamaName.lowercased().split(separator: ":", maxSplits: 1).first.map(String.init) ?? ""
+
         return repository.contains("/") ? repository : nil
     }
 
@@ -33,7 +37,9 @@ public enum HuggingFaceHubModelHandoff {
     private static func ollamaIdentity(_ ollamaName: String) -> String {
         let parts = ollamaName.split(separator: ":", maxSplits: 1).map(String.init)
         let tag = parts.count == 2 ? strippingQuantization(from: parts[1]) : ""
+
         guard !tag.isEmpty, tag.lowercased() != "latest" else { return normalizedIdentity(parts[0]) }
+
         return normalizedIdentity(parts[0] + "-" + tag)
     }
 

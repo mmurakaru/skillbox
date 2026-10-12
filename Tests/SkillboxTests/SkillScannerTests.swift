@@ -1,12 +1,15 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import Skillbox
 
 struct SkillScannerTests {
     private func makeFixture() throws -> URL {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("skillbox-skill-scanner-tests-\(UUID().uuidString)")
+
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
         return root
     }
 
@@ -24,14 +27,17 @@ struct SkillScannerTests {
 
     @Test func scan_emptyRoot_returnsEmpty() throws {
         let root = try makeFixture()
+
         defer { cleanup(root) }
 
         let result = try SkillScanner.scan(rootURL: root)
+
         #expect(result.isEmpty)
     }
 
     @Test func scan_folderWithoutSkillMd_isIgnored() throws {
         let root = try makeFixture()
+
         defer { cleanup(root) }
 
         try FileManager.default.createDirectory(
@@ -40,33 +46,37 @@ struct SkillScannerTests {
         )
 
         let result = try SkillScanner.scan(rootURL: root)
+
         #expect(result.isEmpty)
     }
 
     @Test func scan_parsesFrontmatterFields() throws {
         let root = try makeFixture()
+
         defer { cleanup(root) }
 
         try writeFile(
             at: root.appendingPathComponent("widget").appendingPathComponent("SKILL.md"),
             contents: """
-            ---
-            name: widget skill
-            description: builds widgets when asked
-            ---
+                ---
+                name: widget skill
+                description: builds widgets when asked
+                ---
 
-            Body.
-            """
+                Body.
+                """
         )
 
         let result = try SkillScanner.scan(rootURL: root)
         let skill = try #require(result.first)
+
         #expect(skill.name == "widget skill")
         #expect(skill.description == "builds widgets when asked")
     }
 
     @Test func scan_missingFrontmatter_isSkipped() throws {
         let root = try makeFixture()
+
         defer { cleanup(root) }
 
         try writeFile(
@@ -75,11 +85,13 @@ struct SkillScannerTests {
         )
 
         let result = try SkillScanner.scan(rootURL: root)
+
         #expect(result.isEmpty)
     }
 
     @Test func scan_aggregatesMultipleSkills() throws {
         let root = try makeFixture()
+
         defer { cleanup(root) }
 
         try writeFile(
@@ -92,11 +104,13 @@ struct SkillScannerTests {
         )
 
         let result = try SkillScanner.scan(rootURL: root)
+
         #expect(Set(result.map(\.name)) == ["alpha", "beta"])
     }
 
     @Test func scan_fallsBackToFolderNameWhenFrontmatterMissingName() throws {
         let root = try makeFixture()
+
         defer { cleanup(root) }
 
         try writeFile(
@@ -106,16 +120,19 @@ struct SkillScannerTests {
 
         let result = try SkillScanner.scan(rootURL: root)
         let skill = try #require(result.first)
+
         #expect(skill.name == "foldername")
     }
 
     @Test func scan_followsSymlinkedSkillDirectories() throws {
         let root = try makeFixture()
+
         defer { cleanup(root) }
 
         let agentsRoot = root.appendingPathComponent("agents")
         let claudeRoot = root.appendingPathComponent("claude")
         let skillFolder = agentsRoot.appendingPathComponent("linked")
+
         try writeFile(
             at: skillFolder.appendingPathComponent("SKILL.md"),
             contents: "---\nname: linked\ndescription: linked skill\n---\n"
@@ -129,6 +146,7 @@ struct SkillScannerTests {
         let result = try SkillScanner.scan(rootURL: claudeRoot)
 
         let skill = try #require(result.first)
+
         #expect(skill.name == "linked")
         #expect(skill.description == "linked skill")
     }

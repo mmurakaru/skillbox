@@ -10,7 +10,8 @@ enum SkillCategory: String, Codable, CaseIterable, Identifiable, Sendable {
     var criteria: String {
         switch self {
         case .engineering: "Software development, testing, debugging, architecture, infrastructure, or planning software work."
-        case .productivity: "General workflow organization, task management, handoffs, interviews, or learning usable outside software development."
+        case .productivity:
+            "General workflow organization, task management, handoffs, interviews, or learning usable outside software development."
         case .design: "Visual design, user experience, interfaces, illustrations, or other visual artifacts."
         case .writing: "Authoring, editing, or improving prose, documentation, or communication."
         case .research: "Investigating questions by collecting, verifying, or comparing evidence and sources."

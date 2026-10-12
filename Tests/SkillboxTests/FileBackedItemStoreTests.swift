@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import Skillbox
 
 @MainActor
@@ -18,6 +19,7 @@ struct FileBackedItemStoreTests {
             makeSkill(name: "alpha"),
             makeSkill(name: "beta"),
         ])
+
         #expect(store.filteredItems.count == 2)
     }
 
@@ -26,6 +28,7 @@ struct FileBackedItemStoreTests {
             makeSkill(name: "FrontendDesigner"),
             makeSkill(name: "BackendDesigner"),
         ])
+
         store.searchQuery = "frontend"
         #expect(store.filteredItems.map(\.name) == ["FrontendDesigner"])
     }
@@ -35,6 +38,7 @@ struct FileBackedItemStoreTests {
             makeSkill(name: "alpha", description: "uses redis backend"),
             makeSkill(name: "beta", description: "uses postgres"),
         ])
+
         store.searchQuery = "redis"
         #expect(store.filteredItems.map(\.name) == ["alpha"])
     }
@@ -44,6 +48,7 @@ struct FileBackedItemStoreTests {
             makeSkill(name: "alpha"),
             makeSkill(name: "beta"),
         ])
+
         store.searchQuery = "   "
         #expect(store.filteredItems.count == 2)
     }
@@ -51,6 +56,7 @@ struct FileBackedItemStoreTests {
     @Test func removing_an_item_drops_it_from_the_in_memory_list() {
         let target = makeSkill(name: "doomed")
         let store = SkillStore(seedSkills: [target, makeSkill(name: "survivor")])
+
         store.remove(target)
         #expect(store.items.map(\.name) == ["survivor"])
     }
