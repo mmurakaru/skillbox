@@ -1,7 +1,7 @@
 import Foundation
 import CryptoKit
 
-/// A set of byte-identical local models. Keeping one copy and removing the rest reclaims `reclaimableBytes`.
+/// A set of byte-identical local models.
 public struct DuplicateModelGroup: Identifiable, Sendable {
     public let id: String
     public let models: [LocalModel]
@@ -17,8 +17,7 @@ public struct DuplicateModelGroup: Identifiable, Sendable {
     }
 }
 
-/// Finds duplicate local models. Content hashes are computed only for files that share a size,
-/// and cached by path, size, and modification date so repeated runs stay cheap.
+/// Finds duplicate local models; hashes only same-size files and caches each hash by path, size, and modification date.
 public actor DuplicateModelDetector {
     private var contentHashCache: [String: String] = [:]
 

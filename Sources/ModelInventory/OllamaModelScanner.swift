@@ -1,7 +1,6 @@
 import Foundation
 
-/// Scans Ollama's content-addressed model store (`~/.ollama/models`): JSON manifests under
-/// `manifests/` reference blob digests under `blobs/`. Model size is the sum of the referenced blobs.
+/// Scans Ollama's model store; model size is the sum of the blobs its manifest references.
 public struct OllamaModelScanner: LocalModelScanner {
     public let source: LocalModelSource = .ollama
     public let root: URL

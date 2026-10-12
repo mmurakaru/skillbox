@@ -1,8 +1,6 @@
 import Foundation
 
-/// Scans the Hugging Face Hub cache (`~/.cache/huggingface/hub`, or `HF_HOME` / `HF_HUB_CACHE`).
-/// Each `models--org--name` repo stores content-addressed blobs and snapshots that symlink into them,
-/// so the model size is the sum of the blob files, each counted once.
+/// Scans the Hugging Face Hub cache; size sums the blobs because snapshots only symlink into them.
 public struct HuggingFaceCacheScanner: LocalModelScanner {
     public let source: LocalModelSource = .huggingFaceCache
     public let root: URL
@@ -62,7 +60,7 @@ public struct HuggingFaceCacheScanner: LocalModelScanner {
         return results
     }
 
-    /// Sum of regular blob files, plus the name of the largest one as a stable duplicate key.
+    /// The largest blob name is a stable duplicate key across caches.
     private func blobTotals(in blobsDirectory: URL) -> (size: Int64, largestBlobName: String?) {
         guard let blobs = try? FileManager.default.contentsOfDirectory(
             at: blobsDirectory,

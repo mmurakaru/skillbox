@@ -83,6 +83,29 @@ struct LocalModelStoreTests {
         #expect(store.isScanning == false)
     }
 
+    @Test func modelFolderCreatedAfterConfigureIsScannedAutomatically() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "local-model-watch-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let laterFolder = root.appending(path: "later/models")
+
+        let store = LocalModelStore(makeScanners: { $0.makeScanners(home: root, applicationSupport: nil) })
+        store.configure(LocalModelScanConfiguration(
+            ollama: false, huggingFace: false, lmStudio: false, openWhispr: false, appSupport: false,
+            customPaths: [laterFolder]
+        ))
+        await store.rescan().value
+        #expect(store.models.isEmpty)
+        try FileManager.default.createDirectory(at: laterFolder, withIntermediateDirectories: true)
+        try Data(count: 32).write(to: laterFolder.appending(path: "arrived.gguf"))
+
+        let deadline = ContinuousClock.now + .seconds(5)
+        while store.models.isEmpty, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(store.models.map(\.name) == ["arrived"])
+    }
+
     @Test func copyCountIsOneBeforeDuplicateSearch() {
         let store = LocalModelStore(seedModels: sampleModels())
         #expect(store.copyCount(for: sampleModels()[0]) == 1)

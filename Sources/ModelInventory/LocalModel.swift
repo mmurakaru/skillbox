@@ -21,7 +21,6 @@ public enum LocalModelSource: String, Codable, Sendable, CaseIterable {
     }
 }
 
-/// On-disk weight format of a local model.
 public enum LocalModelFormat: String, Codable, Sendable {
     case gguf
     case safetensors
@@ -29,8 +28,7 @@ public enum LocalModelFormat: String, Codable, Sendable {
     case unknown
 }
 
-/// One AI model stored on this Mac. `digest` is a content hash or content-addressed blob
-/// digest used to find duplicate copies; nil when the source does not provide one.
+/// One AI model stored on this Mac; `digest` groups duplicate copies when the source provides one.
 public struct LocalModel: Identifiable, Sendable, Hashable {
     public let id: String
     public var name: String

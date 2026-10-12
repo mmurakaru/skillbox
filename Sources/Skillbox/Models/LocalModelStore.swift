@@ -95,10 +95,8 @@ final class LocalModelStore {
     }
 
     private func startWatching() {
-        let existingRoots = scanners
-            .flatMap(\.watchRoots)
-            .filter { FileManager.default.fileExists(atPath: $0.path) }
-        watcher = existingRoots.isEmpty ? nil : DirectoryWatcher(urls: existingRoots) { [weak self] in
+        let roots = scanners.flatMap(\.watchRoots)
+        watcher = roots.isEmpty ? nil : DirectoryWatcher(urls: roots) { [weak self] in
             Task { @MainActor in self?.rescan() }
         }
     }

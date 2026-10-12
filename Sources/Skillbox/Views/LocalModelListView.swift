@@ -49,32 +49,38 @@ struct LocalModelListView: View {
     }
 
     private var findDuplicatesButton: some View {
-        Button(action: { store.findDuplicates() }) {
-            Group {
-                if store.isDetectingDuplicates {
-                    ProgressView().controlSize(.mini)
-                } else {
-                    Image(systemName: "doc.on.doc")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .frame(width: 28, height: 26)
-            .glassEffect(.regular, in: .rect(cornerRadius: 6))
-        }
-        .buttonStyle(.plain)
-        .disabled(store.models.isEmpty || store.isDetectingDuplicates)
-        .help("Find duplicate copies")
-        .accessibilityLabel("Find duplicate copies")
+        toolbarIconButton(
+            systemImage: "doc.on.doc",
+            isBusy: store.isDetectingDuplicates,
+            isDisabled: store.models.isEmpty || store.isDetectingDuplicates,
+            help: "Find duplicate copies",
+            action: { store.findDuplicates() }
+        )
     }
 
     private var rescanButton: some View {
-        Button(action: { store.rescan() }) {
+        toolbarIconButton(
+            systemImage: "arrow.clockwise",
+            isBusy: store.isScanning,
+            isDisabled: store.isScanning,
+            help: "Rescan model folders",
+            action: { store.rescan() }
+        )
+    }
+
+    private func toolbarIconButton(
+        systemImage: String,
+        isBusy: Bool,
+        isDisabled: Bool,
+        help: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
             Group {
-                if store.isScanning {
+                if isBusy {
                     ProgressView().controlSize(.mini)
                 } else {
-                    Image(systemName: "arrow.clockwise")
+                    Image(systemName: systemImage)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
@@ -83,9 +89,9 @@ struct LocalModelListView: View {
             .glassEffect(.regular, in: .rect(cornerRadius: 6))
         }
         .buttonStyle(.plain)
-        .disabled(store.isScanning)
-        .help("Rescan model folders")
-        .accessibilityLabel("Rescan model folders")
+        .disabled(isDisabled)
+        .help(help)
+        .accessibilityLabel(help)
     }
 
     private var searchBar: some View {

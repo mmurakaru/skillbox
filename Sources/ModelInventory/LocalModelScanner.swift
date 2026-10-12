@@ -8,8 +8,7 @@ public protocol LocalModelScanner: Sendable {
     func scan() -> [LocalModel]
 }
 
-/// Walks folders for model weight files (`.gguf`, `.safetensors`).
-/// Used for OpenWhispr, LM Studio, the Application Support sweep, and custom paths.
+/// Finds `.gguf` and `.safetensors` weight files for OpenWhispr, LM Studio, Application Support, and custom folders.
 public struct FlatFileModelScanner: LocalModelScanner {
     public let source: LocalModelSource
     public let roots: [URL]
