@@ -28,6 +28,9 @@ struct EnvScopeBadge: View {
     }
 }
 
+/// Shared width of the leading switch or icon so names line up across settings and Keychain rows.
+let envRowLeadingControlWidth: CGFloat = 36
+
 struct EnvRowView: View {
     let envVar: EnvVar
     let isSelected: Bool
@@ -36,6 +39,11 @@ struct EnvRowView: View {
     let onEdit: () -> Void
     let onDelete: () -> Void
     let onSetSecretMark: (Bool) -> Void
+    /// True when the login Keychain holds a secret with this name.
+    let isCopiedToKeychain: Bool
+    let onCopyToKeychain: () -> Void
+    /// Removes the settings.json and stash copy after the caller verifies the Keychain value matches.
+    let onRemovePlaintextCopy: () -> Void
 
     @Binding var rowState: SkillRowView.RowState
     /// Owned by the list so keyboard toggles reach the same confirmation as the switch.
@@ -47,16 +55,20 @@ struct EnvRowView: View {
     @State private var isHoveringReveal = false
     @State private var isHoveringCopy = false
     @State private var isSecretValueRevealed = false
+    @State private var isHoveringKeychain = false
+    @State private var isConfirmingPlaintextRemoval = false
 
     private static let maskedSecretValue = "••••••••"
 
     var body: some View {
         ZStack {
-            if rowState != .normal || isConfirmingSecretDisable { normalContent.hidden() }
+            if rowState != .normal || isConfirmingSecretDisable || isConfirmingPlaintextRemoval { normalContent.hidden() }
             if rowState == .confirmingDelete {
                 confirmContent
             } else if isConfirmingSecretDisable {
                 confirmSecretDisableContent
+            } else if isConfirmingPlaintextRemoval {
+                confirmPlaintextRemovalContent
             } else {
                 normalContent
             }
@@ -106,6 +118,7 @@ struct EnvRowView: View {
             .toggleStyle(.switch)
             .controlSize(.mini)
             .labelsHidden()
+            .frame(width: envRowLeadingControlWidth)
 
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
@@ -115,7 +128,9 @@ struct EnvRowView: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
                     EnvScopeBadge(scope: envVar.scope)
-                    if envVar.isSecret {
+                    if envVar.isSecret && isCopiedToKeychain {
+                        KeychainStorageBadge()
+                    } else if envVar.isSecret {
                         Image(systemName: "key.fill")
                             .font(.system(size: 9))
                             .foregroundStyle(.secondary)
@@ -147,6 +162,19 @@ struct EnvRowView: View {
                     tint: .accentColor,
                     help: "Copy value",
                     action: { SecretPasteboard.copyConcealed(envVar.value) }
+                )
+                iconButton(
+                    systemName: isCopiedToKeychain ? "xmark.bin" : "key.horizontal",
+                    isHovering: $isHoveringKeychain,
+                    tint: isCopiedToKeychain ? .orange : .green,
+                    help: isCopiedToKeychain ? "Remove plaintext copy (the Keychain copy stays)" : "Copy to Keychain",
+                    action: {
+                        if isCopiedToKeychain {
+                            isConfirmingPlaintextRemoval = true
+                        } else {
+                            onCopyToKeychain()
+                        }
+                    }
                 )
             }
 
@@ -262,6 +290,19 @@ struct EnvRowView: View {
             onConfirm: {
                 onToggle()
                 isConfirmingSecretDisable = false
+            }
+        )
+    }
+
+    private var confirmPlaintextRemovalContent: some View {
+        confirmationRow(
+            verb: "Remove",
+            detail: " from settings.json?",
+            confirmTint: .orange,
+            onCancel: { isConfirmingPlaintextRemoval = false },
+            onConfirm: {
+                onRemovePlaintextCopy()
+                isConfirmingPlaintextRemoval = false
             }
         )
     }

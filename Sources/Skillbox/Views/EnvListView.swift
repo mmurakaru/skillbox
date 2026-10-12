@@ -3,6 +3,7 @@ import AppKit
 
 struct EnvListView: View {
     @Environment(EnvVarStore.self) private var store
+    @Environment(KeychainSecretsModel.self) private var keychainSecrets
 
     @AppStorage("editorCommand") private var editorCommand: String = ""
     @AppStorage("envSelectedScope") private var envSelectedScope: String = ""
@@ -36,9 +37,16 @@ struct EnvListView: View {
 
             Divider()
 
+            if let keychainError = keychainSecrets.lastError {
+                keychainErrorBanner(keychainError)
+            }
+
             list
         }
-        .task { applyStickyOrDefault() }
+        .task {
+            keychainSecrets.reload()
+            applyStickyOrDefault()
+        }
         .onChange(of: store.items.count) { _, _ in applyStickyOrDefault() }
         .onChange(of: store.selectedScopeKey) { _, newValue in
             envSelectedScope = newValue ?? ""
@@ -67,13 +75,18 @@ struct EnvListView: View {
         .sheet(isPresented: $showingAddSheet) {
             EnvAddSheet(
                 availableScopes: store.addableScopes,
-                onAdd: { key, value, scope, markedAsSecret in
+                onAdd: { key, value, destination in
                     do {
-                        try store.add(key: key, value: value, scope: scope, markedAsSecret: markedAsSecret)
+                        switch destination {
+                        case .settings(let scope):
+                            try store.add(key: key, value: value, scope: scope)
+                        case .keychain:
+                            try keychainSecrets.addSecret(named: key, value: value)
+                        }
                         showingAddSheet = false
                         return nil
                     } catch {
-                        return (error as? EnvVarStoreError)?.errorDescription ?? error.localizedDescription
+                        return error.localizedDescription
                     }
                 },
                 onCancel: { showingAddSheet = false }
@@ -86,6 +99,7 @@ struct EnvListView: View {
         return Picker("Scope", selection: $store.selectedScopeKey) {
             Text("All scopes").tag(String?.none)
             Text("User Global (\(store.globalCount))").tag(Optional("global"))
+            Text("Keychain (\(keychainSecrets.secretNames.count))").tag(Optional(EnvVarStore.keychainScopeKey))
             ForEach(store.availableProjects) { project in
                 Text("\(project.displayName) (\(project.count))").tag(Optional(project.path))
             }
@@ -102,6 +116,7 @@ struct EnvListView: View {
             return "Showing env vars from all scopes"
         }
         if key == "global" { return "~/.claude/settings.json" }
+        if key == EnvVarStore.keychainScopeKey { return "Secrets stored in the login Keychain" }
         return key
     }
 
@@ -144,10 +159,18 @@ struct EnvListView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
-                    if store.filteredEnvVars.isEmpty {
+                    if store.filteredEnvVars.isEmpty && visibleKeychainSecretNames.isEmpty {
                         emptyState
                             .frame(maxWidth: .infinity, minHeight: 200)
                     } else {
+                        ForEach(visibleKeychainSecretNames, id: \.self) { secretName in
+                            KeychainSecretRowView(
+                                secretName: secretName,
+                                readValue: { try keychainSecrets.readSecretValue(named: secretName) },
+                                onDelete: { performDeleteKeychainSecret(named: secretName) },
+                                onError: { keychainSecrets.reportError($0) }
+                            )
+                        }
                         ForEach(store.filteredEnvVars) { envVar in
                             EnvRowView(
                                 envVar: envVar,
@@ -157,6 +180,9 @@ struct EnvListView: View {
                                 onEdit: { open(envVar: envVar) },
                                 onDelete: { performDelete(envVar) },
                                 onSetSecretMark: { marked in performSetSecretMark(marked, for: envVar) },
+                                isCopiedToKeychain: keychainSecrets.containsSecret(named: envVar.key),
+                                onCopyToKeychain: { performCopyToKeychain(envVar) },
+                                onRemovePlaintextCopy: { performRemovePlaintextCopy(envVar) },
                                 rowState: binding(for: envVar.id),
                                 isConfirmingSecretDisable: secretDisableConfirmationBinding(for: envVar.id)
                             )
@@ -207,7 +233,61 @@ struct EnvListView: View {
         }
     }
 
+    /// Keychain secrets show under "All scopes" and the Keychain filter, never under a settings scope.
+    private var visibleKeychainSecretNames: [String] {
+        let key = store.selectedScopeKey ?? ""
+        guard key.isEmpty || key == EnvVarStore.keychainScopeKey else { return [] }
+        return keychainSecrets.filteredSecretNames(matching: store.searchQuery)
+    }
+
+    private func keychainErrorBanner(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text(message)
+                .font(.system(size: 11))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            Button(action: { keychainSecrets.dismissError() }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Dismiss")
+            .accessibilityLabel("Dismiss")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color.orange.opacity(0.1))
+    }
+
     // MARK: - Actions
+
+    private func performCopyToKeychain(_ envVar: EnvVar) {
+        do {
+            try keychainSecrets.copyEnvSecretToKeychain(envVar)
+        } catch {
+            keychainSecrets.reportError(error)
+        }
+    }
+
+    /// Re-verifies the Keychain value right before deleting, so a changed or missing copy never loses data.
+    private func performRemovePlaintextCopy(_ envVar: EnvVar) {
+        guard keychainSecrets.keychainHoldsSameValue(as: envVar) else {
+            keychainSecrets.reportError(KeychainSecretsModelError.keychainHoldsDifferentValue(envVar.key))
+            return
+        }
+        performDelete(envVar)
+    }
+
+    private func performDeleteKeychainSecret(named secretName: String) {
+        do {
+            try keychainSecrets.deleteSecret(named: secretName)
+        } catch {
+            keychainSecrets.reportError(error)
+        }
+    }
 
     private func binding(for id: String) -> Binding<SkillRowView.RowState> {
         Binding(
@@ -226,7 +306,8 @@ struct EnvListView: View {
     private func applyStickyOrDefault() {
         if !envSelectedScope.isEmpty,
            store.selectedScopeKey != envSelectedScope {
-            if envSelectedScope == "global" || store.availableProjects.contains(where: { $0.path == envSelectedScope }) {
+            if envSelectedScope == "global" || envSelectedScope == EnvVarStore.keychainScopeKey
+                || store.availableProjects.contains(where: { $0.path == envSelectedScope }) {
                 store.selectedScopeKey = envSelectedScope
             }
         }
