@@ -8,6 +8,7 @@ struct SkillboxApp: App {
     @State private var memoryStore = MemoryStore()
     @State private var hookStore = HookStore()
     @State private var envStore = EnvVarStore()
+    @State private var localModelStore: LocalModelStore
     @State private var keychainSecretsModel = KeychainSecretsModel()
     @State private var insightsModel: InsightsModel
     @State private var remoteSkillService = RemoteSkillService()
@@ -27,6 +28,9 @@ struct SkillboxApp: App {
         let credentials = TypeSafeSettings()
         store.configure(rootPath: UserDefaults.standard.string(forKey: "skillsRootPath") ?? "~/.agents/skills")
         self._store = State(initialValue: store)
+        let localModelStore = LocalModelStore()
+        localModelStore.configure(LocalModelScanSettings.configuration())
+        self._localModelStore = State(initialValue: localModelStore)
         self._classificationStore = State(initialValue: classifications)
         self._typeSafeSettings = State(initialValue: credentials)
         self._classificationAutomation = State(initialValue: SkillClassificationAutomation(
@@ -60,6 +64,7 @@ struct SkillboxApp: App {
                 .environment(memoryStore)
                 .environment(hookStore)
                 .environment(envStore)
+                .environment(localModelStore)
                 .environment(keychainSecretsModel)
                 .environment(insightsModel)
                 .environment(remoteSkillService)
@@ -82,6 +87,7 @@ struct SkillboxApp: App {
                 .environment(skillFolderSync)
                 .environment(typeSafeSettings)
                 .environment(insightsModel)
+                .environment(localModelStore)
                 .environment(\.sparkleUpdater, updaterController.updater)
         }
     }

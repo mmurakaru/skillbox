@@ -1,0 +1,203 @@
+import Testing
+import Foundation
+import ModelInventory
+@testable import Skillbox
+
+@MainActor
+struct LocalModelStoreTests {
+    private func sampleModels() -> [LocalModel] {
+        [
+            LocalModel(id: "1", name: "qwen3.5-9b-q4_k_m", source: .openWhispr,
+                       path: URL(fileURLWithPath: "/models/a.gguf"), format: .gguf, sizeBytes: 6_000_000_000),
+            LocalModel(id: "2", name: "llama-3-8b", source: .ollama,
+                       path: URL(fileURLWithPath: "/models/b"), format: .ollamaBlob, sizeBytes: 4_000_000_000),
+        ]
+    }
+
+    private struct FixedModelScanner: LocalModelScanner {
+        let source: LocalModelSource = .custom
+        let models: [LocalModel]
+        var delaySeconds: Double = 0
+        var watchRoots: [URL] { [] }
+        func scan() -> [LocalModel] {
+            if delaySeconds > 0 { Thread.sleep(forTimeInterval: delaySeconds) }
+            return models
+        }
+    }
+
+    /// Lets a test change what the next scan returns.
+    private final class ReplaceableModelScanner: LocalModelScanner, @unchecked Sendable {
+        let source: LocalModelSource = .custom
+        var watchRoots: [URL] { [] }
+        private let lock = NSLock()
+        private var currentModels: [LocalModel]
+
+        init(models: [LocalModel]) { currentModels = models }
+
+        func replaceModels(with models: [LocalModel]) { lock.withLock { currentModels = models } }
+
+        func scan() -> [LocalModel] { lock.withLock { currentModels } }
+    }
+
+    @Test func searchMatchesModelName() {
+        let store = LocalModelStore(seedModels: sampleModels())
+        store.searchQuery = "qwen"
+        #expect(store.filteredModels.map(\.id) == ["1"])
+    }
+
+    @Test func searchMatchesSourceName() {
+        let store = LocalModelStore(seedModels: sampleModels())
+        store.searchQuery = "ollama"
+        #expect(store.filteredModels.map(\.id) == ["2"])
+    }
+
+    @Test func blankSearchReturnsAllModels() {
+        let store = LocalModelStore(seedModels: sampleModels())
+        store.searchQuery = "   "
+        #expect(store.filteredModels.count == 2)
+    }
+
+    @Test func totalBytesSumsAllModels() {
+        #expect(LocalModelStore(seedModels: sampleModels()).totalBytes == 10_000_000_000)
+    }
+
+    @Test func configureScansEnabledSources() async throws {
+        let folder = FileManager.default.temporaryDirectory.appending(path: "local-model-store-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data(count: 64).write(to: folder.appending(path: "tiny.gguf"))
+
+        let store = LocalModelStore(makeScanners: { $0.makeScanners(home: folder, applicationSupport: nil) })
+        store.configure(LocalModelScanConfiguration(
+            ollama: false, huggingFace: false, lmStudio: false, openWhispr: false, appSupport: false,
+            customPaths: [folder]
+        ))
+        await store.rescan().value
+
+        #expect(store.models.map(\.name) == ["tiny"])
+        #expect(store.isScanning == false)
+    }
+
+    @Test func slowOlderScanDoesNotOverwriteNewerScan() async {
+        let newestModels = Array(sampleModels().prefix(1))
+        let store = LocalModelStore(makeScanners: { configuration in
+            configuration.ollama
+                ? [FixedModelScanner(models: [], delaySeconds: 0.3)]
+                : [FixedModelScanner(models: newestModels)]
+        })
+        store.configure(LocalModelScanConfiguration(ollama: true))
+        let slowOlderScan = store.rescan()
+        store.configure(LocalModelScanConfiguration(ollama: false))
+        let newerScan = store.rescan()
+
+        await newerScan.value
+        await slowOlderScan.value
+
+        #expect(store.models.map(\.id) == ["1"])
+        #expect(store.isScanning == false)
+    }
+
+    @Test func modelFolderCreatedAfterConfigureIsScannedAutomatically() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "local-model-watch-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let laterFolder = root.appending(path: "later/models")
+
+        let store = LocalModelStore(makeScanners: { $0.makeScanners(home: root, applicationSupport: nil) })
+        store.configure(LocalModelScanConfiguration(
+            ollama: false, huggingFace: false, lmStudio: false, openWhispr: false, appSupport: false,
+            customPaths: [laterFolder]
+        ))
+        await store.rescan().value
+        #expect(store.models.isEmpty)
+        #expect(!store.watchModelFoldersCreatedSinceLastCheck())
+        try FileManager.default.createDirectory(at: laterFolder, withIntermediateDirectories: true)
+        try Data(count: 32).write(to: laterFolder.appending(path: "arrived.gguf"))
+
+        #expect(store.watchModelFoldersCreatedSinceLastCheck())
+        try await waitUntil { store.models.map(\.name) == ["arrived"] }
+
+        try Data(count: 32).write(to: laterFolder.appending(path: "second.gguf"))
+        try await waitUntil { store.models.count == 2 }
+    }
+
+    private func waitUntil(_ condition: () -> Bool) async throws {
+        let deadline = ContinuousClock.now + .seconds(5)
+        while !condition(), ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(condition())
+    }
+
+    @Test func totalBytesCountsSharedOllamaBlobsOnce() {
+        let blobs: [String: Int64] = ["sha256:weights": 4_000, "sha256:config": 10]
+        let tag = LocalModel(id: "ollama:a", name: "a:latest", source: .ollama, path: URL(fileURLWithPath: "/models/a"),
+                             format: .ollamaBlob, sizeBytes: 4_010, sharedBlobSizes: blobs)
+        let copiedTag = LocalModel(id: "ollama:b", name: "b:latest", source: .ollama, path: URL(fileURLWithPath: "/models/b"),
+                                   format: .ollamaBlob, sizeBytes: 4_010, sharedBlobSizes: blobs)
+        let file = LocalModel(id: "custom:c", name: "c", source: .custom, path: URL(fileURLWithPath: "/models/c.gguf"),
+                              format: .gguf, sizeBytes: 500)
+
+        #expect(LocalModelStore(seedModels: [tag, copiedTag, file]).totalBytes == 4_510)
+    }
+
+    @Test func copyCountIsOneBeforeDuplicateSearch() {
+        let store = LocalModelStore(seedModels: sampleModels())
+        #expect(store.copyCount(for: sampleModels()[0]) == 1)
+    }
+
+    @Test func duplicateSearchGroupsSharedDigests() async {
+        let first = LocalModel(id: "a", name: "a", source: .ollama, path: URL(fileURLWithPath: "/models/a"),
+                               format: .ollamaBlob, sizeBytes: 10, digest: "sha256:same")
+        let second = LocalModel(id: "b", name: "b", source: .huggingFaceCache, path: URL(fileURLWithPath: "/models/b"),
+                                format: .gguf, sizeBytes: 10, digest: "sha256:same")
+        let store = LocalModelStore(seedModels: [first, second])
+
+        await store.findDuplicates()?.value
+
+        #expect(store.copyCount(for: first) == 2)
+        #expect(store.reclaimableBytes == 10)
+    }
+
+    @Test func rescanKeepsDuplicateGroupsWhoseFilesDidNotChange() async {
+        let modified = Date(timeIntervalSince1970: 1_000)
+        func model(_ id: String, digest: String, size: Int64 = 10, modifiedAt: Date = modified) -> LocalModel {
+            LocalModel(id: id, name: id, source: .custom, path: URL(fileURLWithPath: "/models/\(id)"), format: .gguf,
+                       sizeBytes: size, digest: digest, modifiedAt: modifiedAt)
+        }
+        let scanner = ReplaceableModelScanner(models: [
+            model("a", digest: "same"), model("b", digest: "same"), model("c", digest: "other"), model("d", digest: "other"),
+        ])
+        let store = LocalModelStore(makeScanners: { _ in [scanner] })
+        store.configure(LocalModelScanConfiguration())
+        await store.rescan().value
+        await store.findDuplicates()?.value
+        #expect(store.duplicateGroups.count == 2)
+
+        scanner.replaceModels(with: [
+            model("a", digest: "same"), model("b", digest: "same"), model("c", digest: "other"),
+            model("d", digest: "other", modifiedAt: modified.addingTimeInterval(60)),
+        ])
+        await store.rescan().value
+
+        #expect(store.duplicateGroups.map(\.id) == ["digest:same"])
+        #expect(store.copyCount(for: model("a", digest: "same")) == 2)
+        #expect(store.copyCount(for: model("c", digest: "other")) == 1)
+    }
+
+    @Test func scanSettingsDefaultToAllSourcesOn() throws {
+        let suiteName = "LocalModelScanSettingsTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        #expect(LocalModelScanSettings.configuration(from: defaults) == LocalModelScanConfiguration())
+
+        defaults.set(false, forKey: LocalModelScanSettings.scanOllamaKey)
+        defaults.set("/tmp/a, /tmp/b", forKey: LocalModelScanSettings.customPathsKey)
+        let configuration = LocalModelScanSettings.configuration(from: defaults)
+
+        #expect(configuration.ollama == false)
+        #expect(configuration.huggingFace == true)
+        #expect(configuration.customPaths.map(\.path) == ["/tmp/a", "/tmp/b"])
+    }
+}
