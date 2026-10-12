@@ -96,14 +96,35 @@ struct LocalModelStoreTests {
         ))
         await store.rescan().value
         #expect(store.models.isEmpty)
+        #expect(!store.watchModelFoldersCreatedSinceLastCheck())
         try FileManager.default.createDirectory(at: laterFolder, withIntermediateDirectories: true)
         try Data(count: 32).write(to: laterFolder.appending(path: "arrived.gguf"))
 
+        #expect(store.watchModelFoldersCreatedSinceLastCheck())
+        try await waitUntil { store.models.map(\.name) == ["arrived"] }
+
+        try Data(count: 32).write(to: laterFolder.appending(path: "second.gguf"))
+        try await waitUntil { store.models.count == 2 }
+    }
+
+    private func waitUntil(_ condition: () -> Bool) async throws {
         let deadline = ContinuousClock.now + .seconds(5)
-        while store.models.isEmpty, ContinuousClock.now < deadline {
+        while !condition(), ContinuousClock.now < deadline {
             try await Task.sleep(for: .milliseconds(20))
         }
-        #expect(store.models.map(\.name) == ["arrived"])
+        #expect(condition())
+    }
+
+    @Test func totalBytesCountsSharedOllamaBlobsOnce() {
+        let blobs: [String: Int64] = ["sha256:weights": 4_000, "sha256:config": 10]
+        let tag = LocalModel(id: "ollama:a", name: "a:latest", source: .ollama, path: URL(fileURLWithPath: "/models/a"),
+                             format: .ollamaBlob, sizeBytes: 4_010, sharedBlobSizes: blobs)
+        let copiedTag = LocalModel(id: "ollama:b", name: "b:latest", source: .ollama, path: URL(fileURLWithPath: "/models/b"),
+                                   format: .ollamaBlob, sizeBytes: 4_010, sharedBlobSizes: blobs)
+        let file = LocalModel(id: "custom:c", name: "c", source: .custom, path: URL(fileURLWithPath: "/models/c.gguf"),
+                              format: .gguf, sizeBytes: 500)
+
+        #expect(LocalModelStore(seedModels: [tag, copiedTag, file]).totalBytes == 4_510)
     }
 
     @Test func copyCountIsOneBeforeDuplicateSearch() {

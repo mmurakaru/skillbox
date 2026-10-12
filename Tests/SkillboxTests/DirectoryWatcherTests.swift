@@ -65,4 +65,32 @@ struct DirectoryWatcherTests {
         try await Task.sleep(for: .seconds(1))
         #expect(changes == before)
     }
+
+    @Test func withoutAncestorFallbackOnlyExistingFoldersAreWatched() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("skillbox-roots-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let existing = root.appendingPathComponent("existing")
+        try FileManager.default.createDirectory(at: existing, withIntermediateDirectories: true)
+        let missing = root.appendingPathComponent("missing/models")
+
+        let watcher = try #require(DirectoryWatcher(urls: [existing, missing], watchesMissingPathsThroughAncestors: false) {})
+        #expect(watcher.streamRootPaths == [existing.resolvingSymlinksInPath().path])
+        #expect(DirectoryWatcher(urls: [missing], watchesMissingPathsThroughAncestors: false) {} == nil)
+    }
+
+    @Test func eventsOnAPrivateQueueStillCallBackOnTheMainThread() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("skillbox-queue-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        var callbacksOnMainThread: [Bool] = []
+        let watcher = try #require(DirectoryWatcher(urls: [root], eventQueue: DispatchQueue(label: "test-watcher")) {
+            callbacksOnMainThread.append(Thread.isMainThread)
+        })
+        defer { withExtendedLifetime(watcher) {} }
+
+        try "change".write(to: root.appendingPathComponent("model.gguf"), atomically: true, encoding: .utf8)
+
+        try await waitUntil { !callbacksOnMainThread.isEmpty }
+        #expect(callbacksOnMainThread.allSatisfy { $0 })
+    }
 }

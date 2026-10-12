@@ -18,6 +18,12 @@ struct LocalModelScanConfigurationTests {
         #expect(paths.last?.path.hasSuffix("/models") == true)
     }
 
+    @Test func parseCustomPathsSkipsHomeAndRootFolders() {
+        let paths = LocalModelScanConfiguration.parseCustomPaths("~, ~/, /, /tmp/example-home/, /tmp/example-home/models", home: home)
+        #expect(paths.contains { $0.path == "/tmp/example-home/models" })
+        #expect(!paths.contains { $0.path == "/" || $0.path == home.path })
+    }
+
     @Test func blankCustomPathsParseToNothing() {
         #expect(LocalModelScanConfiguration.parseCustomPaths("   ").isEmpty)
     }

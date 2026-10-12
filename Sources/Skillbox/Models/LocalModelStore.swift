@@ -16,6 +16,11 @@ final class LocalModelStore {
     private var configuration: LocalModelScanConfiguration?
     private var scanners: [any LocalModelScanner] = []
     private var watcher: DirectoryWatcher?
+    private var missingWatchRoots: [URL] = []
+    private var rootAppearanceCheck: Task<Void, Never>?
+    private var scanTask: Task<[LocalModel], Never>?
+    private static let watcherEventQueue = DispatchQueue(label: "skillbox.local-models.watcher", qos: .utility)
+    private static let rootAppearanceCheckInterval: Duration = .seconds(300)
     private let duplicateDetector = DuplicateModelDetector()
     private let makeScanners: (LocalModelScanConfiguration) -> [any LocalModelScanner]
     // Bumped per scan so a slow, older scan or duplicate search cannot overwrite newer results.
@@ -38,7 +43,7 @@ final class LocalModelStore {
     }
 
     var totalBytes: Int64 {
-        models.reduce(0) { $0 + $1.sizeBytes }
+        models.totalStorageBytes
     }
 
     /// Space freed by keeping one copy of each duplicate group.
@@ -61,10 +66,13 @@ final class LocalModelStore {
         let generation = inventoryGeneration
         let scanners = self.scanners
         isScanning = true
+        scanTask?.cancel()
+        let scan = Task.detached(priority: .utility) {
+            LocalModelInventory.aggregate(scanners)
+        }
+        scanTask = scan
         return Task {
-            let found = await Task.detached(priority: .utility) {
-                LocalModelInventory.aggregate(scanners)
-            }.value
+            let found = await scan.value
             guard generation == inventoryGeneration else { return }
             models = found
             duplicateGroups = []
@@ -94,10 +102,38 @@ final class LocalModelStore {
         }?.models.count ?? 1
     }
 
+    /// Starts watching model folders created since the last check; returns true when it rescanned.
+    @discardableResult
+    func watchModelFoldersCreatedSinceLastCheck() -> Bool {
+        guard missingWatchRoots.contains(where: { FileManager.default.fileExists(atPath: $0.path) }) else { return false }
+        startWatching()
+        rescan()
+        return true
+    }
+
     private func startWatching() {
         let roots = scanners.flatMap(\.watchRoots)
-        watcher = roots.isEmpty ? nil : DirectoryWatcher(urls: roots) { [weak self] in
+        missingWatchRoots = roots.filter { !FileManager.default.fileExists(atPath: $0.path) }
+        watcher = roots.isEmpty ? nil : DirectoryWatcher(
+            urls: roots,
+            watchesMissingPathsThroughAncestors: false,
+            eventQueue: Self.watcherEventQueue
+        ) { [weak self] in
             Task { @MainActor in self?.rescan() }
+        }
+        scheduleRootAppearanceCheck()
+    }
+
+    /// Missing folders are not watched through a broad ancestor such as the home folder, so a slow timer re-checks them.
+    private func scheduleRootAppearanceCheck() {
+        rootAppearanceCheck?.cancel()
+        guard !missingWatchRoots.isEmpty else { return }
+        rootAppearanceCheck = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.rootAppearanceCheckInterval)
+                guard !Task.isCancelled, let self else { return }
+                if self.watchModelFoldersCreatedSinceLastCheck() { return }
+            }
         }
     }
 }

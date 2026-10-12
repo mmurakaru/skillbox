@@ -27,6 +27,7 @@ struct LocalModelListView: View {
 
             list
         }
+        .onAppear { store.watchModelFoldersCreatedSinceLastCheck() }
     }
 
     private var summary: some View {

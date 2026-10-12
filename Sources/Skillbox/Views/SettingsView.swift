@@ -21,12 +21,14 @@ struct SettingsView: View {
     @AppStorage("claudeCommand") private var claudeCommand: String = ""
     @AppStorage("launchAtLogin") private var launchAtLogin: Bool = false
     @AppStorage("syncRemoteSkillsOnLaunch") private var syncRemoteSkillsOnLaunch: Bool = false
-    @AppStorage(LocalModelScanSettings.scanOllamaKey) private var scanOllamaModels: Bool = true
-    @AppStorage(LocalModelScanSettings.scanHuggingFaceKey) private var scanHuggingFaceModels: Bool = true
-    @AppStorage(LocalModelScanSettings.scanLMStudioKey) private var scanLMStudioModels: Bool = true
-    @AppStorage(LocalModelScanSettings.scanOpenWhisprKey) private var scanOpenWhisprModels: Bool = true
-    @AppStorage(LocalModelScanSettings.scanAppSupportKey) private var scanAppSupportModels: Bool = true
+    @AppStorage(LocalModelScanSettings.scanOllamaKey) private var scanOllamaModels: Bool = LocalModelScanSettings.sourceEnabledByDefault
+    @AppStorage(LocalModelScanSettings.scanHuggingFaceKey) private var scanHuggingFaceModels: Bool = LocalModelScanSettings.sourceEnabledByDefault
+    @AppStorage(LocalModelScanSettings.scanLMStudioKey) private var scanLMStudioModels: Bool = LocalModelScanSettings.sourceEnabledByDefault
+    @AppStorage(LocalModelScanSettings.scanOpenWhisprKey) private var scanOpenWhisprModels: Bool = LocalModelScanSettings.sourceEnabledByDefault
+    @AppStorage(LocalModelScanSettings.scanAppSupportKey) private var scanAppSupportModels: Bool = LocalModelScanSettings.sourceEnabledByDefault
     @AppStorage(LocalModelScanSettings.customPathsKey) private var customModelPaths: String = ""
+    @State private var customModelPathsDraft: String?
+    @FocusState private var customModelPathsFieldFocused: Bool
 
     @State private var detectedEditors: [DetectedEditor] = []
     @State private var isSyncingAll = false
@@ -228,29 +230,38 @@ struct SettingsView: View {
             Toggle("OpenWhispr", isOn: $scanOpenWhisprModels)
             Toggle("Application Support model folders", isOn: $scanAppSupportModels)
             VStack(alignment: .leading, spacing: 6) {
-                TextField("Additional folders", text: $customModelPaths)
-                    .textFieldStyle(.roundedBorder)
-                Text("Comma-separated folders to search for .gguf and .safetensors files.")
+                TextField("Additional folders", text: Binding(
+                    get: { customModelPathsDraft ?? customModelPaths },
+                    set: { customModelPathsDraft = $0 }
+                ))
+                .textFieldStyle(.roundedBorder)
+                .focused($customModelPathsFieldFocused)
+                .onSubmit(commitCustomModelPaths)
+                .onChange(of: customModelPathsFieldFocused) { _, focused in
+                    if !focused { commitCustomModelPaths() }
+                }
+                Text("Comma-separated folders to search for .gguf and .safetensors files. Press Return to apply. Your home folder and / are skipped.")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
             }
         } header: {
             Text("Local models")
         }
-        .onChange(of: localModelScanConfiguration) { _, newConfiguration in
-            localModelStore.configure(newConfiguration)
+        .onChange(of: localModelScanSettingsSnapshot) { _, _ in
+            localModelStore.configure(LocalModelScanSettings.configuration())
         }
     }
 
-    private var localModelScanConfiguration: LocalModelScanConfiguration {
-        LocalModelScanConfiguration(
-            ollama: scanOllamaModels,
-            huggingFace: scanHuggingFaceModels,
-            lmStudio: scanLMStudioModels,
-            openWhispr: scanOpenWhisprModels,
-            appSupport: scanAppSupportModels,
-            customPaths: LocalModelScanConfiguration.parseCustomPaths(customModelPaths)
-        )
+    /// Changes here mean the saved settings changed; the store reads them back from the one shared parser.
+    private var localModelScanSettingsSnapshot: [String] {
+        [scanOllamaModels, scanHuggingFaceModels, scanLMStudioModels, scanOpenWhisprModels, scanAppSupportModels]
+            .map(String.init) + [customModelPaths]
+    }
+
+    private func commitCustomModelPaths() {
+        guard let customModelPathsDraft else { return }
+        customModelPaths = customModelPathsDraft
+        self.customModelPathsDraft = nil
     }
 
     private func browseForFolder(binding: Binding<String>) {

@@ -25,12 +25,14 @@ public struct LocalModelScanConfiguration: Equatable, Sendable {
         self.customPaths = customPaths
     }
 
-    /// Parses the comma-separated custom model paths field, expanding `~` and dropping blanks.
-    public static func parseCustomPaths(_ rawPaths: String) -> [URL] {
-        rawPaths.split(separator: ",")
+    /// Drops the home folder and `/`, since walking either for weight files would read most of the disk.
+    public static func parseCustomPaths(_ rawPaths: String, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> [URL] {
+        let refusedPaths: Set<String> = ["/", home.standardizedFileURL.path]
+        return rawPaths.split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
-            .map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
+            .map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath).standardizedFileURL }
+            .filter { !refusedPaths.contains($0.path) }
     }
 
     /// Builds one scanner per enabled source, rooted at the given home and Application Support folders.

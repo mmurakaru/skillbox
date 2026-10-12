@@ -7,6 +7,7 @@ public enum LocalModelInventory {
         var seenIDs = Set<String>()
         var models: [LocalModel] = []
         for scanner in scanners {
+            if Task.isCancelled { return [] }
             for model in scanner.scan() where seenIDs.insert(model.id).inserted {
                 models.append(model)
             }
