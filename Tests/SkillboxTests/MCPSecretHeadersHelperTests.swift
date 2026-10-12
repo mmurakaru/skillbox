@@ -336,6 +336,29 @@ struct ClaudeGlobalConfigEditorTests {
 
         #expect((servers["example-http"] as? [String: Any])?["headers"] == nil)
     }
+
+    @Test func defaultServerName_prefersTheServerAlreadyWiredToTheSecret() throws {
+        let wiredHelper = try MCPSecretHeadersHelper.command(
+            secretName: "EXAMPLE_API_TOKEN", headerName: "Authorization", valuePrefix: "Bearer ")
+        let servers = [
+            ClaudeHTTPMCPServer(name: "alpha-unrelated", url: "https://alpha.example.com/mcp", staticHeaderNames: [], headersHelper: nil),
+            ClaudeHTTPMCPServer(name: "zeta-wired", url: "https://zeta.example.com/mcp", staticHeaderNames: [], headersHelper: wiredHelper),
+        ]
+
+        #expect(MCPSecretHeadersHelper.defaultServerName(forSecretNamed: "EXAMPLE_API_TOKEN", among: servers) == "zeta-wired")
+    }
+
+    @Test func defaultServerName_withoutAWiredServer_selectsNothing() throws {
+        let otherSecretHelper = try MCPSecretHeadersHelper.command(
+            secretName: "OTHER_API_TOKEN", headerName: "Authorization", valuePrefix: "Bearer ")
+        let servers = [
+            ClaudeHTTPMCPServer(name: "alpha-unrelated", url: "https://alpha.example.com/mcp", staticHeaderNames: [], headersHelper: nil),
+            ClaudeHTTPMCPServer(
+                name: "beta-other-secret", url: "https://beta.example.com/mcp", staticHeaderNames: [], headersHelper: otherSecretHelper),
+        ]
+
+        #expect(MCPSecretHeadersHelper.defaultServerName(forSecretNamed: "EXAMPLE_API_TOKEN", among: servers) == nil)
+    }
 }
 
 /// Passes the first helper check, then holds the config lock and fails the second, so the rollback cannot write.

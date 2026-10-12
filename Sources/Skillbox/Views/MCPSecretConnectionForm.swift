@@ -32,6 +32,7 @@ struct MCPSecretConnectionForm: View {
                         .foregroundStyle(.secondary)
                 } else {
                     Picker("", selection: $selectedServerName) {
+                        Text("Choose a server").tag(String?.none)
                         ForEach(servers) { server in
                             Text(serverLabel(server)).tag(Optional(server.name))
                         }
@@ -80,6 +81,11 @@ struct MCPSecretConnectionForm: View {
             }
 
             HStack {
+                Label(selectedServerHost ?? "No server selected", systemImage: "network")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(selectedServerHost == nil ? .secondary : .primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
                 Spacer()
                 Button("Close", action: onClose)
                     .keyboardShortcut(.cancelAction)
@@ -164,6 +170,10 @@ struct MCPSecretConnectionForm: View {
         return "\(server.name) (\(host))\(marker)"
     }
 
+    private var selectedServerHost: String? {
+        selectedServer.map { URL(string: $0.url)?.host ?? $0.url }
+    }
+
     private func loadServers() {
         let connector = connector
 
@@ -172,7 +182,7 @@ struct MCPSecretConnectionForm: View {
                 servers = try await offMainActor { try connector.configEditor.userScopeHTTPServers() }
 
                 if selectedServerName == nil || selectedServer == nil {
-                    selectedServerName = servers.first?.name
+                    selectedServerName = MCPSecretHeadersHelper.defaultServerName(forSecretNamed: secretName, among: servers)
                 }
             } catch {
                 errorMessage = error.localizedDescription
