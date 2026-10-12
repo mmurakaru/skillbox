@@ -78,26 +78,46 @@ struct DirectoryWatcherTests {
         #expect(DirectoryWatcher(urls: [missing], watchesMissingPathsThroughAncestors: false) {} == nil)
     }
 
-    @Test func releasingWatchersWhileEventsArriveOffMainWaitsForInFlightCallbacks() async throws {
+    @Test func noCallbackRunsAfterReleasingAWatcherWithQueuedEvents() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("skillbox-watchrelease-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        let eventQueue = DispatchQueue(label: "watcher-release-test", qos: .utility)
-        let writer = Task.detached {
-            var index = 0
-            while !Task.isCancelled {
-                try? "\(index)".write(to: root.appendingPathComponent("file-\(index % 8).txt"), atomically: true, encoding: .utf8)
-                index += 1
-            }
-        }
-        defer { writer.cancel() }
+        let eventQueue = DispatchQueue(label: "watcher-release-test")
+        let progress = WatcherCallbackProgress()
+        let holder = WatcherHolder()
+        holder.watcher = DirectoryWatcher(urls: [root], eventQueue: eventQueue) { _ in
+            progress.recordCallback()
+            return true
+        } onChange: {}
+        #expect(holder.watcher != nil)
 
-        for _ in 0..<40 {
-            var watcher = DirectoryWatcher(urls: [root], eventQueue: eventQueue, acceptsPath: { _ in Thread.sleep(forTimeInterval: 0.002); return true }) {}
-            #expect(watcher != nil)
-            try await Task.sleep(for: .milliseconds(15))
-            watcher = nil
-        }
+        // Holding the queue makes FSEvents queue its callback behind this block, so release races a pending callback.
+        eventQueue.async { Thread.sleep(forTimeInterval: 0.8) }
+        try "change".write(to: root.appendingPathComponent("file.txt"), atomically: true, encoding: .utf8)
+        try await Task.sleep(for: .milliseconds(400))
+        await Task.detached { releaseWatcher(holder: holder, progress: progress) }.value
+        try await Task.sleep(for: .milliseconds(800))
+
+        #expect(progress.callbacksAfterRelease == 0)
+    }
+
+    @Test func eventsQueuedBehindABusyEventQueueAreDeliveredOnceItFrees() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("skillbox-watchbusy-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let eventQueue = DispatchQueue(label: "watcher-busy-test")
+        let progress = WatcherCallbackProgress()
+        let watcher = DirectoryWatcher(urls: [root], eventQueue: eventQueue) { _ in
+            progress.recordCallback()
+            return true
+        } onChange: {}
+        defer { withExtendedLifetime(watcher) {} }
+
+        eventQueue.async { Thread.sleep(forTimeInterval: 0.8) }
+        try "change".write(to: root.appendingPathComponent("file.txt"), atomically: true, encoding: .utf8)
+        try await Task.sleep(for: .milliseconds(1600))
+
+        #expect(progress.callbackCount > 0)
     }
 
     @Test func eventsOnAPrivateQueueStillCallBackOnTheMainThread() async throws {
@@ -115,4 +135,28 @@ struct DirectoryWatcherTests {
         try await waitUntil { !callbacksOnMainThread.isEmpty }
         #expect(callbacksOnMainThread.allSatisfy { $0 })
     }
+}
+
+private func releaseWatcher(holder: WatcherHolder, progress: WatcherCallbackProgress) {
+    holder.watcher = nil
+    progress.markReleased()
+}
+
+/// Counts callbacks from the watcher's queue that arrive after the test released the watcher.
+private final class WatcherCallbackProgress: @unchecked Sendable {
+    private let lock = NSLock()
+    private var released = false
+    private var lateCallbacks = 0
+    private var totalCallbacks = 0
+
+    var callbacksAfterRelease: Int { lock.withLock { lateCallbacks } }
+    var callbackCount: Int { lock.withLock { totalCallbacks } }
+
+    func markReleased() { lock.withLock { released = true } }
+    func recordCallback() { lock.withLock { totalCallbacks += 1; if released { lateCallbacks += 1 } } }
+}
+
+/// Lets the test release the watcher from a background thread.
+private final class WatcherHolder: @unchecked Sendable {
+    var watcher: DirectoryWatcher?
 }
