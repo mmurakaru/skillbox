@@ -1,5 +1,11 @@
 # skillbox
 
+## 0.9.2
+
+### Patch Changes
+
+- [#32](https://github.com/mmurakaru/skillbox/pull/32) [`14fadb2`](https://github.com/mmurakaru/skillbox/commit/14fadb2c9e2e237c3c9bb024f448f410768364f2) Thanks [@mmurakaru](https://github.com/mmurakaru)! - Open the add env var and MCP server connection forms in regular windows, so clicking them no longer closes the menu bar panel.
+
 ## 0.9.1
 
 ### Patch Changes
