@@ -9,7 +9,9 @@ struct EnvSecretDetectionTests {
         #expect(EnvSecretDetection.nameLooksSecret(name))
     }
 
-    @Test(arguments: ["CLAUDE_CODE_DISABLE_THINKING", "API_TIMEOUT_MS", "EXAMPLE_BASE_URL", "GIT_AUTHOR_NAME", "OAUTH_CALLBACK_URL", "KEYBOARD_LAYOUT"])
+    @Test(arguments: [
+        "CLAUDE_CODE_DISABLE_THINKING", "API_TIMEOUT_MS", "EXAMPLE_BASE_URL", "GIT_AUTHOR_NAME", "OAUTH_CALLBACK_URL", "KEYBOARD_LAYOUT",
+    ])
     func nameLooksSecret_plainNames_areNotSecret(name: String) {
         #expect(!EnvSecretDetection.nameLooksSecret(name))
     }

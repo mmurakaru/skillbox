@@ -14,6 +14,7 @@ enum SecretPasteboard {
         pasteboard.setString(value, forType: .string)
         pasteboard.setString("", forType: concealedPasteboardType)
         let copiedChangeCount = pasteboard.changeCount
+
         Task {
             try? await Task.sleep(for: delay)
             clearIfUnchanged(pasteboard, since: copiedChangeCount)

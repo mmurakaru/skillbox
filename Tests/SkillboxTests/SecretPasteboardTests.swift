@@ -1,11 +1,13 @@
 import AppKit
 import Testing
+
 @testable import Skillbox
 
 @MainActor
 struct SecretPasteboardTests {
     @Test func copyConcealed_clearsTheSecretAfterTheDelay() async throws {
         let pasteboard = NSPasteboard.withUniqueName()
+
         defer { pasteboard.releaseGlobally() }
 
         SecretPasteboard.copyConcealed("example-secret", to: pasteboard, clearAfter: .milliseconds(50))
@@ -18,6 +20,7 @@ struct SecretPasteboardTests {
 
     @Test func copyConcealed_keepsANewerCopy() async throws {
         let pasteboard = NSPasteboard.withUniqueName()
+
         defer { pasteboard.releaseGlobally() }
 
         SecretPasteboard.copyConcealed("example-secret", to: pasteboard, clearAfter: .milliseconds(50))

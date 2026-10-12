@@ -25,6 +25,7 @@ struct MCPSecretConnectionSheet: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 fieldLabel("Server")
+
                 if servers.isEmpty {
                     Text("No user-scope HTTP MCP servers found in the Claude Code config.")
                         .font(.system(size: 11))
@@ -56,10 +57,12 @@ struct MCPSecretConnectionSheet: View {
                 .frame(width: 110)
             }
 
-            Text("Claude Code runs a helper on each connection that reads the secret from the Keychain. Existing static headers and plaintext env copies stay as a fallback until you remove them.")
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(
+                "Claude Code runs a helper on each connection that reads the secret from the Keychain. Existing static headers and plaintext env copies stay as a fallback until you remove them."
+            )
+            .font(.system(size: 10))
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
 
             if let selectedServer, selectedServerUsesThisSecret, !cleanupItems(for: selectedServer).isEmpty {
                 fallbackCleanup(for: selectedServer)
@@ -97,25 +100,32 @@ struct MCPSecretConnectionSheet: View {
 
     private var selectedServerUsesThisSecret: Bool {
         guard let helper = selectedServer?.headersHelper else { return false }
+
         return MCPSecretHeadersHelper.commandReadsSecret(helper, secretName: secretName)
     }
 
     private func cleanupItems(for server: ClaudeHTTPMCPServer) -> [String] {
         var items: [String] = []
+
         if server.staticHeaderNames.contains(headerName) { items.append("the static \(headerName) header") }
+
         if !plaintextCopies.isEmpty {
             items.append(plaintextCopies.count == 1 ? "1 env copy" : "\(plaintextCopies.count) env copies")
         }
+
         return items
     }
 
     private func fallbackCleanup(for server: ClaudeHTTPMCPServer) -> some View {
         let items = cleanupItems(for: server).joined(separator: " and ")
+
         return VStack(alignment: .leading, spacing: 6) {
             if isConfirmingCleanup {
-                Text("Sessions that started before the helper was added still use \(items) until they restart or reconnect. Remove \(items) now?")
-                    .font(.system(size: 11))
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(
+                    "Sessions that started before the helper was added still use \(items) until they restart or reconnect. Remove \(items) now?"
+                )
+                .font(.system(size: 11))
+                .fixedSize(horizontal: false, vertical: true)
                 HStack {
                     Button("Cancel") { isConfirmingCleanup = false }
                         .controlSize(.small)
@@ -148,15 +158,19 @@ struct MCPSecretConnectionSheet: View {
 
     private func serverLabel(_ server: ClaudeHTTPMCPServer) -> String {
         let host = URL(string: server.url)?.host ?? server.url
-        let marker = server.headersHelper.map { MCPSecretHeadersHelper.commandReadsSecret($0, secretName: secretName) } == true ? " - connected" : ""
+        let marker =
+            server.headersHelper.map { MCPSecretHeadersHelper.commandReadsSecret($0, secretName: secretName) } == true ? " - connected" : ""
+
         return "\(server.name) (\(host))\(marker)"
     }
 
     private func loadServers() {
         let connector = connector
+
         Task {
             do {
                 servers = try await offMainActor { try connector.configEditor.userScopeHTTPServers() }
+
                 if selectedServerName == nil || selectedServer == nil {
                     selectedServerName = servers.first?.name
                 }
@@ -174,6 +188,7 @@ struct MCPSecretConnectionSheet: View {
         let secretName = secretName
         let headerName = headerName
         let valuePrefix = valuePrefix
+
         Task {
             do {
                 try await offMainActor {
@@ -193,6 +208,7 @@ struct MCPSecretConnectionSheet: View {
         let headerName = headerName
         let serverName = server.name
         let removesStaticHeader = server.staticHeaderNames.contains(headerName)
+
         Task {
             do {
                 try await PlaintextSecretCleanup(

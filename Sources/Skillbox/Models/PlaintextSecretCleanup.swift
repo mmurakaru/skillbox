@@ -26,11 +26,13 @@ struct PlaintextSecretCleanup {
             }
         }
         var removed: [String] = []
+
         do {
             if let removeStaticHeader {
                 try await removeStaticHeader()
                 removed.append("the static header")
             }
+
             for plaintextCopy in plaintextCopies {
                 try removePlaintextCopy(plaintextCopy)
                 removed.append("\(plaintextCopy.key) from \(plaintextCopy.fileURL.lastPathComponent)")

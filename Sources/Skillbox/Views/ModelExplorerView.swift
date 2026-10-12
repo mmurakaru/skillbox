@@ -120,6 +120,7 @@ struct ModelExplorerView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                     }
+
                     ForEach(explorer.displayedResults) { hubModel in
                         HuggingFaceHubModelRowView(
                             model: hubModel,
@@ -136,6 +137,7 @@ struct ModelExplorerView: View {
 
     private var unknownSizeNote: String {
         let count = explorer.unknownSizeCountHiddenByFilter
+
         return count == 1
             ? "1 repo is hidden because its name has no parameter count."
             : "\(count) repos are hidden because their names have no parameter count."
@@ -143,7 +145,9 @@ struct ModelExplorerView: View {
 
     private var emptyResultsMessage: String {
         if explorer.results.isEmpty { return "No models found" }
+
         guard explorer.unknownSizeCountHiddenByFilter > 0 else { return "No models in this size range" }
+
         return "No models in this size range. \(unknownSizeNote)"
     }
 

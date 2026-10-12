@@ -110,7 +110,8 @@ struct LocalModelRowView: View {
 
             if canMoveToTrash {
                 if runtimeState == nil {
-                    RowHoverActionButton(systemImage: "trash", help: "Move to Trash", accessibilityLabel: "Move \(model.name) to the Trash") {
+                    RowHoverActionButton(systemImage: "trash", help: "Move to Trash", accessibilityLabel: "Move \(model.name) to the Trash")
+                    {
                         isConfirmingTrash = true
                     }
                 } else {

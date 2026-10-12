@@ -60,13 +60,16 @@ enum JSONMemberTextEditor {
         if let leftNumber = left as? NSNumber, let rightNumber = right as? NSNumber {
             return isBoolean(leftNumber) == isBoolean(rightNumber) && leftNumber == rightNumber
         }
+
         if let leftObject = left as? [String: Any], let rightObject = right as? [String: Any] {
             return leftObject.count == rightObject.count
                 && leftObject.allSatisfy { key, value in rightObject[key].map { jsonValuesEqual(value, $0) } ?? false }
         }
+
         if let leftArray = left as? [Any], let rightArray = right as? [Any] {
             return leftArray.count == rightArray.count && zip(leftArray, rightArray).allSatisfy { jsonValuesEqual($0, $1) }
         }
+
         return (left as AnyObject).isEqual(right)
     }
 

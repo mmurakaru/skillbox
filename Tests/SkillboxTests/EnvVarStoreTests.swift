@@ -413,13 +413,17 @@ struct EnvVarStoreTests {
 
     @Test func purgeStashedSecrets_removesOnlySecretStashEntries() throws {
         let home = try makeTempHome()
+
         defer { try? FileManager.default.removeItem(at: home) }
         let settings = home.appendingPathComponent("settings.json")
+
         try "{}".write(to: settings, atomically: true, encoding: .utf8)
         let stash = home.appendingPathComponent("skillbox-env-stash.json")
+
         try #"{"\#(settings.path)": {"EXAMPLE_API_TOKEN": "abc", "EXAMPLE_FLAG": "1"}}"#
             .write(to: stash, atomically: true, encoding: .utf8)
         let store = EnvVarStore()
+
         store.configure(claudeHomePath: home.path)
 
         try store.purgeStashedSecrets()

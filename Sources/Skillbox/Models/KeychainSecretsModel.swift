@@ -55,9 +55,12 @@ final class KeychainSecretsModel {
     /// Keychain secrets show under "All scopes" and the Keychain filter, never under a settings scope.
     func visibleSecretNames(scopeKey: String?, searchQuery: String) -> [String] {
         let key = scopeKey ?? ""
+
         guard key.isEmpty || key == EnvVarStore.keychainScopeKey else { return [] }
         let trimmed = searchQuery.trimmingCharacters(in: .whitespaces)
+
         guard !trimmed.isEmpty else { return secretNames }
+
         return secretNames.filter { $0.localizedCaseInsensitiveContains(trimmed) }
     }
 
@@ -65,9 +68,11 @@ final class KeychainSecretsModel {
     func addSecret(named name: String, value: String) async throws {
         try KeychainSecretValidation.validateName(name)
         try KeychainSecretValidation.validateValue(value)
+
         if try await offMainActor({ try $0.secretNames() }).contains(name) {
             throw KeychainSecretsModelError.secretAlreadyExists(name)
         }
+
         try await writeAndVerifyNewSecret(named: name, value: value)
         await reload()
     }
@@ -86,13 +91,16 @@ final class KeychainSecretsModel {
     func copyEnvSecretToKeychain(_ envVar: EnvVar) async throws {
         try KeychainSecretValidation.validateName(envVar.key)
         try KeychainSecretValidation.validateValue(envVar.value)
+
         if try await offMainActor({ try $0.secretNames() }).contains(envVar.key) {
             guard try await readSecretValue(named: envVar.key) == envVar.value else {
                 throw KeychainSecretsModelError.keychainHoldsDifferentValue(envVar.key)
             }
             await reload()
+
             return
         }
+
         try await writeAndVerifyNewSecret(named: envVar.key, value: envVar.value)
         await reload()
     }
@@ -100,6 +108,7 @@ final class KeychainSecretsModel {
     /// True when the Keychain holds this env var's exact value, so removing the plaintext copy loses nothing.
     func keychainHoldsSameValue(as envVar: EnvVar) async -> Bool {
         guard containsSecret(named: envVar.key) else { return false }
+
         return (try? await readSecretValue(named: envVar.key)) == envVar.value
     }
 
@@ -109,10 +118,13 @@ final class KeychainSecretsModel {
             try store.writeSecretValue(value, named: name)
             guard (try? store.readSecretValue(named: name)) == value else {
                 try? store.deleteSecret(named: name)
+
                 return false
             }
+
             return true
         }
+
         guard matches else { throw KeychainSecretsModelError.readBackMismatch(name) }
     }
 
@@ -121,6 +133,7 @@ final class KeychainSecretsModel {
         _ work: @escaping @Sendable (any KeychainSecretStoring) throws -> Value
     ) async throws -> Value {
         let store = secretStore
+
         return try await Task.detached { try work(store) }.value
     }
 }

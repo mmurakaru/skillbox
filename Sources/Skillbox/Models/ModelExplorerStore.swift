@@ -38,12 +38,14 @@ final class ModelExplorerStore {
     /// Repos the size filter hides only because their name has no parameter count.
     var unknownSizeCountHiddenByFilter: Int {
         guard sizeBucket != .any else { return 0 }
+
         return results.filter { ModelParameterSizeBucket.billions(from: $0.parameterHint) == nil }.count
     }
 
     func search() async {
         searchGeneration += 1
         let generation = searchGeneration
+
         query.resultLimit = sizeBucket == .any ? HuggingFaceHubQuery.defaultResultLimit : HuggingFaceHubQuery.sizeFilteredResultLimit
         let submittedQuery = query
 

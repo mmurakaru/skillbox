@@ -44,8 +44,10 @@ struct HuggingFaceCacheScannerTests {
 
     @Test func identicalBlobSetsShareADigestButAForkWithOnlyTheLargestBlobDoesNot() throws {
         let hub = try ModelInventoryTestDirectory()
+
         try makeRepository(in: hub, folder: "models--Lab--Model", blobs: [("aaa", 1000), ("bbb", 4000)], snapshotFile: "model.safetensors")
-        try makeRepository(in: hub, folder: "models--Mirror--Model", blobs: [("aaa", 1000), ("bbb", 4000)], snapshotFile: "model.safetensors")
+        try makeRepository(
+            in: hub, folder: "models--Mirror--Model", blobs: [("aaa", 1000), ("bbb", 4000)], snapshotFile: "model.safetensors")
         try makeRepository(in: hub, folder: "models--Fork--Model", blobs: [("bbb", 4000), ("ccc", 200)], snapshotFile: "model.safetensors")
 
         let digests = Dictionary(uniqueKeysWithValues: HuggingFaceCacheScanner(root: hub.url).scan().map { ($0.name, $0.digest) })

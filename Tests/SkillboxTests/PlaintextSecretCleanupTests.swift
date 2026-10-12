@@ -57,7 +57,9 @@ struct PlaintextSecretCleanupTests {
             removePlaintextCopy: { _ in throw ExampleRemovalError() }
         )
 
-        await #expect(throws: PlaintextSecretCleanupError.partiallyRemoved(removed: ["the static header"], reason: "settings.json is read-only.")) {
+        await #expect(
+            throws: PlaintextSecretCleanupError.partiallyRemoved(removed: ["the static header"], reason: "settings.json is read-only.")
+        ) {
             try await cleanup.run()
         }
     }

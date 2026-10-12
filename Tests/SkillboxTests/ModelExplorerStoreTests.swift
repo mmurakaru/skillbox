@@ -33,6 +33,7 @@ struct ModelExplorerStoreTests {
 
         func search(_ query: HuggingFaceHubQuery) async throws -> [HuggingFaceHubModel] {
             lock.withLock { limits.append(query.resultLimit) }
+
             return [HuggingFaceHubModel(id: "org/Model-8B"), HuggingFaceHubModel(id: "org/model-without-size")]
         }
     }
@@ -128,6 +129,7 @@ struct ModelExplorerStoreTests {
 
     @Test func sizeFilterAsksForMoreReposAndCountsTheOnesWithoutASize() async {
         let cacheURL = temporaryCacheURL()
+
         defer { try? FileManager.default.removeItem(at: cacheURL.deletingLastPathComponent()) }
         let client = LimitRecordingSearch()
         let store = ModelExplorerStore(client: client, cacheURL: cacheURL)

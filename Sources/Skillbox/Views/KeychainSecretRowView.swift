@@ -19,6 +19,7 @@ struct KeychainSecretRowView: View {
     var body: some View {
         ZStack {
             if isConfirmingDelete { normalContent.hidden() }
+
             if isConfirmingDelete { confirmDeleteContent } else { normalContent }
         }
         .padding(.horizontal, 10)
@@ -57,7 +58,9 @@ struct KeychainSecretRowView: View {
                     .truncationMode(.tail)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .help("\(secretName)\nsecret - stored in the login Keychain, not in settings.json or agent environments\nreadable without a prompt by processes running as you through the security tool")
+            .help(
+                "\(secretName)\nsecret - stored in the login Keychain, not in settings.json or agent environments\nreadable without a prompt by processes running as you through the security tool"
+            )
 
             rowButton(
                 systemName: revealedValue == nil ? "eye" : "eye.slash",
@@ -98,10 +101,10 @@ struct KeychainSecretRowView: View {
                 .foregroundStyle(.orange)
                 .frame(width: 18)
             Text("Delete ")
-                .font(.system(size: 12)) +
-            Text(secretName)
-                .font(.system(size: 12, weight: .semibold, design: .monospaced)) +
-            Text(" from the Keychain?")
+                .font(.system(size: 12))
+                + Text(secretName)
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                + Text(" from the Keychain?")
                 .font(.system(size: 12))
             Spacer()
             Button("Cancel") { isConfirmingDelete = false }
@@ -120,8 +123,10 @@ struct KeychainSecretRowView: View {
     private func toggleReveal() {
         if revealedValue != nil {
             revealedValue = nil
+
             return
         }
+
         Task {
             do { revealedValue = try await readValue() } catch { onError(error) }
         }
