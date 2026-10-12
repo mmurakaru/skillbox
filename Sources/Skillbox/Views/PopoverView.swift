@@ -15,9 +15,9 @@ enum AppTab: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .skills: "Skills"
-        case .memory: "Claude Code memory"
-        case .hooks: "Claude Code hooks"
-        case .env: "Claude Code env"
+        case .memory: "Memory"
+        case .hooks: "Hooks"
+        case .env: "Env"
         case .usage: "Usage"
         case .models: "Models"
         case .explore: "Explore"
