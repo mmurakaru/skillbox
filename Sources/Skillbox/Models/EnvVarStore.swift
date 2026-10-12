@@ -167,6 +167,20 @@ final class EnvVarStore {
         rescan()
     }
 
+    /// Secrets disabled before secret detection existed still sit in the plaintext stash.
+    var stashedSecrets: [EnvVar] {
+        items.filter { $0.isSecret && $0.state == .disabled }
+    }
+
+    func purgeStashedSecrets() throws {
+        for envVar in stashedSecrets {
+            try writeStashChange(filePath: envVar.fileURL.path) { entries in
+                entries.removeValue(forKey: envVar.key)
+            }
+        }
+        rescan()
+    }
+
     /// Permanently remove from settings.json AND the stash.
     func delete(_ envVar: EnvVar) throws {
         try? removeFromSettings(key: envVar.key, fileURL: envVar.fileURL)
