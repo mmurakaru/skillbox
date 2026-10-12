@@ -6,7 +6,7 @@ struct MCPSecretConnectionSheet: View {
     let connector: MCPSecretConnector
     /// Settings.json copies of this secret that keep it in every agent subprocess environment.
     let plaintextCopies: [EnvVar]
-    let keychainHoldsSameValue: (EnvVar) -> Bool
+    let keychainHoldsSameValue: (EnvVar) async -> Bool
     let onRemovePlaintextCopy: (EnvVar) throws -> Void
     let onClose: () -> Void
 
@@ -153,13 +153,16 @@ struct MCPSecretConnectionSheet: View {
     }
 
     private func loadServers() {
-        do {
-            servers = try connector.configEditor.userScopeHTTPServers()
-            if selectedServerName == nil || selectedServer == nil {
-                selectedServerName = servers.first?.name
+        let connector = connector
+        Task {
+            do {
+                servers = try await offMainActor { try connector.configEditor.userScopeHTTPServers() }
+                if selectedServerName == nil || selectedServer == nil {
+                    selectedServerName = servers.first?.name
+                }
+            } catch {
+                errorMessage = error.localizedDescription
             }
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 
@@ -167,33 +170,50 @@ struct MCPSecretConnectionSheet: View {
         guard let serverName = selectedServerName else { return }
         errorMessage = nil
         statusMessage = nil
-        do {
-            try connector.connect(secretName: secretName, serverName: serverName, headerName: headerName, valuePrefix: valuePrefix)
-            statusMessage = "\(serverName) reads \(headerName) from the Keychain on its next connection."
-            loadServers()
-        } catch {
-            errorMessage = error.localizedDescription
+        let connector = connector
+        let secretName = secretName
+        let headerName = headerName
+        let valuePrefix = valuePrefix
+        Task {
+            do {
+                try await offMainActor {
+                    try connector.connect(secretName: secretName, serverName: serverName, headerName: headerName, valuePrefix: valuePrefix)
+                }
+                statusMessage = "\(serverName) reads \(headerName) from the Keychain on its next connection."
+                loadServers()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
     private func removeFallbacks(from server: ClaudeHTTPMCPServer) {
         errorMessage = nil
-        do {
-            let removesStaticHeader = server.staticHeaderNames.contains(headerName)
-            try PlaintextSecretCleanup(
-                plaintextCopies: plaintextCopies,
-                keychainHoldsSameValue: keychainHoldsSameValue,
-                removeStaticHeader: removesStaticHeader
-                    ? { try connector.removeStaticHeader(named: headerName, fromServer: server.name) }
-                    : nil,
-                removePlaintextCopy: onRemovePlaintextCopy
-            ).run()
-            isConfirmingCleanup = false
-            statusMessage = "\(server.name) now reads \(headerName) only from the Keychain."
-            loadServers()
-        } catch {
-            errorMessage = error.localizedDescription
+        let connector = connector
+        let headerName = headerName
+        let serverName = server.name
+        let removesStaticHeader = server.staticHeaderNames.contains(headerName)
+        Task {
+            do {
+                try await PlaintextSecretCleanup(
+                    plaintextCopies: plaintextCopies,
+                    keychainHoldsSameValue: keychainHoldsSameValue,
+                    removeStaticHeader: removesStaticHeader
+                        ? { try await offMainActor { try connector.removeStaticHeader(named: headerName, fromServer: serverName) } }
+                        : nil,
+                    removePlaintextCopy: onRemovePlaintextCopy
+                ).run()
+                isConfirmingCleanup = false
+                statusMessage = "\(serverName) now reads \(headerName) only from the Keychain."
+            } catch {
+                errorMessage = error.localizedDescription
+            }
             loadServers()
         }
+    }
+
+    /// The config lock can spin for seconds and the helper check starts a shell, so neither may block the panel.
+    private func offMainActor<Value: Sendable>(_ work: @escaping @Sendable () throws -> Value) async throws -> Value {
+        try await Task.detached(operation: work).value
     }
 }

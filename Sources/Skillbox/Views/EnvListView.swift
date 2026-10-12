@@ -105,7 +105,7 @@ struct EnvListView: View {
                 secretName: target.secretName,
                 connector: MCPSecretConnector(),
                 plaintextCopies: plaintextCopies(ofSecretNamed: target.secretName),
-                keychainHoldsSameValue: { keychainSecrets.keychainHoldsSameValue(as: $0) },
+                keychainHoldsSameValue: { await keychainSecrets.keychainHoldsSameValue(as: $0) },
                 onRemovePlaintextCopy: { try store.delete($0) },
                 onClose: { mcpConnectionTarget = nil }
             )

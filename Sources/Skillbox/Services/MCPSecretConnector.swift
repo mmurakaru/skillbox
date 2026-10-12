@@ -12,7 +12,7 @@ enum MCPSecretConnectorError: Error, LocalizedError, Equatable {
 }
 
 /// Connects a Keychain secret to a user-scope Claude Code HTTP MCP server through `headersHelper`.
-struct MCPSecretConnector {
+struct MCPSecretConnector: Sendable {
     var configEditor = ClaudeGlobalConfigEditor(configURL: ClaudeGlobalConfigEditor.defaultConfigURL())
     var processRunner: any ProcessRunning = SystemProcessRunner()
 
