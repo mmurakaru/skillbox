@@ -209,6 +209,11 @@ final class EnvVarStore {
     }
 
     /// Permanently remove from settings.json AND the stash.
+    /// Settings.json copies of a secret, which keep it in every agent subprocess environment.
+    func plaintextCopies(ofSecretNamed secretName: String) -> [EnvVar] {
+        items.filter { $0.key == secretName && $0.isSecret }
+    }
+
     func delete(_ envVar: EnvVar) throws {
         try? removeFromSettings(key: envVar.key, fileURL: envVar.fileURL)
         try writeStashChange(filePath: envVar.fileURL.path) { entries in

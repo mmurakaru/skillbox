@@ -4,6 +4,7 @@ import SwiftUI
 struct EnvListView: View {
     @Environment(EnvVarStore.self) private var store
     @Environment(KeychainSecretsModel.self) private var keychainSecrets
+    @Environment(\.openWindow) private var openWindow
 
     @AppStorage("editorCommand") private var editorCommand: String = ""
     @AppStorage("envSelectedScope") private var envSelectedScope: String = ""
@@ -11,10 +12,9 @@ struct EnvListView: View {
     @Binding var selectedEnvID: String?
     @Binding var rowStates: [String: SkillRowView.RowState]
 
-    @State private var showingAddSheet = false
+    @State private var hostingWindow = HostingWindowReference()
     /// Row awaiting confirmation before an enabled secret is disabled (its value is removed).
     @State private var secretDisableConfirmationID: String?
-    @State private var mcpConnectionTarget: MCPConnectionTarget?
     @FocusState private var searchFocused: Bool
     @State private var isConfirmingStashPurge = false
 
@@ -94,42 +94,7 @@ struct EnvListView: View {
 
             return .handled
         }
-        .sheet(isPresented: $showingAddSheet) {
-            EnvAddSheet(
-                availableScopes: store.addableScopes,
-                onAdd: { key, value, destination in
-                    do {
-                        switch destination {
-                        case .settings(let scope):
-                            try store.add(key: key, value: value, scope: scope)
-                        case .keychain:
-                            try await keychainSecrets.addSecret(named: key, value: value)
-                        }
-                        showingAddSheet = false
-
-                        return nil
-                    } catch {
-                        return error.localizedDescription
-                    }
-                },
-                onCancel: { showingAddSheet = false }
-            )
-        }
-        .sheet(item: $mcpConnectionTarget) { target in
-            MCPSecretConnectionSheet(
-                secretName: target.secretName,
-                connector: MCPSecretConnector(),
-                plaintextCopies: plaintextCopies(ofSecretNamed: target.secretName),
-                keychainHoldsSameValue: { await keychainSecrets.keychainHoldsSameValue(as: $0) },
-                onRemovePlaintextCopy: { try store.delete($0) },
-                onClose: { mcpConnectionTarget = nil }
-            )
-        }
-    }
-
-    private struct MCPConnectionTarget: Identifiable {
-        let secretName: String
-        var id: String { secretName }
+        .background(HostingWindowReader { hostingWindow.window = $0 })
     }
 
     private var scopePicker: some View {
@@ -163,7 +128,7 @@ struct EnvListView: View {
     }
 
     private var addButton: some View {
-        Button(action: { showingAddSheet = true }) {
+        Button(action: openAddWindow) {
             Image(systemName: "plus")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.secondary)
@@ -260,7 +225,7 @@ struct EnvListView: View {
                                 secretName: secretName,
                                 readValue: { try await keychainSecrets.readSecretValue(named: secretName) },
                                 onDelete: { performDeleteKeychainSecret(named: secretName) },
-                                onConnectToMCPServer: { mcpConnectionTarget = MCPConnectionTarget(secretName: secretName) },
+                                onConnectToMCPServer: { openMCPConnectionWindow(forSecretNamed: secretName) },
                                 onError: { keychainSecrets.reportError($0) }
                             )
                         }
@@ -343,8 +308,16 @@ struct EnvListView: View {
         }
     }
 
-    private func plaintextCopies(ofSecretNamed secretName: String) -> [EnvVar] {
-        store.items.filter { $0.key == secretName && $0.isSecret }
+    private func openAddWindow() {
+        PanelWindowHandoff.open(closing: hostingWindow.window) {
+            openWindow(id: EnvWindowIdentifier.addEnvVar)
+        }
+    }
+
+    private func openMCPConnectionWindow(forSecretNamed secretName: String) {
+        PanelWindowHandoff.open(closing: hostingWindow.window) {
+            openWindow(id: EnvWindowIdentifier.mcpSecretConnection, value: secretName)
+        }
     }
 
     /// Re-verifies the Keychain value right before deleting, so a changed or missing copy never loses data.

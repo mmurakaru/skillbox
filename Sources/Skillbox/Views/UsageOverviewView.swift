@@ -4,7 +4,7 @@ import SwiftUI
 struct UsageOverviewView: View {
     @Environment(ProviderUsageStore.self) private var store
     @Environment(\.openWindow) private var openWindow
-    @State private var hostingWindow = UsageWindowReference()
+    @State private var hostingWindow = HostingWindowReference()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,12 +29,8 @@ struct UsageOverviewView: View {
                             error: store.errors[provider],
                             isRefreshing: store.refreshing.contains(provider),
                             onEdit: {
-                                let panel = hostingWindow.window
-
-                                NSApp.activate(ignoringOtherApps: true)
-                                openWindow(id: "usage-snapshot", value: provider)
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak panel] in
-                                    panel?.close()
+                                PanelWindowHandoff.open(closing: hostingWindow.window) {
+                                    openWindow(id: "usage-snapshot", value: provider)
                                 }
                             },
                             onUseLive: { Task { await store.refresh(provider, useLive: true, allowKeychainPrompt: provider == .claude) } },
@@ -46,7 +42,7 @@ struct UsageOverviewView: View {
             }
             .scrollEdgeEffectStyle(.soft, for: .all)
         }
-        .background(UsageHostingWindowReader { hostingWindow.window = $0 })
+        .background(HostingWindowReader { hostingWindow.window = $0 })
         .task { await store.refreshAll() }
 
     }
@@ -196,31 +192,4 @@ private struct ProviderUsageCard: View {
             .font(.system(size: 10)).foregroundStyle(.secondary)
         }
     }
-}
-
-/// Captures the containing menu bar window so opening an editor can dismiss that specific panel.
-private struct UsageHostingWindowReader: NSViewRepresentable {
-    let onWindow: (NSWindow?) -> Void
-    func makeNSView(context: Context) -> WindowView {
-        let view = WindowView()
-
-        view.onWindow = onWindow
-
-        return view
-    }
-    func updateNSView(_ nsView: WindowView, context: Context) { nsView.onWindow = onWindow }
-    final class WindowView: NSView {
-        var onWindow: ((NSWindow?) -> Void)?
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            let capturedWindow = window
-
-            DispatchQueue.main.async { [weak self] in self?.onWindow?(capturedWindow) }
-        }
-    }
-}
-
-@MainActor
-private final class UsageWindowReference {
-    weak var window: NSWindow?
 }

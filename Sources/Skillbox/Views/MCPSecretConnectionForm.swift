@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Picks a user-scope HTTP MCP server and wires one Keychain secret into its request headers.
-struct MCPSecretConnectionSheet: View {
+struct MCPSecretConnectionForm: View {
     let secretName: String
     let connector: MCPSecretConnector
     /// Settings.json copies of this secret that keep it in every agent subprocess environment.
