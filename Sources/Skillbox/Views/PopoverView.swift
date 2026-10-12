@@ -7,6 +7,7 @@ enum AppTab: String, CaseIterable, Identifiable {
     case hooks
     case env
     case usage
+    case models
 
     var id: String { rawValue }
 
@@ -17,6 +18,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .hooks: "Hooks"
         case .env: "Env"
         case .usage: "Usage"
+        case .models: "Models"
         }
     }
 
@@ -27,6 +29,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .hooks: "bolt"
         case .env: "lock"
         case .usage: "chart.bar"
+        case .models: "cpu"
         }
     }
 }
@@ -42,6 +45,7 @@ struct PopoverView: View {
     @Environment(MemoryStore.self) private var memoryStore
     @Environment(HookStore.self) private var hookStore
     @Environment(EnvVarStore.self) private var envStore
+    @Environment(LocalModelStore.self) private var localModelStore
     @Environment(RemoteSkillService.self) private var remoteSkillService
     @Environment(SkillOverridesStore.self) private var overridesStore
     @Environment(SkillFolderSync.self) private var skillFolderSync
@@ -164,6 +168,7 @@ struct PopoverView: View {
                     case .hooks: hooksBody
                     case .env: envBody
                     case .usage: UsageOverviewView()
+                    case .models: LocalModelListView()
                     }
                 }
             }
@@ -180,7 +185,7 @@ struct PopoverView: View {
             Text("\(activeCount)")
                 .font(.system(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.secondary)
-                .help(activeTab == .usage ? "3 providers" : "\(activeCount) visible items")
+                .help(activeCountHelp)
             Button(action: showSettings) {
                 Image(systemName: "gearshape").frame(width: 36, height: 32)
             }
@@ -441,6 +446,8 @@ struct PopoverView: View {
                 .keyboardShortcut("4", modifiers: .command)
             Button("") { activeTabRaw = AppTab.usage.rawValue }
                 .keyboardShortcut("5", modifiers: .command)
+            Button("") { activeTabRaw = AppTab.models.rawValue }
+                .keyboardShortcut("6", modifiers: .command)
         }
         .opacity(0)
         .frame(width: 0, height: 0)
@@ -454,6 +461,15 @@ struct PopoverView: View {
         case .hooks: hookStore.filteredHooks.count
         case .env: envStore.filteredEnvVars.count
         case .usage: UsageProvider.allCases.count
+        case .models: localModelStore.filteredModels.count
+        }
+    }
+
+    private var activeCountHelp: String {
+        switch activeTab {
+        case .usage: "\(activeCount) providers"
+        case .models: "\(activeCount) local models"
+        default: "\(activeCount) visible items"
         }
     }
 

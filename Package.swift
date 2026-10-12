@@ -13,9 +13,19 @@ let package = Package(
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.10.0"),
     ],
     targets: [
+        .target(
+            name: "ModelInventory",
+            path: "Sources/ModelInventory"
+        ),
+        .testTarget(
+            name: "ModelInventoryTests",
+            dependencies: ["ModelInventory"],
+            path: "Tests/ModelInventoryTests"
+        ),
         .executableTarget(
             name: "Skillbox",
             dependencies: [
+                "ModelInventory",
                 "Yams",
                 .product(name: "Markdown", package: "swift-markdown"),
                 .product(name: "Sparkle", package: "Sparkle"),

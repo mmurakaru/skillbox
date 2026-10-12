@@ -2,6 +2,7 @@ import SwiftUI
 import ServiceManagement
 import AppKit
 import Sparkle
+import ModelInventory
 
 struct SettingsView: View {
     @Environment(SkillStore.self) private var skillStore
@@ -9,6 +10,7 @@ struct SettingsView: View {
     @Environment(SkillClassificationStore.self) private var classifications
     @Environment(TypeSafeSettings.self) private var typeSafeSettings
     @Environment(InsightsModel.self) private var insightsModel
+    @Environment(LocalModelStore.self) private var localModelStore
     @Environment(\.sparkleUpdater) private var sparkleUpdater
 
     @AppStorage("skillsRootPath") private var skillsRootPath: String = "~/.agents/skills"
@@ -19,6 +21,12 @@ struct SettingsView: View {
     @AppStorage("claudeCommand") private var claudeCommand: String = ""
     @AppStorage("launchAtLogin") private var launchAtLogin: Bool = false
     @AppStorage("syncRemoteSkillsOnLaunch") private var syncRemoteSkillsOnLaunch: Bool = false
+    @AppStorage(LocalModelScanSettings.scanOllamaKey) private var scanOllamaModels: Bool = true
+    @AppStorage(LocalModelScanSettings.scanHuggingFaceKey) private var scanHuggingFaceModels: Bool = true
+    @AppStorage(LocalModelScanSettings.scanLMStudioKey) private var scanLMStudioModels: Bool = true
+    @AppStorage(LocalModelScanSettings.scanOpenWhisprKey) private var scanOpenWhisprModels: Bool = true
+    @AppStorage(LocalModelScanSettings.scanAppSupportKey) private var scanAppSupportModels: Bool = true
+    @AppStorage(LocalModelScanSettings.customPathsKey) private var customModelPaths: String = ""
 
     @State private var detectedEditors: [DetectedEditor] = []
     @State private var isSyncingAll = false
@@ -121,6 +129,8 @@ struct SettingsView: View {
                 Text("Memory")
             }
 
+            localModelsSection
+
             Section {
                 Picker("Editor", selection: $editorCommand) {
                     if detectedEditors.isEmpty {
@@ -208,6 +218,39 @@ struct SettingsView: View {
             detectedEditors = EditorDetector.detect()
             syncLaunchAtLoginFromSystem()
         }
+    }
+
+    private var localModelsSection: some View {
+        Section {
+            Toggle("Ollama", isOn: $scanOllamaModels)
+            Toggle("Hugging Face cache", isOn: $scanHuggingFaceModels)
+            Toggle("LM Studio", isOn: $scanLMStudioModels)
+            Toggle("OpenWhispr", isOn: $scanOpenWhisprModels)
+            Toggle("Application Support model folders", isOn: $scanAppSupportModels)
+            VStack(alignment: .leading, spacing: 6) {
+                TextField("Additional folders", text: $customModelPaths)
+                    .textFieldStyle(.roundedBorder)
+                Text("Comma-separated folders to search for .gguf and .safetensors files.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
+        } header: {
+            Text("Local models")
+        }
+        .onChange(of: localModelScanConfiguration) { _, newConfiguration in
+            localModelStore.configure(newConfiguration)
+        }
+    }
+
+    private var localModelScanConfiguration: LocalModelScanConfiguration {
+        LocalModelScanConfiguration(
+            ollama: scanOllamaModels,
+            huggingFace: scanHuggingFaceModels,
+            lmStudio: scanLMStudioModels,
+            openWhispr: scanOpenWhisprModels,
+            appSupport: scanAppSupportModels,
+            customPaths: LocalModelScanConfiguration.parseCustomPaths(customModelPaths)
+        )
     }
 
     private func browseForFolder(binding: Binding<String>) {
