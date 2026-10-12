@@ -8,6 +8,7 @@ struct SkillboxApp: App {
     @State private var memoryStore = MemoryStore()
     @State private var hookStore = HookStore()
     @State private var envStore = EnvVarStore()
+    @State private var keychainSecretsModel = KeychainSecretsModel()
     @State private var insightsModel: InsightsModel
     @State private var remoteSkillService = RemoteSkillService()
     @State private var overridesStore = SkillOverridesStore()
@@ -59,6 +60,7 @@ struct SkillboxApp: App {
                 .environment(memoryStore)
                 .environment(hookStore)
                 .environment(envStore)
+                .environment(keychainSecretsModel)
                 .environment(insightsModel)
                 .environment(remoteSkillService)
                 .environment(overridesStore)

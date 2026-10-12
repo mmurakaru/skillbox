@@ -37,8 +37,11 @@ final class EnvVarStore {
 
     var searchQuery: String = ""
 
-    /// nil/empty = all scopes, "global" = user global, otherwise = a project path.
+    /// nil/empty = all scopes, "global" = user global, `keychainScopeKey` = Keychain secrets only, otherwise = a project path.
     var selectedScopeKey: String?
+
+    /// Scope filter value that shows only Keychain-backed secrets, which this store does not hold.
+    static let keychainScopeKey = "keychain"
 
     private var watcher: DirectoryWatcher?
     private var watchedPaths: [String] = []
@@ -130,6 +133,7 @@ final class EnvVarStore {
     var filteredEnvVars: [EnvVar] {
         let scoped = items.filter { item in
             guard let key = selectedScopeKey, !key.isEmpty else { return true }
+            if key == Self.keychainScopeKey { return false }
             if key == "global" {
                 if case .userGlobal = item.scope { return true }
                 return false
@@ -193,21 +197,15 @@ final class EnvVarStore {
     /// Add a brand-new env var. Creates the settings.json file if missing.
     /// Throws `.duplicateKey` if the key already exists in that scope (enabled or disabled).
     /// Throws `.secretInSharedProjectScope` for a secret aimed at the committed project file.
-    func add(key: String, value: String, scope: EnvScope, markedAsSecret: Bool = false) throws {
+    func add(key: String, value: String, scope: EnvScope) throws {
         let fileURL = settingsURL(for: scope)
 
         // Check for collisions against current state.
         if items.contains(where: { $0.fileURL.path == fileURL.path && $0.key == key }) {
             throw EnvVarStoreError.duplicateKey(key)
         }
-        let isSecret = markedAsSecret || EnvSecretDetection.isSecret(key: key, markedSecretNames: markedSecretNames)
-        if isSecret, scope.isSharedWithVersionControl {
+        if EnvSecretDetection.isSecret(key: key, markedSecretNames: markedSecretNames), scope.isSharedWithVersionControl {
             throw EnvVarStoreError.secretInSharedProjectScope(key)
-        }
-        let writesSecretMark = markedAsSecret && !EnvSecretDetection.nameLooksSecret(key) && !markedSecretNames.contains(key)
-        // The mark is name-wide, so other vars with this name must pass its guards before the value is written.
-        if writesSecretMark {
-            try validateSecretMark(forName: key)
         }
 
         try ensureParentDirectory(for: fileURL)
@@ -215,9 +213,6 @@ final class EnvVarStore {
             var env = (root["env"] as? [String: Any]) ?? [:]
             env[key] = value
             root["env"] = env
-        }
-        if writesSecretMark {
-            try saveSecretMark(true, forName: key)
         }
         rescan()
     }
@@ -408,7 +403,7 @@ final class EnvVarStore {
     }
 
     private func ensureValidSelection() {
-        guard let key = selectedScopeKey, !key.isEmpty else { return }
+        guard let key = selectedScopeKey, !key.isEmpty, key != Self.keychainScopeKey else { return }
         if key == "global" {
             if globalCount == 0 { selectedScopeKey = nil }
             return
