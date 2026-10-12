@@ -27,7 +27,8 @@ public actor DuplicateModelDetector {
         var modelsByKey: [String: [LocalModel]] = [:]
         var modelsNeedingHash: [LocalModel] = []
 
-        for model in models {
+        // Shared blobs are one copy on disk, so tags that point at them are not reclaimable duplicates.
+        for model in models where model.sharedBlobSizes.isEmpty {
             if let digest = model.digest {
                 modelsByKey["digest:\(digest)", default: []].append(model)
             } else {

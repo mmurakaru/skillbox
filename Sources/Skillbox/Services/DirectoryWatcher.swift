@@ -5,30 +5,46 @@ import CoreServices
 final class DirectoryWatcher {
     private var stream: FSEventStreamRef?
     private var debounceWorkItem: DispatchWorkItem?
+    private let debounceLock = NSLock()
     private let watchedPaths: [String]
     private let onChange: () -> Void
     private let acceptsPath: (String) -> Bool
+    private let eventQueue: DispatchQueue
+    /// Directories the FSEvents stream is rooted at, after resolving symlinks and missing paths.
+    let streamRootPaths: Set<String>
 
     convenience init?(url: URL, acceptsPath: @escaping (String) -> Bool = { _ in true }, onChange: @escaping () -> Void) {
         self.init(urls: [url], acceptsPath: acceptsPath, onChange: onChange)
     }
 
-    init?(urls: [URL], acceptsPath: @escaping (String) -> Bool = { _ in true }, onChange: @escaping () -> Void) {
+    /// Turn off `watchesMissingPathsThroughAncestors` for large trees: a missing path's nearest ancestor can be the home folder.
+    init?(
+        urls: [URL],
+        watchesMissingPathsThroughAncestors: Bool = true,
+        eventQueue: DispatchQueue = .main,
+        acceptsPath: @escaping (String) -> Bool = { _ in true },
+        onChange: @escaping () -> Void
+    ) {
         watchedPaths = urls.map { $0.resolvingSymlinksInPath().standardizedFileURL.path }
         self.onChange = onChange
         self.acceptsPath = acceptsPath
-        let roots = Set(watchedPaths.map { path in
+        self.eventQueue = eventQueue
+        streamRootPaths = Set(watchedPaths.compactMap { path in
             var root = URL(fileURLWithPath: path)
             var directory: ObjCBool = false
             if FileManager.default.fileExists(atPath: path, isDirectory: &directory), !directory.boolValue {
                 root.deleteLastPathComponent()
             }
-            // Watch an existing ancestor so missing roots and files can appear later.
+            guard watchesMissingPathsThroughAncestors else {
+                return FileManager.default.fileExists(atPath: root.path) ? root.path : nil
+            }
             while !FileManager.default.fileExists(atPath: root.path), root.path != "/" {
                 root.deleteLastPathComponent()
             }
             return root.path
         })
+        guard !streamRootPaths.isEmpty else { return nil }
+        let roots = streamRootPaths
         var context = FSEventStreamContext(
             version: 0, info: Unmanaged.passUnretained(self).toOpaque(),
             retain: nil, release: nil, copyDescription: nil
@@ -46,7 +62,7 @@ final class DirectoryWatcher {
             }
         }, &context, Array(roots) as CFArray, FSEventStreamEventId(kFSEventStreamEventIdSinceNow), 0.2, flags)
         guard let stream else { return nil }
-        FSEventStreamSetDispatchQueue(stream, .main)
+        FSEventStreamSetDispatchQueue(stream, eventQueue)
         guard FSEventStreamStart(stream) else {
             FSEventStreamInvalidate(stream)
             FSEventStreamRelease(stream)
@@ -62,15 +78,19 @@ final class DirectoryWatcher {
         }
     }
 
+    /// Runs on the event queue; the debounce lives there too so only the final callback hops to the main thread.
     private func scheduleChange() {
-        debounceWorkItem?.cancel()
-        let work = DispatchWorkItem { [weak self] in self?.onChange() }
-        debounceWorkItem = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: work)
+        let onChange = self.onChange
+        let work = DispatchWorkItem { DispatchQueue.main.async(execute: onChange) }
+        debounceLock.withLock {
+            debounceWorkItem?.cancel()
+            debounceWorkItem = work
+        }
+        eventQueue.asyncAfter(deadline: .now() + 0.2, execute: work)
     }
 
     deinit {
-        debounceWorkItem?.cancel()
+        debounceLock.withLock { debounceWorkItem?.cancel() }
         if let stream {
             FSEventStreamStop(stream)
             FSEventStreamInvalidate(stream)

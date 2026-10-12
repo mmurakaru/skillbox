@@ -37,6 +37,7 @@ struct LocalModelListView: View {
                 try? await Task.sleep(for: .seconds(5))
             }
         }
+        .onAppear { store.watchModelFoldersCreatedSinceLastCheck() }
     }
 
     private func moveToTrash(_ model: LocalModel) {
