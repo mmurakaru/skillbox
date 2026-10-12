@@ -9,7 +9,7 @@ struct EnvProjectSummary: Identifiable, Hashable {
     var id: String { path }
 }
 
-enum EnvVarStoreError: Error, LocalizedError {
+enum EnvVarStoreError: Error, LocalizedError, Equatable {
     case parseFailed
     case duplicateKey(String)
     case secretInSharedProjectScope(String)
@@ -190,6 +190,11 @@ final class EnvVarStore {
         if isSecret, scope.isSharedWithVersionControl {
             throw EnvVarStoreError.secretInSharedProjectScope(key)
         }
+        let writesSecretMark = markedAsSecret && !EnvSecretDetection.nameLooksSecret(key) && !markedSecretNames.contains(key)
+        // The mark is name-wide, so other vars with this name must pass its guards before the value is written.
+        if writesSecretMark {
+            try validateSecretMark(forName: key)
+        }
 
         try ensureParentDirectory(for: fileURL)
         try writeSettingsChange(fileURL: fileURL) { root in
@@ -197,28 +202,35 @@ final class EnvVarStore {
             env[key] = value
             root["env"] = env
         }
-        if markedAsSecret, !EnvSecretDetection.nameLooksSecret(key), !markedSecretNames.contains(key) {
-            try setSecretMark(true, forName: key)
-        } else {
-            rescan()
+        if writesSecretMark {
+            try saveSecretMark(true, forName: key)
         }
+        rescan()
     }
 
     /// Marks or unmarks an env var name as a secret. Names matching the name rule stay secret regardless.
     func setSecretMark(_ marked: Bool, forName key: String) throws {
         if marked {
-            let instances = items.filter { $0.key == key }
-            if instances.contains(where: { $0.scope.isSharedWithVersionControl }) {
-                throw EnvVarStoreError.secretInSharedProjectScope(key)
-            }
-            if instances.contains(where: { !$0.isEnabled }) {
-                throw EnvVarStoreError.secretMarkOnDisabledVar(key)
-            }
+            try validateSecretMark(forName: key)
         }
+        try saveSecretMark(marked, forName: key)
+        rescan()
+    }
+
+    private func validateSecretMark(forName key: String) throws {
+        let instances = items.filter { $0.key == key }
+        if instances.contains(where: { $0.scope.isSharedWithVersionControl }) {
+            throw EnvVarStoreError.secretInSharedProjectScope(key)
+        }
+        if instances.contains(where: { !$0.isEnabled }) {
+            throw EnvVarStoreError.secretMarkOnDisabledVar(key)
+        }
+    }
+
+    private func saveSecretMark(_ marked: Bool, forName key: String) throws {
         var names = secretMarksFile.load()
         if marked { names.insert(key) } else { names.remove(key) }
         try secretMarksFile.save(names)
-        rescan()
     }
 
     // MARK: - Internals (exposed for tests)

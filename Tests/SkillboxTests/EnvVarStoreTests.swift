@@ -324,6 +324,36 @@ struct EnvVarStoreTests {
         }
     }
 
+    @Test func add_markedAsSecret_whenSameNameIsDisabledElsewhere_writesNothing() throws {
+        let project = FileManager.default.temporaryDirectory.appendingPathComponent("skillbox-envstore-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: project) }
+        let store = EnvVarStore(seedItems: [makeEnvVar(key: "DATABASE_URL", state: .disabled)])
+        let localScope = EnvScope.projectLocal(name: "example-project", path: project.path)
+
+        #expect(throws: EnvVarStoreError.secretMarkOnDisabledVar("DATABASE_URL")) {
+            try store.add(key: "DATABASE_URL", value: "postgres://example", scope: localScope, markedAsSecret: true)
+        }
+        #expect(!FileManager.default.fileExists(atPath: store.settingsURL(for: localScope).path))
+    }
+
+    @Test func add_markedAsSecret_whenSameNameSitsInAnotherSharedProjectFile_writesNothing() throws {
+        let project = FileManager.default.temporaryDirectory.appendingPathComponent("skillbox-envstore-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: project) }
+        let store = EnvVarStore(seedItems: [
+            makeEnvVar(
+                key: "DATABASE_URL",
+                scope: .project(name: "other-project", path: "/p/other-project"),
+                fileURL: URL(fileURLWithPath: "/p/other-project/.claude/settings.json")
+            ),
+        ])
+        let localScope = EnvScope.projectLocal(name: "example-project", path: project.path)
+
+        #expect(throws: EnvVarStoreError.secretInSharedProjectScope("DATABASE_URL")) {
+            try store.add(key: "DATABASE_URL", value: "postgres://example", scope: localScope, markedAsSecret: true)
+        }
+        #expect(!FileManager.default.fileExists(atPath: store.settingsURL(for: localScope).path))
+    }
+
     @Test func add_markedAsSecret_whenSettingsWriteFails_persistsNoMark() throws {
         let home = try makeTempHome()
         defer { try? FileManager.default.removeItem(at: home) }
