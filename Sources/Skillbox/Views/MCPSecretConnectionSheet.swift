@@ -6,7 +6,8 @@ struct MCPSecretConnectionSheet: View {
     let connector: MCPSecretConnector
     /// Settings.json copies of this secret that keep it in every agent subprocess environment.
     let plaintextCopies: [EnvVar]
-    let onRemovePlaintextCopies: () throws -> Void
+    let keychainHoldsSameValue: (EnvVar) -> Bool
+    let onRemovePlaintextCopy: (EnvVar) throws -> Void
     let onClose: () -> Void
 
     @State private var servers: [ClaudeHTTPMCPServer] = []
@@ -178,10 +179,15 @@ struct MCPSecretConnectionSheet: View {
     private func removeFallbacks(from server: ClaudeHTTPMCPServer) {
         errorMessage = nil
         do {
-            if server.staticHeaderNames.contains(headerName) {
-                try connector.removeStaticHeader(named: headerName, fromServer: server.name)
-            }
-            try onRemovePlaintextCopies()
+            let removesStaticHeader = server.staticHeaderNames.contains(headerName)
+            try PlaintextSecretCleanup(
+                plaintextCopies: plaintextCopies,
+                keychainHoldsSameValue: keychainHoldsSameValue,
+                removeStaticHeader: removesStaticHeader
+                    ? { try connector.removeStaticHeader(named: headerName, fromServer: server.name) }
+                    : nil,
+                removePlaintextCopy: onRemovePlaintextCopy
+            ).run()
             isConfirmingCleanup = false
             statusMessage = "\(server.name) now reads \(headerName) only from the Keychain."
             loadServers()

@@ -98,7 +98,8 @@ struct EnvListView: View {
                 secretName: target.secretName,
                 connector: MCPSecretConnector(),
                 plaintextCopies: plaintextCopies(ofSecretNamed: target.secretName),
-                onRemovePlaintextCopies: { try removePlaintextCopies(ofSecretNamed: target.secretName) },
+                keychainHoldsSameValue: { keychainSecrets.keychainHoldsSameValue(as: $0) },
+                onRemovePlaintextCopy: { try store.delete($0) },
                 onClose: { mcpConnectionTarget = nil }
             )
         }
@@ -285,21 +286,11 @@ struct EnvListView: View {
         }
     }
 
-    /// Re-verifies the Keychain value right before deleting, so a changed or missing copy never loses data.
     private func plaintextCopies(ofSecretNamed secretName: String) -> [EnvVar] {
         store.items.filter { $0.key == secretName && $0.isSecret }
     }
 
-    /// Each copy is removed only when the Keychain holds its exact value, so no distinct value is lost.
-    private func removePlaintextCopies(ofSecretNamed secretName: String) throws {
-        for envVar in plaintextCopies(ofSecretNamed: secretName) {
-            guard keychainSecrets.keychainHoldsSameValue(as: envVar) else {
-                throw KeychainSecretsModelError.keychainHoldsDifferentValue(envVar.key)
-            }
-            try store.delete(envVar)
-        }
-    }
-
+    /// Re-verifies the Keychain value right before deleting, so a changed or missing copy never loses data.
     private func performRemovePlaintextCopy(_ envVar: EnvVar) {
         guard keychainSecrets.keychainHoldsSameValue(as: envVar) else {
             keychainSecrets.reportError(KeychainSecretsModelError.keychainHoldsDifferentValue(envVar.key))
