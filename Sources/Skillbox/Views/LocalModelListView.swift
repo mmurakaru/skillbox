@@ -6,6 +6,8 @@ import ModelInventory
 struct LocalModelListView: View {
     @Environment(LocalModelStore.self) private var store
 
+    @State private var isWindowVisible = false
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
@@ -26,6 +28,23 @@ struct LocalModelListView: View {
             Divider()
 
             list
+        }
+        .background(WindowVisibilityReader { isWindowVisible = $0 })
+        .task(id: isWindowVisible) {
+            guard isWindowVisible else { return }
+            while !Task.isCancelled {
+                await store.refreshRuntimeStates()
+                try? await Task.sleep(for: .seconds(5))
+            }
+        }
+    }
+
+    private func moveToTrash(_ model: LocalModel) {
+        do {
+            try store.moveToTrash(model)
+        } catch {
+            NSSound.beep()
+            print("Move to Trash failed: \(error)")
         }
     }
 
@@ -125,7 +144,11 @@ struct LocalModelListView: View {
                         LocalModelRowView(
                             model: model,
                             copyCount: store.copyCount(for: model),
-                            onReveal: { NSWorkspace.shared.activateFileViewerSelecting([model.path]) }
+                            runtimeState: store.runtimeState(for: model),
+                            canMoveToTrash: LocalModelTrashPolicy.canMoveToTrash(model),
+                            onReveal: { NSWorkspace.shared.activateFileViewerSelecting([model.path]) },
+                            onStop: { Task { await store.stop(model) } },
+                            onMoveToTrash: { moveToTrash(model) }
                         )
                     }
                 }

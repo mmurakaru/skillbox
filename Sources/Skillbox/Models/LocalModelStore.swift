@@ -10,6 +10,7 @@ final class LocalModelStore {
     private(set) var isScanning = false
     private(set) var duplicateGroups: [DuplicateModelGroup] = []
     private(set) var isDetectingDuplicates = false
+    private(set) var runtimeStates: [String: ModelRuntimeState] = [:]
 
     var searchQuery = ""
 
@@ -17,15 +18,21 @@ final class LocalModelStore {
     private var scanners: [any LocalModelScanner] = []
     private var watcher: DirectoryWatcher?
     private let duplicateDetector = DuplicateModelDetector()
+    private let runtimeMonitor: any ModelRuntimeMonitoring
+    private let moveItemToTrash: (URL) throws -> Void
     private let makeScanners: (LocalModelScanConfiguration) -> [any LocalModelScanner]
     // Bumped per scan so a slow, older scan or duplicate search cannot overwrite newer results.
     private var inventoryGeneration = 0
 
     init(
         makeScanners: @escaping (LocalModelScanConfiguration) -> [any LocalModelScanner] = { $0.makeScanners() },
+        runtimeMonitor: any ModelRuntimeMonitoring = ModelRuntimeMonitor(),
+        moveItemToTrash: @escaping (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) },
         seedModels: [LocalModel] = []
     ) {
         self.makeScanners = makeScanners
+        self.runtimeMonitor = runtimeMonitor
+        self.moveItemToTrash = moveItemToTrash
         self.models = seedModels
     }
 
@@ -94,10 +101,48 @@ final class LocalModelStore {
         }?.models.count ?? 1
     }
 
+    /// Reads which models are loaded in memory. Called only while the Models tab is visible.
+    func refreshRuntimeStates() async {
+        runtimeStates = await runtimeMonitor.runtimeStates(for: models)
+    }
+
+    func runtimeState(for model: LocalModel) -> ModelRuntimeState? {
+        runtimeStates[model.id]
+    }
+
+    /// Unloads a cleanly stoppable model, then refreshes runtime state.
+    func stop(_ model: LocalModel) async {
+        guard let target = runtimeStates[model.id]?.stopTarget else { return }
+        await runtimeMonitor.stop(target, modelPath: model.path)
+        await refreshRuntimeStates()
+    }
+
+    /// Moves a model to the Trash and drops it from the inventory and its duplicate group.
+    func moveToTrash(_ model: LocalModel) throws {
+        guard LocalModelTrashPolicy.canMoveToTrash(model) else { throw LocalModelTrashError.notTrashable(model.name) }
+        try moveItemToTrash(model.path)
+        models.removeAll { $0.id == model.id }
+        runtimeStates[model.id] = nil
+        duplicateGroups = duplicateGroups
+            .map { DuplicateModelGroup(id: $0.id, models: $0.models.filter { $0.id != model.id }) }
+            .filter { $0.models.count > 1 }
+    }
+
     private func startWatching() {
         let roots = scanners.flatMap(\.watchRoots)
         watcher = roots.isEmpty ? nil : DirectoryWatcher(urls: roots) { [weak self] in
             Task { @MainActor in self?.rescan() }
+        }
+    }
+}
+
+/// Why a local model could not be moved to the Trash.
+enum LocalModelTrashError: LocalizedError, Equatable {
+    case notTrashable(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .notTrashable(let name): "Model \(name) shares files with other models and cannot be moved to the Trash"
         }
     }
 }

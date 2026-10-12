@@ -25,6 +25,20 @@ struct LocalModelStoreTests {
         }
     }
 
+    private actor RecordingRuntimeMonitor: ModelRuntimeMonitoring {
+        var states: [String: ModelRuntimeState]
+        private(set) var stopRequests: [ModelStopTarget] = []
+
+        init(states: [String: ModelRuntimeState]) { self.states = states }
+
+        func runtimeStates(for models: [LocalModel]) async -> [String: ModelRuntimeState] { states }
+
+        func stop(_ target: ModelStopTarget, modelPath: URL) async {
+            stopRequests.append(target)
+            states = [:]
+        }
+    }
+
     @Test func searchMatchesModelName() {
         let store = LocalModelStore(seedModels: sampleModels())
         store.searchQuery = "qwen"
@@ -138,5 +152,61 @@ struct LocalModelStoreTests {
         #expect(configuration.ollama == false)
         #expect(configuration.huggingFace == true)
         #expect(configuration.customPaths.map(\.path) == ["/tmp/a", "/tmp/b"])
+    }
+
+    @Test func runtimeRefreshAndStopUnloadTheModel() async {
+        let target = ModelStopTarget.ollama(modelName: "llama-3-8b")
+        let monitor = RecordingRuntimeMonitor(states: ["2": ModelRuntimeState(stopTarget: target, hostName: "Ollama")])
+        let store = LocalModelStore(runtimeMonitor: monitor, seedModels: sampleModels())
+
+        await store.refreshRuntimeStates()
+        #expect(store.runtimeState(for: sampleModels()[1])?.stopTarget == target)
+
+        await store.stop(sampleModels()[1])
+        #expect(await monitor.stopRequests == [target])
+        #expect(store.runtimeState(for: sampleModels()[1]) == nil)
+    }
+
+    @Test func stopIgnoresModelsWithoutStopTarget() async {
+        let monitor = RecordingRuntimeMonitor(states: ["1": ModelRuntimeState(stopTarget: nil, hostName: "OtherApp")])
+        let store = LocalModelStore(runtimeMonitor: monitor, seedModels: sampleModels())
+        await store.refreshRuntimeStates()
+
+        await store.stop(sampleModels()[0])
+
+        #expect(await monitor.stopRequests.isEmpty)
+    }
+
+    @Test func moveToTrashRemovesModelAndItsDuplicateGroup() async throws {
+        let trashable = LocalModel(id: "t", name: "copy", source: .custom, path: URL(fileURLWithPath: "/models/copy.gguf"),
+                                   format: .gguf, sizeBytes: 8, digest: "same")
+        let twin = LocalModel(id: "u", name: "twin", source: .custom, path: URL(fileURLWithPath: "/models/twin.gguf"),
+                              format: .gguf, sizeBytes: 8, digest: "same")
+        var trashedPaths: [String] = []
+        let store = LocalModelStore(moveItemToTrash: { trashedPaths.append($0.path) }, seedModels: [trashable, twin])
+        await store.findDuplicates()?.value
+        #expect(store.copyCount(for: twin) == 2)
+
+        try store.moveToTrash(trashable)
+
+        #expect(trashedPaths == ["/models/copy.gguf"])
+        #expect(store.models.map(\.id) == ["u"])
+        #expect(store.copyCount(for: twin) == 1)
+        #expect(store.reclaimableBytes == 0)
+    }
+
+    @Test func failedMoveToTrashKeepsTheModel() {
+        struct TrashFailure: Error {}
+        let store = LocalModelStore(moveItemToTrash: { _ in throw TrashFailure() }, seedModels: sampleModels())
+        #expect(throws: TrashFailure.self) { try store.moveToTrash(sampleModels()[0]) }
+        #expect(store.models.count == 2)
+    }
+
+    @Test func moveToTrashRefusesSharedOllamaBlobs() {
+        let store = LocalModelStore(seedModels: sampleModels())
+        #expect(throws: LocalModelTrashError.notTrashable("llama-3-8b")) {
+            try store.moveToTrash(sampleModels()[1])
+        }
+        #expect(store.models.count == 2)
     }
 }
