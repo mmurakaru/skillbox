@@ -62,6 +62,8 @@ struct AdoptAsRemoteSheet: View {
             }
             .buttonStyle(.plain)
             .help("Close")
+            .accessibilityLabel("Close")
+            .hoverActionLabel("Close")
         }
     }
 

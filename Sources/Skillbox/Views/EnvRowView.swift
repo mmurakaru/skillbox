@@ -6,6 +6,8 @@ struct EnvScopeBadge: View {
     var body: some View {
         Text(scope.shortLabel)
             .font(.system(size: 9, weight: .semibold))
+            .lineLimit(1)
+            .fixedSize()
             .foregroundStyle(color)
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
@@ -50,12 +52,7 @@ struct EnvRowView: View {
     @Binding var isConfirmingSecretDisable: Bool
 
     @State private var isHoveringRow = false
-    @State private var isHoveringEdit = false
-    @State private var isHoveringDelete = false
-    @State private var isHoveringReveal = false
-    @State private var isHoveringCopy = false
     @State private var isSecretValueRevealed = false
-    @State private var isHoveringKeychain = false
     @State private var isConfirmingPlaintextRemoval = false
 
     private static let maskedSecretValue = "••••••••"
@@ -137,12 +134,8 @@ struct EnvRowView: View {
                         .foregroundStyle(envVar.isEnabled ? Color.primary : Color.secondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
-                    EnvScopeBadge(scope: envVar.scope)
 
-                    if envVar.isSecret && hasKeychainSecretWithSameName {
-                        KeychainStorageBadge()
-                            .help("The login Keychain has a secret with this name")
-                    } else if envVar.isSecret {
+                    if envVar.isSecret && !hasKeychainSecretWithSameName {
                         Image(systemName: "key.fill")
                             .font(.system(size: 9))
                             .foregroundStyle(.secondary)
@@ -158,38 +151,45 @@ struct EnvRowView: View {
 
                     Spacer(minLength: 0)
                 }
-                Text(secondaryLine)
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .opacity(envVar.isEnabled ? 1.0 : 0.7)
+                HStack(spacing: 4) {
+                    EnvScopeBadge(scope: envVar.scope)
+
+                    if envVar.isSecret && hasKeychainSecretWithSameName {
+                        KeychainStorageBadge()
+                            .help("The login Keychain has a secret with this name")
+                    }
+
+                    Text(secondaryLine)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .opacity(envVar.isEnabled ? 1.0 : 0.7)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .help(helpText)
 
             if envVar.isSecret {
-                iconButton(
+                RowIconActionButton(
                     systemName: isSecretValueRevealed ? "eye.slash" : "eye",
-                    isHovering: $isHoveringReveal,
                     tint: .accentColor,
-                    help: isSecretValueRevealed ? "Hide value" : "Reveal value",
+                    label: isSecretValueRevealed ? "Hide value" : "Reveal value",
                     action: { isSecretValueRevealed.toggle() }
                 )
-                iconButton(
+                RowIconActionButton(
                     systemName: "doc.on.doc",
-                    isHovering: $isHoveringCopy,
                     tint: .accentColor,
-                    help: "Copy value",
+                    label: "Copy value",
                     action: { SecretPasteboard.copyConcealed(envVar.value) }
                 )
-                iconButton(
+                RowIconActionButton(
                     systemName: hasKeychainSecretWithSameName ? "xmark.bin" : "key.horizontal",
-                    isHovering: $isHoveringKeychain,
                     tint: hasKeychainSecretWithSameName ? .orange : .green,
-                    help: hasKeychainSecretWithSameName
+                    label: hasKeychainSecretWithSameName ? "Remove plaintext copy" : "Copy to Keychain",
+                    detail: hasKeychainSecretWithSameName
                         ? "Remove plaintext copy after checking the Keychain holds the same value. Claude Code then stops getting it as an env var, so connect it to an MCP server first if a server needs it."
-                        : "Copy to Keychain",
+                        : nil,
                     action: {
                         if hasKeychainSecretWithSameName {
                             isConfirmingPlaintextRemoval = true
@@ -201,22 +201,20 @@ struct EnvRowView: View {
             }
 
             if envVar.isEnabled {
-                iconButton(
+                RowIconActionButton(
                     systemName: "pencil",
-                    isHovering: $isHoveringEdit,
                     tint: .accentColor,
-                    help: "Open settings.json in editor",
+                    label: "Open settings.json in editor",
                     action: onEdit
                 )
             } else {
                 Color.clear.frame(width: 22, height: 22)
             }
 
-            iconButton(
+            RowIconActionButton(
                 systemName: "trash",
-                isHovering: $isHoveringDelete,
                 tint: .red,
-                help: "Remove permanently",
+                label: "Remove permanently",
                 action: { rowState = .confirmingDelete }
             )
         }
@@ -274,32 +272,6 @@ struct EnvRowView: View {
         }
 
         return lines.joined(separator: "\n")
-    }
-
-    private func iconButton(
-        systemName: String,
-        isHovering: Binding<Bool>,
-        tint: Color,
-        help: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(isHovering.wrappedValue ? tint : Color.secondary)
-                .frame(width: 22, height: 22)
-                .background(
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(isHovering.wrappedValue ? tint.opacity(0.15) : Color.clear)
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help(help)
-        .accessibilityLabel(help)
-        .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.1)) { isHovering.wrappedValue = hovering }
-        }
     }
 
     private var confirmContent: some View {

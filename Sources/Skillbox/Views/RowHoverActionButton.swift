@@ -25,5 +25,6 @@ struct RowHoverActionButton: View {
         .buttonStyle(.plain)
         .help(help)
         .accessibilityLabel(accessibilityLabel)
+        .hoverActionLabel(help)
     }
 }

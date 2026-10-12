@@ -15,8 +15,6 @@ struct SkillRowView: View {
     @Binding var rowState: RowState
 
     @State private var isHoveringRow = false
-    @State private var isHoveringEdit = false
-    @State private var isHoveringDelete = false
     @State private var isHoveringSync = false
     @State private var isHoveringOverride = false
     @State private var isHoveringAdopt = false
@@ -131,19 +129,17 @@ struct SkillRowView: View {
 
             syncControl
 
-            iconButton(
+            RowIconActionButton(
                 systemName: "pencil",
-                isHovering: $isHoveringEdit,
                 tint: .accentColor,
-                help: "Open in editor",
+                label: "Open in editor",
                 action: onEdit
             )
 
-            iconButton(
+            RowIconActionButton(
                 systemName: "trash",
-                isHovering: $isHoveringDelete,
                 tint: .red,
-                help: "Move to Trash",
+                label: "Move to Trash",
                 action: { rowState = .confirmingDelete }
             )
         }
@@ -221,6 +217,7 @@ struct SkillRowView: View {
                 .frame(width: 170)
             }
             .help(overrideMenuTooltip)
+            .hoverActionLabel("Listing visibility: \(overrideState.displayLabel)")
         }
     }
 
@@ -286,6 +283,7 @@ struct SkillRowView: View {
                 }
             }
             .help(syncTooltip)
+            .hoverActionLabel(syncTooltip)
         } else if skill.provenance == nil, let onAdopt {
             Button(action: onAdopt) {
                 Image(systemName: "link.badge.plus")
@@ -305,6 +303,7 @@ struct SkillRowView: View {
                 }
             }
             .help("Adopt as remote-tracked")
+            .hoverActionLabel("Adopt as remote-tracked")
         }
     }
 
@@ -316,33 +315,6 @@ struct SkillRowView: View {
         }
 
         return "Sync from \(p.source)"
-    }
-
-    private func iconButton(
-        systemName: String,
-        isHovering: Binding<Bool>,
-        tint: Color,
-        help: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(isHovering.wrappedValue ? tint : Color.secondary)
-                .frame(width: 22, height: 22)
-                .background(
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(isHovering.wrappedValue ? tint.opacity(0.15) : Color.clear)
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help(help)
-        .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.1)) {
-                isHovering.wrappedValue = hovering
-            }
-        }
     }
 
     private var confirmContent: some View {

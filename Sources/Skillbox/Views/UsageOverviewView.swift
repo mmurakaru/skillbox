@@ -18,6 +18,7 @@ struct UsageOverviewView: View {
                 .disabled(!store.refreshing.isEmpty)
                 .help("Refresh live usage")
                 .accessibilityLabel("Refresh live usage")
+                .hoverActionLabel("Refresh live usage")
             }
             ScrollView {
                 VStack(spacing: 12) {

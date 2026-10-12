@@ -121,6 +121,7 @@ struct LocalModelRowView: View {
                         .foregroundStyle(.tertiary)
                         .frame(width: 22, height: 22)
                         .help("Unload this model before moving it to the Trash")
+                        .hoverActionLabel("Unload before moving to the Trash")
                         .accessibilityLabel("Move to Trash unavailable while \(model.name) is loaded")
                 }
             }

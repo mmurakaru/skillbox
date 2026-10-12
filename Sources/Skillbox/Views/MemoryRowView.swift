@@ -40,8 +40,6 @@ struct MemoryRowView: View {
     @Binding var rowState: SkillRowView.RowState
 
     @State private var isHoveringRow = false
-    @State private var isHoveringEdit = false
-    @State private var isHoveringDelete = false
 
     var body: some View {
         ZStack {
@@ -105,19 +103,17 @@ struct MemoryRowView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .help(memory.description.isEmpty ? memory.projectFullPath : memory.description)
 
-            iconButton(
+            RowIconActionButton(
                 systemName: "pencil",
-                isHovering: $isHoveringEdit,
                 tint: .accentColor,
-                help: "Open in editor",
+                label: "Open in editor",
                 action: onEdit
             )
 
-            iconButton(
+            RowIconActionButton(
                 systemName: "trash",
-                isHovering: $isHoveringDelete,
                 tint: .red,
-                help: "Move to Trash",
+                label: "Move to Trash",
                 action: { rowState = .confirmingDelete }
             )
         }
@@ -129,33 +125,6 @@ struct MemoryRowView: View {
         }
 
         return "\(memory.projectDisplayName) · \(memory.description)"
-    }
-
-    private func iconButton(
-        systemName: String,
-        isHovering: Binding<Bool>,
-        tint: Color,
-        help: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(isHovering.wrappedValue ? tint : Color.secondary)
-                .frame(width: 22, height: 22)
-                .background(
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(isHovering.wrappedValue ? tint.opacity(0.15) : Color.clear)
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help(help)
-        .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.1)) {
-                isHovering.wrappedValue = hovering
-            }
-        }
     }
 
     private var confirmContent: some View {

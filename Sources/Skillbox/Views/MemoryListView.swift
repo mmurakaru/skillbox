@@ -139,6 +139,9 @@ struct MemoryListView: View {
 
                 }
                 .buttonStyle(.borderless)
+                .help("Clear search")
+                .accessibilityLabel("Clear search")
+                .hoverActionLabel("Clear search")
             }
         }
         .padding(.vertical, 4)
