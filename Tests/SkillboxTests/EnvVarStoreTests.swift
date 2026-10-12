@@ -268,8 +268,9 @@ struct EnvVarStoreTests {
         #expect(throws: EnvVarStoreError.self) {
             try store.add(key: "EXAMPLE_API_TOKEN", value: "abc", scope: sharedScope)
         }
+        try store.setSecretMark(true, forName: "DATABASE_URL")
         #expect(throws: EnvVarStoreError.self) {
-            try store.add(key: "DATABASE_URL", value: "abc", scope: sharedScope, markedAsSecret: true)
+            try store.add(key: "DATABASE_URL", value: "abc", scope: sharedScope)
         }
         #expect(!FileManager.default.fileExists(atPath: store.settingsURL(for: sharedScope).path))
     }
@@ -288,14 +289,15 @@ struct EnvVarStoreTests {
         #expect((parsed?["env"] as? [String: Any])?["EXAMPLE_API_TOKEN"] as? String == "abc")
     }
 
-    @Test func add_markedAsSecret_persistsMarkAndFlagsItem() throws {
+    @Test func setSecretMark_persistsMarkAndFlagsItem() throws {
         let home = try makeTempHome()
         defer { try? FileManager.default.removeItem(at: home) }
-        try "{}".write(to: home.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
+        try #"{"env": {"DATABASE_URL": "postgres://example"}}"#
+            .write(to: home.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
         let store = EnvVarStore()
         store.configure(claudeHomePath: home.path)
 
-        try store.add(key: "DATABASE_URL", value: "postgres://example", scope: .userGlobal, markedAsSecret: true)
+        try store.setSecretMark(true, forName: "DATABASE_URL")
 
         #expect(store.markedSecretNames == ["DATABASE_URL"])
         #expect(store.items.first(where: { $0.key == "DATABASE_URL" })?.isSecret == true)
@@ -322,62 +324,6 @@ struct EnvVarStoreTests {
         #expect(throws: EnvVarStoreError.self) {
             try store.setSecretMark(true, forName: "DATABASE_URL")
         }
-    }
-
-    @Test func add_markedAsSecret_whenSameNameIsDisabledElsewhere_writesNothing() throws {
-        let project = FileManager.default.temporaryDirectory.appendingPathComponent("skillbox-envstore-\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: project) }
-        let store = EnvVarStore(seedItems: [makeEnvVar(key: "DATABASE_URL", state: .disabled)])
-        let localScope = EnvScope.projectLocal(name: "example-project", path: project.path)
-
-        #expect(throws: EnvVarStoreError.secretMarkOnDisabledVar("DATABASE_URL")) {
-            try store.add(key: "DATABASE_URL", value: "postgres://example", scope: localScope, markedAsSecret: true)
-        }
-        #expect(!FileManager.default.fileExists(atPath: store.settingsURL(for: localScope).path))
-    }
-
-    @Test func add_markedAsSecret_whenSameNameSitsInAnotherSharedProjectFile_writesNothing() throws {
-        let project = FileManager.default.temporaryDirectory.appendingPathComponent("skillbox-envstore-\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: project) }
-        let store = EnvVarStore(seedItems: [
-            makeEnvVar(
-                key: "DATABASE_URL",
-                scope: .project(name: "other-project", path: "/p/other-project"),
-                fileURL: URL(fileURLWithPath: "/p/other-project/.claude/settings.json")
-            ),
-        ])
-        let localScope = EnvScope.projectLocal(name: "example-project", path: project.path)
-
-        #expect(throws: EnvVarStoreError.secretInSharedProjectScope("DATABASE_URL")) {
-            try store.add(key: "DATABASE_URL", value: "postgres://example", scope: localScope, markedAsSecret: true)
-        }
-        #expect(!FileManager.default.fileExists(atPath: store.settingsURL(for: localScope).path))
-    }
-
-    @Test func add_markedAsSecret_whenSettingsWriteFails_persistsNoMark() throws {
-        let home = try makeTempHome()
-        defer { try? FileManager.default.removeItem(at: home) }
-        try "{ not json".write(to: home.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
-        let store = EnvVarStore()
-        store.configure(claudeHomePath: home.path)
-
-        #expect(throws: (any Error).self) {
-            try store.add(key: "DATABASE_URL", value: "postgres://example", scope: .userGlobal, markedAsSecret: true)
-        }
-        #expect(store.secretMarksFile.load().isEmpty)
-    }
-
-    @Test func add_markedAsSecret_forNameRuleSecret_persistsNoRedundantMark() throws {
-        let home = try makeTempHome()
-        defer { try? FileManager.default.removeItem(at: home) }
-        try "{}".write(to: home.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
-        let store = EnvVarStore()
-        store.configure(claudeHomePath: home.path)
-
-        try store.add(key: "EXAMPLE_API_TOKEN", value: "abc", scope: .userGlobal, markedAsSecret: true)
-
-        #expect(store.secretMarksFile.load().isEmpty)
-        #expect(store.items.first(where: { $0.key == "EXAMPLE_API_TOKEN" })?.isSecret == true)
     }
 
     @Test func filtered_searchBySecretValue_doesNotMatch() {

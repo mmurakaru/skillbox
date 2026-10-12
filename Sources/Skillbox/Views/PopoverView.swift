@@ -50,6 +50,7 @@ struct PopoverView: View {
     @Environment(EnvVarStore.self) private var envStore
     @Environment(LocalModelStore.self) private var localModelStore
     @Environment(ModelExplorerStore.self) private var modelExplorerStore
+    @Environment(KeychainSecretsModel.self) private var keychainSecrets
     @Environment(RemoteSkillService.self) private var remoteSkillService
     @Environment(SkillOverridesStore.self) private var overridesStore
     @Environment(SkillFolderSync.self) private var skillFolderSync
@@ -477,6 +478,7 @@ struct PopoverView: View {
         case .memory: memoryStore.filteredMemories.count
         case .hooks: hookStore.filteredHooks.count
         case .env: envStore.filteredEnvVars.count
+            + keychainSecrets.visibleSecretNames(scopeKey: envStore.selectedScopeKey, searchQuery: envStore.searchQuery).count
         case .usage: UsageProvider.allCases.count
         case .models: localModelStore.filteredModels.count
         case .explore: modelExplorerStore.displayedResults.count
