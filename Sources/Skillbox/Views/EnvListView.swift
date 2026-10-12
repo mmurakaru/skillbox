@@ -1,5 +1,5 @@
-import AppKit
 import SwiftUI
+import AppKit
 
 struct EnvListView: View {
     @Environment(EnvVarStore.self) private var store
@@ -16,6 +16,7 @@ struct EnvListView: View {
     @State private var secretDisableConfirmationID: String?
     @State private var mcpConnectionTarget: MCPConnectionTarget?
     @FocusState private var searchFocused: Bool
+    @State private var isConfirmingStashPurge = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -40,12 +41,18 @@ struct EnvListView: View {
 
             if let keychainError = keychainSecrets.lastError {
                 ErrorBannerView(message: keychainError) { keychainSecrets.dismissError() }
+                Divider()
+            }
+
+            if !store.stashedSecrets.isEmpty {
+                stashedSecretsBanner
+                Divider()
             }
 
             list
         }
         .task {
-            keychainSecrets.reload()
+            await keychainSecrets.reload()
             applyStickyOrDefault()
         }
         .onChange(of: store.items.count) { _, _ in applyStickyOrDefault() }
@@ -56,35 +63,21 @@ struct EnvListView: View {
         .onChange(of: store.searchQuery) { _, _ in
             selectedEnvID = store.filteredEnvVars.first?.id
         }
-        .onKeyPress(.upArrow) {
-            moveSelection(by: -1)
-
-            return .handled
-        }
-        .onKeyPress(.downArrow) {
-            moveSelection(by: 1)
-
-            return .handled
-        }
+        .onKeyPress(.upArrow) { moveSelection(by: -1); return .handled }
+        .onKeyPress(.downArrow) { moveSelection(by: 1); return .handled }
         .onKeyPress(.return) {
             if searchFocused { return .ignored }
-
             triggerEditOnSelected()
-
             return .handled
         }
         .onKeyPress(.delete) {
             if searchFocused { return .ignored }
-
             triggerDeleteConfirmOnSelected()
-
             return .handled
         }
         .onKeyPress(.space) {
             if searchFocused { return .ignored }
-
             triggerToggleOnSelected()
-
             return .handled
         }
         .sheet(isPresented: $showingAddSheet) {
@@ -96,10 +89,9 @@ struct EnvListView: View {
                         case .settings(let scope):
                             try store.add(key: key, value: value, scope: scope)
                         case .keychain:
-                            try keychainSecrets.addSecret(named: key, value: value)
+                            try await keychainSecrets.addSecret(named: key, value: value)
                         }
                         showingAddSheet = false
-
                         return nil
                     } catch {
                         return error.localizedDescription
@@ -113,7 +105,7 @@ struct EnvListView: View {
                 secretName: target.secretName,
                 connector: MCPSecretConnector(),
                 plaintextCopies: plaintextCopies(ofSecretNamed: target.secretName),
-                keychainHoldsSameValue: { keychainSecrets.keychainHoldsSameValue(as: $0) },
+                keychainHoldsSameValue: { await keychainSecrets.keychainHoldsSameValue(as: $0) },
                 onRemovePlaintextCopy: { try store.delete($0) },
                 onClose: { mcpConnectionTarget = nil }
             )
@@ -127,7 +119,6 @@ struct EnvListView: View {
 
     private var scopePicker: some View {
         @Bindable var store = store
-
         return Picker("Scope", selection: $store.selectedScopeKey) {
             Text("All scopes").tag(String?.none)
             Text("User Global (\(store.globalCount))").tag(Optional("global"))
@@ -147,11 +138,8 @@ struct EnvListView: View {
         guard let key = store.selectedScopeKey, !key.isEmpty else {
             return "Showing env vars from all scopes"
         }
-
         if key == "global" { return "~/.claude/settings.json" }
-
         if key == EnvVarStore.keychainScopeKey { return "Secrets stored in the login Keychain" }
-
         return key
     }
 
@@ -170,7 +158,6 @@ struct EnvListView: View {
 
     private var searchBar: some View {
         @Bindable var store = store
-
         return HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
@@ -178,7 +165,6 @@ struct EnvListView: View {
                 .textFieldStyle(.plain)
                 .focused($searchFocused)
                 .onSubmit { triggerEditOnSelected() }
-
             if !store.searchQuery.isEmpty {
                 Button(action: { store.searchQuery = "" }) {
                     Image(systemName: "xmark.circle.fill")
@@ -192,6 +178,45 @@ struct EnvListView: View {
         .glassEffect(.regular, in: .rect(cornerRadius: 6))
     }
 
+    private var stashedSecretsBanner: some View {
+        let count = store.stashedSecrets.count
+        let subject = count == 1 ? "1 disabled secret sits" : "\(count) disabled secrets sit"
+        return HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text(isConfirmingStashPurge
+                ? "Delete these stashed values? Enable a secret first to keep it."
+                : "\(subject) in plaintext in the Skillbox stash.")
+                .font(.system(size: 11))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 4)
+            if isConfirmingStashPurge {
+                Button("Cancel") { isConfirmingStashPurge = false }
+                    .controlSize(.small)
+                Button("Purge") { performPurgeStashedSecrets() }
+                    .controlSize(.small)
+                    .buttonStyle(.borderedProminent)
+                    .tint(.orange)
+            } else {
+                Button("Purge…") { isConfirmingStashPurge = true }
+                    .controlSize(.small)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color.orange.opacity(0.1))
+    }
+
+    private func performPurgeStashedSecrets() {
+        do {
+            try store.purgeStashedSecrets()
+            isConfirmingStashPurge = false
+        } catch {
+            NSSound.beep()
+            print("Env stash purge failed: \(error)")
+        }
+    }
+
     private var list: some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -203,7 +228,7 @@ struct EnvListView: View {
                         ForEach(visibleKeychainSecretNames, id: \.self) { secretName in
                             KeychainSecretRowView(
                                 secretName: secretName,
-                                readValue: { try keychainSecrets.readSecretValue(named: secretName) },
+                                readValue: { try await keychainSecrets.readSecretValue(named: secretName) },
                                 onDelete: { performDeleteKeychainSecret(named: secretName) },
                                 onConnectToMCPServer: { mcpConnectionTarget = MCPConnectionTarget(secretName: secretName) },
                                 onError: { keychainSecrets.reportError($0) }
@@ -248,7 +273,6 @@ struct EnvListView: View {
             Image(systemName: "switch.2")
                 .font(.system(size: 32))
                 .foregroundStyle(.tertiary)
-
             if let err = store.lastError {
                 Text(err)
                     .font(.system(size: 11))
@@ -279,10 +303,12 @@ struct EnvListView: View {
     // MARK: - Actions
 
     private func performCopyToKeychain(_ envVar: EnvVar) {
-        do {
-            try keychainSecrets.copyEnvSecretToKeychain(envVar)
-        } catch {
-            keychainSecrets.reportError(error)
+        Task {
+            do {
+                try await keychainSecrets.copyEnvSecretToKeychain(envVar)
+            } catch {
+                keychainSecrets.reportError(error)
+            }
         }
     }
 
@@ -292,19 +318,22 @@ struct EnvListView: View {
 
     /// Re-verifies the Keychain value right before deleting, so a changed or missing copy never loses data.
     private func performRemovePlaintextCopy(_ envVar: EnvVar) {
-        guard keychainSecrets.keychainHoldsSameValue(as: envVar) else {
-            keychainSecrets.reportError(KeychainSecretsModelError.keychainHoldsDifferentValue(envVar.key))
-
-            return
+        Task {
+            guard await keychainSecrets.keychainHoldsSameValue(as: envVar) else {
+                keychainSecrets.reportError(KeychainSecretsModelError.keychainHoldsDifferentValue(envVar.key))
+                return
+            }
+            performDelete(envVar)
         }
-        performDelete(envVar)
     }
 
     private func performDeleteKeychainSecret(named secretName: String) {
-        do {
-            try keychainSecrets.deleteSecret(named: secretName)
-        } catch {
-            keychainSecrets.reportError(error)
+        Task {
+            do {
+                try await keychainSecrets.deleteSecret(named: secretName)
+            } catch {
+                keychainSecrets.reportError(error)
+            }
         }
     }
 
@@ -324,15 +353,12 @@ struct EnvListView: View {
 
     private func applyStickyOrDefault() {
         if !envSelectedScope.isEmpty,
-            store.selectedScopeKey != envSelectedScope
-        {
+           store.selectedScopeKey != envSelectedScope {
             if envSelectedScope == "global" || envSelectedScope == EnvVarStore.keychainScopeKey
-                || store.availableProjects.contains(where: { $0.path == envSelectedScope })
-            {
+                || store.availableProjects.contains(where: { $0.path == envSelectedScope }) {
                 store.selectedScopeKey = envSelectedScope
             }
         }
-
         if selectedEnvID == nil {
             selectedEnvID = store.filteredEnvVars.first?.id
         }
@@ -340,13 +366,10 @@ struct EnvListView: View {
 
     private func moveSelection(by delta: Int) {
         let items = store.filteredEnvVars
-
         guard !items.isEmpty else { return }
         searchFocused = false
-
         if let current = selectedEnvID, let idx = items.firstIndex(where: { $0.id == current }) {
             let next = max(0, min(items.count - 1, idx + delta))
-
             selectedEnvID = items[next].id
         } else {
             selectedEnvID = items.first?.id
@@ -355,8 +378,7 @@ struct EnvListView: View {
 
     private func triggerEditOnSelected() {
         guard let id = selectedEnvID,
-            let envVar = store.filteredEnvVars.first(where: { $0.id == id })
-        else { return }
+              let envVar = store.filteredEnvVars.first(where: { $0.id == id }) else { return }
         open(envVar: envVar)
     }
 
@@ -367,9 +389,7 @@ struct EnvListView: View {
 
     private func triggerToggleOnSelected() {
         guard let id = selectedEnvID,
-            let envVar = store.filteredEnvVars.first(where: { $0.id == id })
-        else { return }
-
+              let envVar = store.filteredEnvVars.first(where: { $0.id == id }) else { return }
         if envVar.isSecret && envVar.isEnabled {
             secretDisableConfirmationID = envVar.id
         } else {
@@ -380,7 +400,6 @@ struct EnvListView: View {
     private func open(envVar: EnvVar) {
         guard envVar.isEnabled else { return }
         let cmd = editorCommand.isEmpty ? "code" : editorCommand
-
         EditorLauncher.openPath(envVar.fileURL.path, command: cmd)
         NSApp.deactivate()
     }
@@ -406,7 +425,6 @@ struct EnvListView: View {
     private func performDelete(_ envVar: EnvVar) {
         do {
             try store.delete(envVar)
-
             if selectedEnvID == envVar.id {
                 selectedEnvID = store.filteredEnvVars.first?.id
             }

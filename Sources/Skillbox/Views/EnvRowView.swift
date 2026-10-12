@@ -63,7 +63,6 @@ struct EnvRowView: View {
     var body: some View {
         ZStack {
             if rowState != .normal || isConfirmingSecretDisable || isConfirmingPlaintextRemoval { normalContent.hidden() }
-
             if rowState == .confirmingDelete {
                 confirmContent
             } else if isConfirmingSecretDisable {
@@ -89,9 +88,7 @@ struct EnvRowView: View {
 
     private var rowBackground: Color {
         if isSelected { return Color.accentColor.opacity(0.18) }
-
         if isHoveringRow { return Color.primary.opacity(0.06) }
-
         return .clear
     }
 
@@ -112,19 +109,16 @@ struct EnvRowView: View {
 
     private var normalContent: some View {
         HStack(spacing: 8) {
-            Toggle(
-                "",
-                isOn: Binding(
-                    get: { envVar.isEnabled },
-                    set: { _ in
-                        if envVar.isSecret && envVar.isEnabled {
-                            isConfirmingSecretDisable = true
-                        } else {
-                            onToggle()
-                        }
+            Toggle("", isOn: Binding(
+                get: { envVar.isEnabled },
+                set: { _ in
+                    if envVar.isSecret && envVar.isEnabled {
+                        isConfirmingSecretDisable = true
+                    } else {
+                        onToggle()
                     }
-                )
-            )
+                }
+            ))
             .toggleStyle(.switch)
             .controlSize(.mini)
             .labelsHidden()
@@ -138,7 +132,6 @@ struct EnvRowView: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
                     EnvScopeBadge(scope: envVar.scope)
-
                     if envVar.isSecret && hasKeychainSecretWithSameName {
                         KeychainStorageBadge()
                             .help("The login Keychain has a secret with this name")
@@ -148,14 +141,12 @@ struct EnvRowView: View {
                             .foregroundStyle(.secondary)
                             .accessibilityLabel("Secret")
                     }
-
                     if envVar.isSecret && envVar.scope.isSharedWithVersionControl {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.system(size: 9))
                             .foregroundStyle(.orange)
                             .accessibilityLabel("Secret in a shared project file")
                     }
-
                     Spacer(minLength: 0)
                 }
                 Text(secondaryLine)
@@ -187,8 +178,7 @@ struct EnvRowView: View {
                     systemName: hasKeychainSecretWithSameName ? "xmark.bin" : "key.horizontal",
                     isHovering: $isHoveringKeychain,
                     tint: hasKeychainSecretWithSameName ? .orange : .green,
-                    help: hasKeychainSecretWithSameName
-                        ? "Remove plaintext copy after checking the Keychain holds the same value" : "Copy to Keychain",
+                    help: hasKeychainSecretWithSameName ? "Remove plaintext copy after checking the Keychain holds the same value. Claude Code then stops getting it as an env var, so connect it to an MCP server first if a server needs it." : "Copy to Keychain",
                     action: {
                         if hasKeychainSecretWithSameName {
                             isConfirmingPlaintextRemoval = true
@@ -223,7 +213,6 @@ struct EnvRowView: View {
 
     private var secondaryLine: String {
         let valuePart: String
-
         if envVar.value.isEmpty {
             valuePart = "(empty)"
         } else if envVar.isSecret && !isSecretValueRevealed {
@@ -231,7 +220,6 @@ struct EnvRowView: View {
         } else {
             valuePart = "= \(envVar.value)"
         }
-
         if showProjectName {
             switch envVar.scope {
             case .userGlobal:
@@ -240,25 +228,20 @@ struct EnvRowView: View {
                 return "[\(name)] \(valuePart)"
             }
         }
-
         return valuePart
     }
 
     private var helpText: String {
         var lines = [envVar.isSecret ? envVar.key : "\(envVar.key) = \(envVar.value)"]
-
         if envVar.isSecret {
             lines.append("secret - value hidden; env values reach every process Claude Code starts")
         }
-
         if envVar.isSecret && envVar.scope.isSharedWithVersionControl {
             lines.append("this file is meant for version control - move the secret to the local scope")
         }
-
         if let catalogDescription = EnvVarCatalog.description(for: envVar.key) {
             lines.append(catalogDescription)
         }
-
         switch envVar.scope {
         case .userGlobal:
             lines.append("scope: User Global")
@@ -267,11 +250,9 @@ struct EnvRowView: View {
         case .projectLocal(_, let path):
             lines.append("project (local): \(path)")
         }
-
         if !envVar.isEnabled {
             lines.append("disabled - value preserved in skillbox-env-stash.json")
         }
-
         return lines.joined(separator: "\n")
     }
 
@@ -330,7 +311,7 @@ struct EnvRowView: View {
     private var confirmPlaintextRemovalContent: some View {
         confirmationRow(
             verb: "Remove",
-            detail: " from settings.json?",
+            detail: " from settings.json? Claude Code loses it.",
             confirmTint: .orange,
             onCancel: { isConfirmingPlaintextRemoval = false },
             onConfirm: {
@@ -353,10 +334,10 @@ struct EnvRowView: View {
                 .frame(width: 18)
 
             Text("\(verb) ")
-                .font(.system(size: 12))
-                + Text(envVar.key)
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                + Text(detail)
+                .font(.system(size: 12)) +
+            Text(envVar.key)
+                .font(.system(size: 12, weight: .semibold, design: .monospaced)) +
+            Text(detail)
                 .font(.system(size: 12))
 
             Spacer()

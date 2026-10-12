@@ -9,7 +9,7 @@ enum EnvAddDestination: Equatable {
 struct EnvAddSheet: View {
     let availableScopes: [EnvScope]
     /// Receives key, value, and destination; returns an error message or nil.
-    let onAdd: (String, String, EnvAddDestination) -> String?
+    let onAdd: (String, String, EnvAddDestination) async -> String?
     let onCancel: () -> Void
 
     @State private var keyText: String = ""
@@ -70,11 +70,10 @@ struct EnvAddSheet: View {
                 Text(isSecret ? "Storage" : "Scope")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
-
                 if isSecret {
                     Label("Login Keychain", systemImage: "key.fill")
                         .font(.system(size: 12))
-                    Text("Nothing is written to settings.json, so the value doesn't reach every process Claude Code starts.")
+                    Text("Nothing is written to settings.json, so the value stays out of files and of every process Claude Code starts. Processes running as you can still read it without a prompt through the security tool. Values must be one line of printable ASCII up to 1,500 bytes, so PEM keys and JSON files are not supported.")
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -133,7 +132,6 @@ struct EnvAddSheet: View {
             ForEach(suggestions, id: \.key) { entry in
                 Button(action: {
                     keyText = entry.key
-
                     if valueText.isEmpty { valueText = entry.suggestedValue }
                 }) {
                     VStack(alignment: .leading, spacing: 1) {
@@ -173,19 +171,18 @@ struct EnvAddSheet: View {
 
     private func submit() {
         let trimmedKey = keyText.trimmingCharacters(in: .whitespaces)
-
         guard !trimmedKey.isEmpty else { return }
         let destination: EnvAddDestination
-
         if isSecret {
             destination = .keychain
         } else {
             guard availableScopes.indices.contains(selectedScopeIndex) else { return }
             destination = .settings(availableScopes[selectedScopeIndex])
         }
-
-        if let addError = onAdd(trimmedKey, valueText, destination) {
-            errorMessage = addError
+        Task {
+            if let addError = await onAdd(trimmedKey, valueText, destination) {
+                errorMessage = addError
+            }
         }
     }
 }

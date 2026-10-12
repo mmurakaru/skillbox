@@ -4,12 +4,12 @@ import Testing
 @testable import Skillbox
 
 struct EnvSecretDetectionTests {
-    @Test(arguments: ["EXAMPLE_API_TOKEN", "service_api_key", "DB_PASSWORD", "CLIENT_SECRET", "ANTHROPIC_AUTH_TOKEN"])
+    @Test(arguments: ["EXAMPLE_API_TOKEN", "API_KEY", "service_api_key", "DB_PASSWORD", "CLIENT_SECRET", "ANTHROPIC_AUTH_TOKEN"])
     func nameLooksSecret_credentialNames_areSecret(name: String) {
         #expect(EnvSecretDetection.nameLooksSecret(name))
     }
 
-    @Test(arguments: ["CLAUDE_CODE_DISABLE_THINKING", "API_TIMEOUT_MS", "EXAMPLE_BASE_URL"])
+    @Test(arguments: ["CLAUDE_CODE_DISABLE_THINKING", "API_TIMEOUT_MS", "EXAMPLE_BASE_URL", "GIT_AUTHOR_NAME", "OAUTH_CALLBACK_URL", "KEYBOARD_LAYOUT"])
     func nameLooksSecret_plainNames_areNotSecret(name: String) {
         #expect(!EnvSecretDetection.nameLooksSecret(name))
     }

@@ -22,7 +22,7 @@ enum JSONMemberTextEditor {
     }
 
     private static func render(_ value: Any, original: (value: Any, text: [UInt8])?, indentLevel: Int) throws -> String {
-        if let original, (value as AnyObject).isEqual(original.value) {
+        if let original, jsonValuesEqual(value, original.value) {
             return String(decoding: original.text, as: UTF8.self)
         }
 
@@ -53,6 +53,25 @@ enum JSONMemberTextEditor {
         }
 
         return "{\n" + lines.joined(separator: ",\n") + "\n" + String(repeating: "  ", count: indentLevel) + "}"
+    }
+
+    /// `NSNumber` treats `true` and `1` as equal, but they are different JSON values.
+    private static func jsonValuesEqual(_ left: Any, _ right: Any) -> Bool {
+        if let leftNumber = left as? NSNumber, let rightNumber = right as? NSNumber {
+            return isBoolean(leftNumber) == isBoolean(rightNumber) && leftNumber == rightNumber
+        }
+        if let leftObject = left as? [String: Any], let rightObject = right as? [String: Any] {
+            return leftObject.count == rightObject.count
+                && leftObject.allSatisfy { key, value in rightObject[key].map { jsonValuesEqual(value, $0) } ?? false }
+        }
+        if let leftArray = left as? [Any], let rightArray = right as? [Any] {
+            return leftArray.count == rightArray.count && zip(leftArray, rightArray).allSatisfy { jsonValuesEqual($0, $1) }
+        }
+        return (left as AnyObject).isEqual(right)
+    }
+
+    private static func isBoolean(_ number: NSNumber) -> Bool {
+        CFGetTypeID(number) == CFBooleanGetTypeID()
     }
 
     /// Matches `JSON.stringify(value, null, 2)` for values that have no original text to keep.

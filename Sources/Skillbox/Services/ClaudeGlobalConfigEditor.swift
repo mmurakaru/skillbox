@@ -33,7 +33,7 @@ struct ClaudeHTTPMCPServer: Identifiable, Equatable {
 }
 
 /// Edits the Claude Code global config (`~/.claude.json`) under the same lock the Claude Code CLI takes.
-struct ClaudeGlobalConfigEditor {
+struct ClaudeGlobalConfigEditor: Sendable {
     let configURL: URL
     /// A lock directory older than this is abandoned; matches the lock library Claude Code uses.
     var staleLockAge: TimeInterval = 10

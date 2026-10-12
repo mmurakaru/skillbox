@@ -407,7 +407,26 @@ struct EnvVarStoreTests {
         let stashed = try #require(store.items.first)
 
         #expect(stashed.isSecret && stashed.state == .disabled)
+        #expect(store.stashedSecrets.map(\.key) == ["EXAMPLE_API_TOKEN"])
         #expect(try String(contentsOf: stash, encoding: .utf8) == stashContents)
+    }
+
+    @Test func purgeStashedSecrets_removesOnlySecretStashEntries() throws {
+        let home = try makeTempHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let settings = home.appendingPathComponent("settings.json")
+        try "{}".write(to: settings, atomically: true, encoding: .utf8)
+        let stash = home.appendingPathComponent("skillbox-env-stash.json")
+        try #"{"\#(settings.path)": {"EXAMPLE_API_TOKEN": "abc", "EXAMPLE_FLAG": "1"}}"#
+            .write(to: stash, atomically: true, encoding: .utf8)
+        let store = EnvVarStore()
+        store.configure(claudeHomePath: home.path)
+
+        try store.purgeStashedSecrets()
+
+        #expect(EnvVarScanner.loadStash(stashURL: store.stashURL)[settings.path] == ["EXAMPLE_FLAG": "1"])
+        #expect(store.stashedSecrets.isEmpty)
+        #expect(store.items.map(\.key) == ["EXAMPLE_FLAG"])
     }
 
     @Test func toggle_offCollapsesEmptyEnvBlock_butLeavesOtherKeys() async throws {

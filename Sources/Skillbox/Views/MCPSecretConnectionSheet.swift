@@ -6,7 +6,7 @@ struct MCPSecretConnectionSheet: View {
     let connector: MCPSecretConnector
     /// Settings.json copies of this secret that keep it in every agent subprocess environment.
     let plaintextCopies: [EnvVar]
-    let keychainHoldsSameValue: (EnvVar) -> Bool
+    let keychainHoldsSameValue: (EnvVar) async -> Bool
     let onRemovePlaintextCopy: (EnvVar) throws -> Void
     let onClose: () -> Void
 
@@ -25,7 +25,6 @@ struct MCPSecretConnectionSheet: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 fieldLabel("Server")
-
                 if servers.isEmpty {
                     Text("No user-scope HTTP MCP servers found in the Claude Code config.")
                         .font(.system(size: 11))
@@ -57,12 +56,10 @@ struct MCPSecretConnectionSheet: View {
                 .frame(width: 110)
             }
 
-            Text(
-                "Claude Code runs a helper on each connection that reads the secret from the Keychain. Existing static headers and plaintext env copies stay as a fallback until you remove them."
-            )
-            .font(.system(size: 10))
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
+            Text("Claude Code runs a helper on each connection that reads the secret from the Keychain. Existing static headers and plaintext env copies stay as a fallback until you remove them.")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
             if let selectedServer, selectedServerUsesThisSecret, !cleanupItems(for: selectedServer).isEmpty {
                 fallbackCleanup(for: selectedServer)
@@ -100,32 +97,25 @@ struct MCPSecretConnectionSheet: View {
 
     private var selectedServerUsesThisSecret: Bool {
         guard let helper = selectedServer?.headersHelper else { return false }
-
         return MCPSecretHeadersHelper.commandReadsSecret(helper, secretName: secretName)
     }
 
     private func cleanupItems(for server: ClaudeHTTPMCPServer) -> [String] {
         var items: [String] = []
-
         if server.staticHeaderNames.contains(headerName) { items.append("the static \(headerName) header") }
-
         if !plaintextCopies.isEmpty {
             items.append(plaintextCopies.count == 1 ? "1 env copy" : "\(plaintextCopies.count) env copies")
         }
-
         return items
     }
 
     private func fallbackCleanup(for server: ClaudeHTTPMCPServer) -> some View {
         let items = cleanupItems(for: server).joined(separator: " and ")
-
         return VStack(alignment: .leading, spacing: 6) {
             if isConfirmingCleanup {
-                Text(
-                    "Sessions that started before the helper was added still use \(items) until they restart or reconnect. Remove \(items) now?"
-                )
-                .font(.system(size: 11))
-                .fixedSize(horizontal: false, vertical: true)
+                Text("Sessions that started before the helper was added still use \(items) until they restart or reconnect. Remove \(items) now?")
+                    .font(.system(size: 11))
+                    .fixedSize(horizontal: false, vertical: true)
                 HStack {
                     Button("Cancel") { isConfirmingCleanup = false }
                         .controlSize(.small)
@@ -158,21 +148,21 @@ struct MCPSecretConnectionSheet: View {
 
     private func serverLabel(_ server: ClaudeHTTPMCPServer) -> String {
         let host = URL(string: server.url)?.host ?? server.url
-        let marker =
-            server.headersHelper.map { MCPSecretHeadersHelper.commandReadsSecret($0, secretName: secretName) } == true ? " - connected" : ""
-
+        let marker = server.headersHelper.map { MCPSecretHeadersHelper.commandReadsSecret($0, secretName: secretName) } == true ? " - connected" : ""
         return "\(server.name) (\(host))\(marker)"
     }
 
     private func loadServers() {
-        do {
-            servers = try connector.configEditor.userScopeHTTPServers()
-
-            if selectedServerName == nil || selectedServer == nil {
-                selectedServerName = servers.first?.name
+        let connector = connector
+        Task {
+            do {
+                servers = try await offMainActor { try connector.configEditor.userScopeHTTPServers() }
+                if selectedServerName == nil || selectedServer == nil {
+                    selectedServerName = servers.first?.name
+                }
+            } catch {
+                errorMessage = error.localizedDescription
             }
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 
@@ -180,34 +170,50 @@ struct MCPSecretConnectionSheet: View {
         guard let serverName = selectedServerName else { return }
         errorMessage = nil
         statusMessage = nil
-        do {
-            try connector.connect(secretName: secretName, serverName: serverName, headerName: headerName, valuePrefix: valuePrefix)
-            statusMessage = "\(serverName) reads \(headerName) from the Keychain on its next connection."
-            loadServers()
-        } catch {
-            errorMessage = error.localizedDescription
+        let connector = connector
+        let secretName = secretName
+        let headerName = headerName
+        let valuePrefix = valuePrefix
+        Task {
+            do {
+                try await offMainActor {
+                    try connector.connect(secretName: secretName, serverName: serverName, headerName: headerName, valuePrefix: valuePrefix)
+                }
+                statusMessage = "\(serverName) reads \(headerName) from the Keychain on its next connection."
+                loadServers()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
     private func removeFallbacks(from server: ClaudeHTTPMCPServer) {
         errorMessage = nil
-        do {
-            let removesStaticHeader = server.staticHeaderNames.contains(headerName)
-
-            try PlaintextSecretCleanup(
-                plaintextCopies: plaintextCopies,
-                keychainHoldsSameValue: keychainHoldsSameValue,
-                removeStaticHeader: removesStaticHeader
-                    ? { try connector.removeStaticHeader(named: headerName, fromServer: server.name) }
-                    : nil,
-                removePlaintextCopy: onRemovePlaintextCopy
-            ).run()
-            isConfirmingCleanup = false
-            statusMessage = "\(server.name) now reads \(headerName) only from the Keychain."
-            loadServers()
-        } catch {
-            errorMessage = error.localizedDescription
+        let connector = connector
+        let headerName = headerName
+        let serverName = server.name
+        let removesStaticHeader = server.staticHeaderNames.contains(headerName)
+        Task {
+            do {
+                try await PlaintextSecretCleanup(
+                    plaintextCopies: plaintextCopies,
+                    keychainHoldsSameValue: keychainHoldsSameValue,
+                    removeStaticHeader: removesStaticHeader
+                        ? { try await offMainActor { try connector.removeStaticHeader(named: headerName, fromServer: serverName) } }
+                        : nil,
+                    removePlaintextCopy: onRemovePlaintextCopy
+                ).run()
+                isConfirmingCleanup = false
+                statusMessage = "\(serverName) now reads \(headerName) only from the Keychain."
+            } catch {
+                errorMessage = error.localizedDescription
+            }
             loadServers()
         }
+    }
+
+    /// The config lock can spin for seconds and the helper check starts a shell, so neither may block the panel.
+    private func offMainActor<Value: Sendable>(_ work: @escaping @Sendable () throws -> Value) async throws -> Value {
+        try await Task.detached(operation: work).value
     }
 }
