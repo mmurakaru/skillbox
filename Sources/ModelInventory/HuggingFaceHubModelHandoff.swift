@@ -53,7 +53,7 @@ public enum HuggingFaceHubModelHandoff {
 
     /// GGUF repos pull straight into Ollama; other formats download with the Hugging Face CLI.
     public static func downloadCommand(for model: HuggingFaceHubModel) -> String {
-        isGGUFRepository(model) ? "ollama pull hf.co/\(model.id)" : "hf download \(model.id)"
+        isGGUFRepository(model) ? "ollama pull 'hf.co/\(model.id)'" : "hf download '\(model.id)'"
     }
 
     public static func modelPageURL(for model: HuggingFaceHubModel) -> URL? {

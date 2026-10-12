@@ -50,14 +50,14 @@ struct HuggingFaceHubModelHandoffTests {
 
     @Test func ggufRepositoriesPullIntoOllama() {
         #expect(HuggingFaceHubModelHandoff.downloadCommand(for: HuggingFaceHubModel(id: "org/Model-8B-GGUF"))
-            == "ollama pull hf.co/org/Model-8B-GGUF")
+            == "ollama pull 'hf.co/org/Model-8B-GGUF'")
         #expect(HuggingFaceHubModelHandoff.downloadCommand(for: HuggingFaceHubModel(id: "org/Model-8B", libraryName: "gguf"))
-            == "ollama pull hf.co/org/Model-8B")
+            == "ollama pull 'hf.co/org/Model-8B'")
     }
 
     @Test func otherFormatsDownloadWithTheHuggingFaceCLI() {
         #expect(HuggingFaceHubModelHandoff.downloadCommand(for: HuggingFaceHubModel(id: "Qwen/Qwen3-8B", libraryName: "transformers"))
-            == "hf download Qwen/Qwen3-8B")
+            == "hf download 'Qwen/Qwen3-8B'")
     }
 
     @Test func modelPageURL() {

@@ -3,27 +3,36 @@ import Foundation
 @testable import ModelInventory
 
 struct HuggingFaceHubClientTests {
-    private func queryItems(_ query: HuggingFaceHubQuery) -> [String: String] {
-        let url = HuggingFaceHubClient().makeRequest(query).url!
+    private func queryItems(_ query: HuggingFaceHubQuery) throws -> [String: String] {
+        let url = try #require(try HuggingFaceHubClient().makeRequest(query).url)
         let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         return Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0.value ?? "") })
     }
 
-    @Test func requestIncludesSearchAuthorFormatTagAndSort() {
-        let request = HuggingFaceHubClient().makeRequest(HuggingFaceHubQuery(search: "qwen", author: "Qwen", formatFilter: "gguf", sort: .recent))
+    @Test func requestIncludesSearchAuthorFormatTagAndSort() throws {
+        let request = try HuggingFaceHubClient().makeRequest(HuggingFaceHubQuery(search: "qwen", author: "Qwen", formatFilter: "gguf", sort: .recent))
         #expect(request.url?.absoluteString.hasPrefix("https://huggingface.co/api/models?") == true)
-        #expect(queryItems(HuggingFaceHubQuery(search: "qwen", author: "Qwen", formatFilter: "gguf", sort: .recent)) == [
+        #expect(try queryItems(HuggingFaceHubQuery(search: "qwen", author: "Qwen", formatFilter: "gguf", sort: .recent)) == [
             "limit": "50", "sort": "lastModified", "direction": "-1",
             "search": "qwen", "author": "Qwen", "filter": "gguf",
         ])
     }
 
-    @Test func requestOmitsBlankFilters() {
-        #expect(queryItems(HuggingFaceHubQuery(search: "  ", author: "")) == ["limit": "50", "sort": "downloads", "direction": "-1"])
+    @Test func requestOmitsBlankFilters() throws {
+        #expect(try queryItems(HuggingFaceHubQuery(search: "  ", author: "")) == ["limit": "50", "sort": "downloads", "direction": "-1"])
     }
 
-    @Test func requestIsAnonymous() {
-        #expect(HuggingFaceHubClient().makeRequest(HuggingFaceHubQuery()).value(forHTTPHeaderField: "Authorization") == nil)
+    @Test func requestIsAnonymous() throws {
+        #expect(try HuggingFaceHubClient().makeRequest(HuggingFaceHubQuery()).value(forHTTPHeaderField: "Authorization") == nil)
+    }
+
+    @Test func requestSendsTheQueryResultLimit() throws {
+        #expect(try queryItems(HuggingFaceHubQuery(resultLimit: HuggingFaceHubQuery.sizeFilteredResultLimit))["limit"] == "100")
+    }
+
+    @Test func queryCachedWithoutALimitDecodesWithTheDefault() throws {
+        let cached = Data(#"{"search":"qwen","author":"","sort":"downloads"}"#.utf8)
+        #expect(try JSONDecoder().decode(HuggingFaceHubQuery.self, from: cached).resultLimit == HuggingFaceHubQuery.defaultResultLimit)
     }
 
     @Test func sortAPIValues() {

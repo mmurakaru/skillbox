@@ -66,22 +66,49 @@ public enum HuggingFaceHubSort: String, Sendable, Codable, CaseIterable, Identif
 
 /// Server-side Hub search: free text, lab (author), weight format tag such as `gguf` or `mlx`, and sort.
 public struct HuggingFaceHubQuery: Sendable, Equatable, Codable {
+    public static let defaultResultLimit = 50
+    /// Size filters run on the client, so a filtered search asks for more repos to keep enough matches.
+    public static let sizeFilteredResultLimit = 100
+
     public var search: String
     public var author: String
     public var formatFilter: String?
     public var sort: HuggingFaceHubSort
+    public var resultLimit: Int
 
-    public init(search: String = "", author: String = "", formatFilter: String? = nil, sort: HuggingFaceHubSort = .downloads) {
+    public init(
+        search: String = "",
+        author: String = "",
+        formatFilter: String? = nil,
+        sort: HuggingFaceHubSort = .downloads,
+        resultLimit: Int = HuggingFaceHubQuery.defaultResultLimit
+    ) {
         self.search = search
         self.author = author
         self.formatFilter = formatFilter
         self.sort = sort
+        self.resultLimit = resultLimit
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case search, author, formatFilter, sort, resultLimit
+    }
+
+    // Caches written before the limit existed decode with the default limit.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        search = try container.decode(String.self, forKey: .search)
+        author = try container.decode(String.self, forKey: .author)
+        formatFilter = try container.decodeIfPresent(String.self, forKey: .formatFilter)
+        sort = try container.decode(HuggingFaceHubSort.self, forKey: .sort)
+        resultLimit = try container.decodeIfPresent(Int.self, forKey: .resultLimit) ?? Self.defaultResultLimit
     }
 }
 
 /// Why a Hugging Face Hub search failed.
 public enum HuggingFaceHubError: Error, Equatable {
     case unexpectedStatus(Int)
+    case invalidRequest
 }
 
 /// Searches Hugging Face Hub models.
@@ -91,17 +118,18 @@ public protocol HuggingFaceHubSearching: Sendable {
 
 /// Queries the public Hugging Face Hub models API anonymously.
 public struct HuggingFaceHubClient: HuggingFaceHubSearching {
-    public static let resultLimit = 50
     private let session: URLSession
 
     public init(session: URLSession = .shared) {
         self.session = session
     }
 
-    public func makeRequest(_ query: HuggingFaceHubQuery) -> URLRequest {
-        var components = URLComponents(string: "https://huggingface.co/api/models")!
+    public func makeRequest(_ query: HuggingFaceHubQuery) throws -> URLRequest {
+        guard var components = URLComponents(string: "https://huggingface.co/api/models") else {
+            throw HuggingFaceHubError.invalidRequest
+        }
         var items = [
-            URLQueryItem(name: "limit", value: String(Self.resultLimit)),
+            URLQueryItem(name: "limit", value: String(query.resultLimit)),
             URLQueryItem(name: "sort", value: query.sort.apiValue),
             URLQueryItem(name: "direction", value: "-1"),
         ]
@@ -119,13 +147,14 @@ public struct HuggingFaceHubClient: HuggingFaceHubSearching {
         }
         components.queryItems = items
 
-        var request = URLRequest(url: components.url!)
+        guard let url = components.url else { throw HuggingFaceHubError.invalidRequest }
+        var request = URLRequest(url: url)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         return request
     }
 
     public func search(_ query: HuggingFaceHubQuery) async throws -> [HuggingFaceHubModel] {
-        let (data, response) = try await session.data(for: makeRequest(query))
+        let (data, response) = try await session.data(for: try makeRequest(query))
         if let httpResponse = response as? HTTPURLResponse, !(200..<300).contains(httpResponse.statusCode) {
             throw HuggingFaceHubError.unexpectedStatus(httpResponse.statusCode)
         }

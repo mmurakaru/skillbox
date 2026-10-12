@@ -80,6 +80,10 @@ struct ModelExplorerView: View {
             .labelsHidden()
             .fixedSize()
             .help("Parameter count")
+            .onChange(of: explorer.sizeBucket) { previousBucket, newBucket in
+                // A size filter asks the Hub for more repos, so switching it on or off needs a new search.
+                if (previousBucket == .any) != (newBucket == .any) { runSearch() }
+            }
 
             Picker("Sort", selection: $explorer.query.sort) {
                 ForEach(HuggingFaceHubSort.allCases) { Text($0.label).tag($0) }
@@ -106,6 +110,13 @@ struct ModelExplorerView: View {
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
+                    if explorer.unknownSizeCountHiddenByFilter > 0 {
+                        Text(unknownSizeNote)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                    }
                     ForEach(explorer.displayedResults) { hubModel in
                         HuggingFaceHubModelRowView(
                             model: hubModel,
@@ -120,12 +131,25 @@ struct ModelExplorerView: View {
         }
     }
 
+    private var unknownSizeNote: String {
+        let count = explorer.unknownSizeCountHiddenByFilter
+        return count == 1
+            ? "1 repo is hidden because its name has no parameter count."
+            : "\(count) repos are hidden because their names have no parameter count."
+    }
+
+    private var emptyResultsMessage: String {
+        if explorer.results.isEmpty { return "No models found" }
+        guard explorer.unknownSizeCountHiddenByFilter > 0 else { return "No models in this size range" }
+        return "No models in this size range. \(unknownSizeNote)"
+    }
+
     private var emptyState: some View {
         VStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 32))
                 .foregroundStyle(.tertiary)
-            Text(explorer.errorMessage ?? (explorer.results.isEmpty ? "No models found" : "No models in this size range"))
+            Text(explorer.errorMessage ?? emptyResultsMessage)
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
