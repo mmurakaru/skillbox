@@ -25,6 +25,18 @@ struct ModelExplorerStoreTests {
         }
     }
 
+    /// Records the limit each search asked for.
+    private final class LimitRecordingSearch: HuggingFaceHubSearching, @unchecked Sendable {
+        private let lock = NSLock()
+        private var limits: [Int] = []
+        var requestedLimits: [Int] { lock.withLock { limits } }
+
+        func search(_ query: HuggingFaceHubQuery) async throws -> [HuggingFaceHubModel] {
+            lock.withLock { limits.append(query.resultLimit) }
+            return [HuggingFaceHubModel(id: "org/Model-8B"), HuggingFaceHubModel(id: "org/model-without-size")]
+        }
+    }
+
     private func temporaryCacheURL() -> URL {
         FileManager.default.temporaryDirectory.appending(path: "model-explorer-\(UUID().uuidString)/cache.json")
     }
@@ -112,6 +124,22 @@ struct ModelExplorerStoreTests {
         #expect(store.displayedResults.map(\.name) == ["Qwen3-4B"])
         store.sizeBucket = .extraLarge
         #expect(store.displayedResults.map(\.name) == ["Llama-3-70B"])
+    }
+
+    @Test func sizeFilterAsksForMoreReposAndCountsTheOnesWithoutASize() async {
+        let cacheURL = temporaryCacheURL()
+        defer { try? FileManager.default.removeItem(at: cacheURL.deletingLastPathComponent()) }
+        let client = LimitRecordingSearch()
+        let store = ModelExplorerStore(client: client, cacheURL: cacheURL)
+
+        await store.search()
+        #expect(store.unknownSizeCountHiddenByFilter == 0)
+        store.sizeBucket = .medium
+        await store.search()
+
+        #expect(client.requestedLimits == [HuggingFaceHubQuery.defaultResultLimit, HuggingFaceHubQuery.sizeFilteredResultLimit])
+        #expect(store.displayedResults.map(\.id) == ["org/Model-8B"])
+        #expect(store.unknownSizeCountHiddenByFilter == 1)
     }
 
     @Test func offlineReturnToTheCachedQueryShowsItsResultsAgain() async {

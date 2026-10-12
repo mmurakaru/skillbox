@@ -30,6 +30,7 @@ public actor DuplicateModelDetector {
 
         // Shared blobs are one copy on disk, so tags that point at them are not reclaimable duplicates.
         for model in models where model.sharedBlobSizes.isEmpty {
+            // Identical digests mean identical bytes, so whole-size reclaimable bytes are exact.
             if let digest = model.digest {
                 modelsByKey["digest:\(digest)", default: []].append(model)
             } else {

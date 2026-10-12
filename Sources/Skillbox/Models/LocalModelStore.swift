@@ -26,7 +26,7 @@ final class LocalModelStore {
     private let runtimeMonitor: any ModelRuntimeMonitoring
     private let moveItemToTrash: (URL) throws -> Void
     private let makeScanners: (LocalModelScanConfiguration) -> [any LocalModelScanner]
-    // Bumped per scan so a slow, older scan or duplicate search cannot overwrite newer results.
+    // Bumped per scan so a slow, older scan cannot overwrite newer results.
     private var inventoryGeneration = 0
 
     init(
@@ -88,7 +88,7 @@ final class LocalModelStore {
 
             guard generation == inventoryGeneration else { return }
             models = found
-            duplicateGroups = []
+            duplicateGroups = Self.groups(duplicateGroups, keepingMembersUnchangedIn: found)
             isScanning = false
         }
     }
@@ -98,15 +98,27 @@ final class LocalModelStore {
     func findDuplicates() -> Task<Void, Never>? {
         guard !isDetectingDuplicates else { return nil }
         isDetectingDuplicates = true
-        let generation = inventoryGeneration
         let snapshot = models
 
         return Task {
             let groups = await duplicateDetector.findDuplicates(in: snapshot)
 
             isDetectingDuplicates = false
-            guard generation == inventoryGeneration else { return }
-            duplicateGroups = groups
+            duplicateGroups = Self.groups(groups, keepingMembersUnchangedIn: models)
+        }
+    }
+
+    /// Keeps hash results for files that did not change, so a slow duplicate search survives unrelated folder events.
+    private static func groups(_ groups: [DuplicateModelGroup], keepingMembersUnchangedIn models: [LocalModel]) -> [DuplicateModelGroup] {
+        let currentModels = Dictionary(models.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return groups.compactMap { group in
+            let unchangedMembers = group.models.compactMap { member -> LocalModel? in
+                guard let current = currentModels[member.id],
+                      current.sizeBytes == member.sizeBytes,
+                      current.modifiedAt == member.modifiedAt else { return nil }
+                return current
+            }
+            return unchangedMembers.count > 1 ? DuplicateModelGroup(id: group.id, models: unchangedMembers) : nil
         }
     }
 
@@ -119,6 +131,10 @@ final class LocalModelStore {
 
     /// Reads which models are loaded in memory. Called only while the Models tab is visible.
     func refreshRuntimeStates() async {
+        guard !models.isEmpty else {
+            runtimeStates = [:]
+            return
+        }
         runtimeStates = await runtimeMonitor.runtimeStates(for: models)
     }
 
@@ -135,7 +151,8 @@ final class LocalModelStore {
 
     /// Moves a model to the Trash and drops it from the inventory and its duplicate group.
     func moveToTrash(_ model: LocalModel) throws {
-        guard LocalModelTrashPolicy.canMoveToTrash(model) else { throw LocalModelTrashError.notTrashable(model.name) }
+        guard LocalModelTrashPolicy.canMoveToTrash(model) else { throw LocalModelTrashError.managedByOllama(model.name) }
+        guard runtimeStates[model.id] == nil else { throw LocalModelTrashError.loadedInMemory(model.name) }
         try moveItemToTrash(model.path)
         models.removeAll { $0.id == model.id }
         runtimeStates[model.id] = nil
@@ -189,11 +206,13 @@ final class LocalModelStore {
 
 /// Why a local model could not be moved to the Trash.
 enum LocalModelTrashError: LocalizedError, Equatable {
-    case notTrashable(String)
+    case managedByOllama(String)
+    case loadedInMemory(String)
 
     var errorDescription: String? {
         switch self {
-        case .notTrashable(let name): "Model \(name) shares files with other models and cannot be moved to the Trash"
+        case .managedByOllama(let name): "Ollama manages the files of \(name). Remove it with `ollama rm \(name)`."
+        case .loadedInMemory(let name): "\(name) is loaded in memory. Unload it before moving it to the Trash."
         }
     }
 }

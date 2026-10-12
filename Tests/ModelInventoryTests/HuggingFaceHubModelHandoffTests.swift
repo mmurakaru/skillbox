@@ -1,13 +1,11 @@
-import Foundation
 import Testing
-
+import Foundation
 @testable import ModelInventory
 
 struct HuggingFaceHubModelHandoffTests {
     private func local(_ name: String, _ source: LocalModelSource) -> LocalModel {
-        LocalModel(
-            id: "\(source.rawValue):\(name)", name: name, source: source,
-            path: URL(fileURLWithPath: "/models/\(name)"), format: .gguf, sizeBytes: 1)
+        LocalModel(id: "\(source.rawValue):\(name)", name: name, source: source,
+                   path: URL(fileURLWithPath: "/models/\(name)"), format: .gguf, sizeBytes: 1)
     }
 
     private func installed(_ hubID: String, _ localModels: [LocalModel]) -> Bool {
@@ -33,14 +31,10 @@ struct HuggingFaceHubModelHandoffTests {
 
     @Test func matchesHubPullsAsTheOllamaScannerListsThem() throws {
         let store = try ModelInventoryTestDirectory()
-
         try store.writeFile("blobs/sha256-w", bytes: 10)
-        try store.writeFile(
-            "manifests/hf.co/unsloth/Qwen3-8B-GGUF/Q4_K_M",
-            contents: Data(
-                """
-                {"layers": [{"digest": "sha256:w", "mediaType": "application/vnd.ollama.image.model"}]}
-                """.utf8))
+        try store.writeFile("manifests/hf.co/unsloth/Qwen3-8B-GGUF/Q4_K_M", contents: Data("""
+        {"layers": [{"digest": "sha256:w", "mediaType": "application/vnd.ollama.image.model"}]}
+        """.utf8))
         let scanned = OllamaModelScanner(root: store.url).scan()
 
         #expect(installed("unsloth/Qwen3-8B-GGUF", scanned))
@@ -55,23 +49,19 @@ struct HuggingFaceHubModelHandoffTests {
     }
 
     @Test func ggufRepositoriesPullIntoOllama() {
-        #expect(
-            HuggingFaceHubModelHandoff.downloadCommand(for: HuggingFaceHubModel(id: "org/Model-8B-GGUF"))
-                == "ollama pull hf.co/org/Model-8B-GGUF")
-        #expect(
-            HuggingFaceHubModelHandoff.downloadCommand(for: HuggingFaceHubModel(id: "org/Model-8B", libraryName: "gguf"))
-                == "ollama pull hf.co/org/Model-8B")
+        #expect(HuggingFaceHubModelHandoff.downloadCommand(for: HuggingFaceHubModel(id: "org/Model-8B-GGUF"))
+            == "ollama pull 'hf.co/org/Model-8B-GGUF'")
+        #expect(HuggingFaceHubModelHandoff.downloadCommand(for: HuggingFaceHubModel(id: "org/Model-8B", libraryName: "gguf"))
+            == "ollama pull 'hf.co/org/Model-8B'")
     }
 
     @Test func otherFormatsDownloadWithTheHuggingFaceCLI() {
-        #expect(
-            HuggingFaceHubModelHandoff.downloadCommand(for: HuggingFaceHubModel(id: "Qwen/Qwen3-8B", libraryName: "transformers"))
-                == "hf download Qwen/Qwen3-8B")
+        #expect(HuggingFaceHubModelHandoff.downloadCommand(for: HuggingFaceHubModel(id: "Qwen/Qwen3-8B", libraryName: "transformers"))
+            == "hf download 'Qwen/Qwen3-8B'")
     }
 
     @Test func modelPageURL() {
-        #expect(
-            HuggingFaceHubModelHandoff.modelPageURL(for: HuggingFaceHubModel(id: "Qwen/Qwen3-8B"))?.absoluteString
-                == "https://huggingface.co/Qwen/Qwen3-8B")
+        #expect(HuggingFaceHubModelHandoff.modelPageURL(for: HuggingFaceHubModel(id: "Qwen/Qwen3-8B"))?.absoluteString
+            == "https://huggingface.co/Qwen/Qwen3-8B")
     }
 }

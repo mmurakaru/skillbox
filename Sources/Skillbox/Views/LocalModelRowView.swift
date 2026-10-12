@@ -109,8 +109,18 @@ struct LocalModelRowView: View {
                 systemImage: "folder", help: "Reveal in Finder", accessibilityLabel: "Reveal \(model.name) in Finder", action: onReveal)
 
             if canMoveToTrash {
-                RowHoverActionButton(systemImage: "trash", help: "Move to Trash", accessibilityLabel: "Move \(model.name) to the Trash") {
-                    isConfirmingTrash = true
+                if runtimeState == nil {
+                    RowHoverActionButton(systemImage: "trash", help: "Move to Trash", accessibilityLabel: "Move \(model.name) to the Trash") {
+                        isConfirmingTrash = true
+                    }
+                } else {
+                    // A disabled button can drop its tooltip, so the reason shows on a plain icon.
+                    Image(systemName: "trash")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 22, height: 22)
+                        .help("Unload this model before moving it to the Trash")
+                        .accessibilityLabel("Move to Trash unavailable while \(model.name) is loaded")
                 }
             }
         }

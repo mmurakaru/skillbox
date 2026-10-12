@@ -28,7 +28,7 @@ public enum LocalModelFormat: String, Codable, Sendable {
     case unknown
 }
 
-/// One AI model stored on this Mac; `digest` groups duplicate copies when the source provides one.
+/// One AI model stored on this Mac; `digest` is a byte-identity key that groups duplicate copies when the source provides one.
 public struct LocalModel: Identifiable, Sendable, Hashable {
     public let id: String
     public var name: String

@@ -39,8 +39,20 @@ struct HuggingFaceCacheScannerTests {
         #expect(models.first?.name == "Qwen/Qwen3-8B")
         #expect(models.first?.source == .huggingFaceCache)
         #expect(models.first?.sizeBytes == 5000)
-        #expect(models.first?.digest == "bbb")
         #expect(models.first?.format == .safetensors)
+    }
+
+    @Test func identicalBlobSetsShareADigestButAForkWithOnlyTheLargestBlobDoesNot() throws {
+        let hub = try ModelInventoryTestDirectory()
+        try makeRepository(in: hub, folder: "models--Lab--Model", blobs: [("aaa", 1000), ("bbb", 4000)], snapshotFile: "model.safetensors")
+        try makeRepository(in: hub, folder: "models--Mirror--Model", blobs: [("aaa", 1000), ("bbb", 4000)], snapshotFile: "model.safetensors")
+        try makeRepository(in: hub, folder: "models--Fork--Model", blobs: [("bbb", 4000), ("ccc", 200)], snapshotFile: "model.safetensors")
+
+        let digests = Dictionary(uniqueKeysWithValues: HuggingFaceCacheScanner(root: hub.url).scan().map { ($0.name, $0.digest) })
+
+        #expect(digests["Lab/Model"] != nil)
+        #expect(digests["Lab/Model"] == digests["Mirror/Model"])
+        #expect(digests["Fork/Model"] != digests["Lab/Model"])
     }
 
     @Test func detectsGGUFFormat() throws {
