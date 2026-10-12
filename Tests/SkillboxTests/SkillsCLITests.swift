@@ -16,8 +16,9 @@ struct SkillsCLITests {
         import Darwin
         @main struct Harness {
             static func main() async throws {
-                close(STDIN_FILENO)
-                precondition(kqueue() == STDIN_FILENO)
+                let eventQueue = kqueue()
+                precondition(eventQueue >= 0 && dup2(eventQueue, STDIN_FILENO) == STDIN_FILENO)
+                close(eventQueue)
                 let result = try await SkillsCLI.runShellRaw("printf skillbox-stdout; printf skillbox-stderr >&2")
                 precondition(result.exitCode == 0)
                 precondition(result.combinedOutput.contains("skillbox-stdout"))
