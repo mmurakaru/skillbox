@@ -16,6 +16,7 @@ struct EnvListView: View {
     @State private var secretDisableConfirmationID: String?
     @State private var mcpConnectionTarget: MCPConnectionTarget?
     @FocusState private var searchFocused: Bool
+    @State private var isConfirmingStashPurge = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -40,12 +41,18 @@ struct EnvListView: View {
 
             if let keychainError = keychainSecrets.lastError {
                 keychainErrorBanner(keychainError)
+                Divider()
+            }
+
+            if !store.stashedSecrets.isEmpty {
+                stashedSecretsBanner
+                Divider()
             }
 
             list
         }
         .task {
-            keychainSecrets.reload()
+            await keychainSecrets.reload()
             applyStickyOrDefault()
         }
         .onChange(of: store.items.count) { _, _ in applyStickyOrDefault() }
@@ -82,7 +89,7 @@ struct EnvListView: View {
                         case .settings(let scope):
                             try store.add(key: key, value: value, scope: scope)
                         case .keychain:
-                            try keychainSecrets.addSecret(named: key, value: value)
+                            try await keychainSecrets.addSecret(named: key, value: value)
                         }
                         showingAddSheet = false
                         return nil
@@ -171,6 +178,45 @@ struct EnvListView: View {
         .glassEffect(.regular, in: .rect(cornerRadius: 6))
     }
 
+    private var stashedSecretsBanner: some View {
+        let count = store.stashedSecrets.count
+        let subject = count == 1 ? "1 disabled secret sits" : "\(count) disabled secrets sit"
+        return HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text(isConfirmingStashPurge
+                ? "Delete these stashed values? Enable a secret first to keep it."
+                : "\(subject) in plaintext in the Skillbox stash.")
+                .font(.system(size: 11))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 4)
+            if isConfirmingStashPurge {
+                Button("Cancel") { isConfirmingStashPurge = false }
+                    .controlSize(.small)
+                Button("Purge") { performPurgeStashedSecrets() }
+                    .controlSize(.small)
+                    .buttonStyle(.borderedProminent)
+                    .tint(.orange)
+            } else {
+                Button("Purge…") { isConfirmingStashPurge = true }
+                    .controlSize(.small)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color.orange.opacity(0.1))
+    }
+
+    private func performPurgeStashedSecrets() {
+        do {
+            try store.purgeStashedSecrets()
+            isConfirmingStashPurge = false
+        } catch {
+            NSSound.beep()
+            print("Env stash purge failed: \(error)")
+        }
+    }
+
     private var list: some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -182,7 +228,7 @@ struct EnvListView: View {
                         ForEach(visibleKeychainSecretNames, id: \.self) { secretName in
                             KeychainSecretRowView(
                                 secretName: secretName,
-                                readValue: { try keychainSecrets.readSecretValue(named: secretName) },
+                                readValue: { try await keychainSecrets.readSecretValue(named: secretName) },
                                 onDelete: { performDeleteKeychainSecret(named: secretName) },
                                 onConnectToMCPServer: { mcpConnectionTarget = MCPConnectionTarget(secretName: secretName) },
                                 onError: { keychainSecrets.reportError($0) }
@@ -279,10 +325,12 @@ struct EnvListView: View {
     // MARK: - Actions
 
     private func performCopyToKeychain(_ envVar: EnvVar) {
-        do {
-            try keychainSecrets.copyEnvSecretToKeychain(envVar)
-        } catch {
-            keychainSecrets.reportError(error)
+        Task {
+            do {
+                try await keychainSecrets.copyEnvSecretToKeychain(envVar)
+            } catch {
+                keychainSecrets.reportError(error)
+            }
         }
     }
 
@@ -292,18 +340,22 @@ struct EnvListView: View {
 
     /// Re-verifies the Keychain value right before deleting, so a changed or missing copy never loses data.
     private func performRemovePlaintextCopy(_ envVar: EnvVar) {
-        guard keychainSecrets.keychainHoldsSameValue(as: envVar) else {
-            keychainSecrets.reportError(KeychainSecretsModelError.keychainHoldsDifferentValue(envVar.key))
-            return
+        Task {
+            guard await keychainSecrets.keychainHoldsSameValue(as: envVar) else {
+                keychainSecrets.reportError(KeychainSecretsModelError.keychainHoldsDifferentValue(envVar.key))
+                return
+            }
+            performDelete(envVar)
         }
-        performDelete(envVar)
     }
 
     private func performDeleteKeychainSecret(named secretName: String) {
-        do {
-            try keychainSecrets.deleteSecret(named: secretName)
-        } catch {
-            keychainSecrets.reportError(error)
+        Task {
+            do {
+                try await keychainSecrets.deleteSecret(named: secretName)
+            } catch {
+                keychainSecrets.reportError(error)
+            }
         }
     }
 
