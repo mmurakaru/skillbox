@@ -10,30 +10,11 @@ struct UsageSnapshotScene: Scene {
                 UsageSnapshotEditor(provider: provider, snapshot: store.snapshots[provider]) {
                     store.saveManualSnapshot($0)
                 }
-                .background(UsageEditorWindowActivation())
+                .background(RegularWindowActivation())
             }
         }
         .restorationBehavior(.disabled)
         .windowResizability(.contentSize)
         .defaultPosition(.center)
-    }
-}
-
-/// Activates and makes the editor key, following the Settings window's focus handling.
-private struct UsageEditorWindowActivation: NSViewRepresentable {
-    func makeNSView(context: Context) -> ActivationView { ActivationView() }
-    func updateNSView(_ nsView: ActivationView, context: Context) {}
-
-    final class ActivationView: NSView {
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            guard let window else { return }
-            NSApp.activate(ignoringOtherApps: true)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak window] in
-                NSApp.activate(ignoringOtherApps: true)
-                window?.orderFrontRegardless()
-                window?.makeKeyAndOrderFront(nil)
-            }
-        }
     }
 }

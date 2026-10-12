@@ -6,7 +6,7 @@ enum EnvAddDestination: Equatable {
     case keychain
 }
 
-struct EnvAddSheet: View {
+struct EnvAddForm: View {
     let availableScopes: [EnvScope]
     /// Receives key, value, and destination; returns an error message or nil.
     let onAdd: (String, String, EnvAddDestination) async -> String?

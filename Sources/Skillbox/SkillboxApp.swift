@@ -88,6 +88,8 @@ struct SkillboxApp: App {
 
         UsageSnapshotScene(store: usageStore)
 
+        EnvWindowScenes(envStore: envStore, keychainSecrets: keychainSecretsModel)
+
         Settings {
             SettingsView()
                 .environment(classificationStore)

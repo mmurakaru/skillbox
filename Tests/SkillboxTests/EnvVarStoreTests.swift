@@ -378,6 +378,25 @@ struct EnvVarStoreTests {
         }
     }
 
+    @Test func plaintextCopies_returnsOnlySecretVarsWithThatName() {
+        let secretCopy = EnvVar(
+            key: "EXAMPLE_API_TOKEN", value: "a", state: .enabled, scope: .userGlobal,
+            fileURL: URL(fileURLWithPath: "/tmp/settings.json"), modifiedAt: Date(), isSecret: true
+        )
+        let otherName = EnvVar(
+            key: "OTHER_API_TOKEN", value: "b", state: .enabled, scope: .userGlobal,
+            fileURL: URL(fileURLWithPath: "/tmp/settings.json"), modifiedAt: Date(), isSecret: true
+        )
+        let plainSameName = EnvVar(
+            key: "EXAMPLE_API_TOKEN", value: "c", state: .enabled,
+            scope: .projectLocal(name: "example-project", path: "/p/example-project"),
+            fileURL: URL(fileURLWithPath: "/p/example-project/.claude/settings.local.json"), modifiedAt: Date(), isSecret: false
+        )
+        let store = EnvVarStore(seedItems: [secretCopy, otherName, plainSameName])
+
+        #expect(store.plaintextCopies(ofSecretNamed: "EXAMPLE_API_TOKEN").map(\.id) == [secretCopy.id])
+    }
+
     @Test func filtered_searchBySecretValue_doesNotMatch() {
         var secret = makeEnvVar(key: "EXAMPLE_API_TOKEN", value: "needle-value")
 

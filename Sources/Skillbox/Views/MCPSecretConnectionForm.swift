@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Picks a user-scope HTTP MCP server and wires one Keychain secret into its request headers.
-struct MCPSecretConnectionSheet: View {
+struct MCPSecretConnectionForm: View {
     let secretName: String
     let connector: MCPSecretConnector
     /// Settings.json copies of this secret that keep it in every agent subprocess environment.
@@ -32,6 +32,7 @@ struct MCPSecretConnectionSheet: View {
                         .foregroundStyle(.secondary)
                 } else {
                     Picker("", selection: $selectedServerName) {
+                        Text("Choose a server").tag(String?.none)
                         ForEach(servers) { server in
                             Text(serverLabel(server)).tag(Optional(server.name))
                         }
@@ -80,6 +81,11 @@ struct MCPSecretConnectionSheet: View {
             }
 
             HStack {
+                Label(selectedServerHost ?? "No server selected", systemImage: "network")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(selectedServerHost == nil ? .secondary : .primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
                 Spacer()
                 Button("Close", action: onClose)
                     .keyboardShortcut(.cancelAction)
@@ -164,6 +170,10 @@ struct MCPSecretConnectionSheet: View {
         return "\(server.name) (\(host))\(marker)"
     }
 
+    private var selectedServerHost: String? {
+        selectedServer.map { URL(string: $0.url)?.host ?? $0.url }
+    }
+
     private func loadServers() {
         let connector = connector
 
@@ -172,7 +182,7 @@ struct MCPSecretConnectionSheet: View {
                 servers = try await offMainActor { try connector.configEditor.userScopeHTTPServers() }
 
                 if selectedServerName == nil || selectedServer == nil {
-                    selectedServerName = servers.first?.name
+                    selectedServerName = MCPSecretHeadersHelper.defaultServerName(forSecretNamed: secretName, among: servers)
                 }
             } catch {
                 errorMessage = error.localizedDescription

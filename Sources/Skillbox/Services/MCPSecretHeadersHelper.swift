@@ -61,6 +61,13 @@ enum MCPSecretHeadersHelper {
         command.contains(SystemKeychainSecretStore.readCommand(forSecretNamed: secretName))
     }
 
+    /// Never guesses: preselecting an unrelated server would send the secret to the wrong host on one click.
+    static func defaultServerName(forSecretNamed secretName: String, among servers: [ClaudeHTTPMCPServer]) -> String? {
+        servers.first { server in
+            server.headersHelper.map { commandReadsSecret($0, secretName: secretName) } == true
+        }?.name
+    }
+
     /// Runs the command in a shell like Claude Code does; the output is parsed, never shown or logged.
     static func verifyCommandPrintsHeader(_ command: String, headerName: String, processRunner: any ProcessRunning) throws {
         let result = try processRunner.run(executablePath: "/bin/sh", arguments: ["-c", command], standardInput: nil)
