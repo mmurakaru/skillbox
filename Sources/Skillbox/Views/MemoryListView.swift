@@ -177,7 +177,7 @@ struct MemoryListView: View {
                 Text("No memory entries")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
-                Text("Claude saves memory during conversations.")
+                Text("Claude Code saves memory during conversations.")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
             } else {
