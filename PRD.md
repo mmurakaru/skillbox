@@ -1,22 +1,24 @@
 # Skillbox - Product Requirements Document
 
-> A native menu bar app for browsing, opening, and deleting Claude skills.
+> A native menu bar toolbox for the configuration and usage of AI coding agents.
 
 ---
 
 ## 1. Overview
 
-Skillbox is a lightweight, native macOS menu bar app for managing Claude skills installed at `~/.claude/skills/`. It provides a scrollable, searchable list of every user-installed skill with one-click actions to open the skill folder in your editor or move it to Trash.
+Skillbox is a lightweight, native macOS menu bar app for the local setup of AI coding agents. It is harness-agnostic: features that apply to several agents (a shared skill store, provider usage for Claude Code, Codex, and Grok) are not tied to one harness, and features that exist in only one harness (Claude Code memory, hooks, and env vars) name that harness in the UI.
+
+Skills live in one canonical store at `~/.agents/skills/`, and Skillbox keeps `~/.claude/skills/` as a compatibility mount of symlinks for Claude Code. The skill list is scrollable and searchable, with one-click actions to open a skill folder in your editor or move it to Trash.
 
 **v1 ships macOS-only, personal-use, ad-hoc signed.** Cross-platform builds (Linux, Windows) are roadmap items captured in §14.
 
 ## 2. Problem
 
-Managing Claude skills today means `cd ~/.claude/skills && ls`, then `code <name>` or `rm -rf <name>`. Power users with 30+ skills want a menu bar app that collapses that to one click and stays out of the way otherwise.
+Each agent harness keeps its skills, memory, hooks, environment, and usage limits in its own files and dashboards. Developers who use several harnesses jump between `ls`, editors, CLIs, and web pages to see and change that state. A menu bar app collapses this into one place and stays out of the way otherwise.
 
 ## 3. Goals
 
-- **G1** - Single, always-accessible view of every user-installed skill.
+- **G1** - Single, always-accessible view of agent configuration: skills, memory, hooks, env vars, and usage.
 - **G2** - One-click open of any skill folder in the user's preferred editor.
 - **G3** - One-click delete (move to Trash) with inline confirmation.
 - **G4** - Stay out of the way: menu bar app, no Dock icon.
@@ -25,21 +27,21 @@ Managing Claude skills today means `cd ~/.claude/skills && ls`, then `code <name
 ## 4. Non-Goals
 
 - Skill creation or editing within the app itself (delegate to editor).
-- Plugin skill management - those are owned by `claude plugin` commands and live across versioned cache + marketplace dirs; deleting them would break installs. Out of scope for Skillbox.
+- Plugin skill management - those are owned by harness plugin commands and live across versioned cache + marketplace dirs; deleting them would break installs. Out of scope for Skillbox.
 - Syncing skills across machines.
 - Cloud connectivity, accounts, marketplace.
-- Modifying Claude's runtime behavior.
+- Modifying a harness's runtime behavior.
 
 ## 5. Target User
 
-Developers who maintain user-level Claude skills on their Mac and want a fast menu bar app to browse, open, and prune them.
+Developers who use one or more AI coding agents on their Mac and want a fast menu bar app to see and maintain the skills, configuration, and usage those agents share.
 
 ## 6. Skill Source
 
-**Single root, configurable, default `~/.claude/skills/`.** A skill is any direct child folder containing a `SKILL.md` file with YAML frontmatter.
+**Single canonical root, configurable, default `~/.agents/skills/`.** A skill is any direct child folder containing a `SKILL.md` file with YAML frontmatter. Skillbox keeps `~/.claude/skills/` as a compatibility mount of symlinks into this root for Claude Code.
 
 ```
-~/.claude/skills/
+~/.agents/skills/
 ├── diagnose/
 │   └── SKILL.md
 ├── frontend-ui-engineering/
@@ -159,7 +161,8 @@ Jev automatically classifies skill definitions on launch and when added or chang
 
 Native SwiftUI `Settings { ... }` scene. Fields:
 
-- **Skills directory** - text field + "Browse..." button. Default `~/.claude/skills/`.
+- **Skills source directory** - text field + "Browse..." button. Default `~/.agents/skills/`.
+- **Claude Code skills mount** - compatibility symlink directory for Claude Code. Default `~/.claude/skills/`.
 - **Editor** - dropdown of detected GUI editors + "Custom command" text field.
 - **Open target** - radio: Folder / SKILL.md.
 - **Launch at login** - toggle (uses `SMAppService`).
@@ -209,7 +212,8 @@ The TypeSafe API key is stored in macOS Keychain. Other preferences are stored i
 
 | Key                | Type    | Default                               |
 |--------------------|---------|---------------------------------------|
-| `skillsRootPath`   | String  | `~/.claude/skills`                    |
+| `skillsRootPath`   | String  | `~/.agents/skills`                    |
+| `claudeSkillsMountPath` | String | `~/.claude/skills`               |
 | `editorCommand`    | String  | first detected of `code,cursor,zed,subl,nova,bbedit,mate` |
 | `openTarget`       | String  | `folder` (or `skill_md`)              |
 | `launchAtLogin`    | Bool    | `false`                               |
