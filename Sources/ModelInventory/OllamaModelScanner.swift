@@ -48,7 +48,6 @@ public struct OllamaModelScanner: LocalModelScanner {
             }
             let size = blobSizes.values.reduce(0, +)
             // The weights layer identifies identical models across tags.
-            let weightsDigest = layers.first { $0.mediaType?.contains("model") == true }?.digest
 
             results.append(LocalModel(
                 id: "\(source.rawValue):\(url.path)",
@@ -57,7 +56,6 @@ public struct OllamaModelScanner: LocalModelScanner {
                 path: url,
                 format: .ollamaBlob,
                 sizeBytes: size,
-                digest: weightsDigest,
                 modifiedAt: values?.contentModificationDate,
                 sharedBlobSizes: blobSizes
             ))

@@ -39,6 +39,20 @@ struct LocalModelStoreTests {
         }
     }
 
+    /// Lets a test change what the next scan returns.
+    private final class ReplaceableModelScanner: LocalModelScanner, @unchecked Sendable {
+        let source: LocalModelSource = .custom
+        var watchRoots: [URL] { [] }
+        private let lock = NSLock()
+        private var currentModels: [LocalModel]
+
+        init(models: [LocalModel]) { currentModels = models }
+
+        func replaceModels(with models: [LocalModel]) { lock.withLock { currentModels = models } }
+
+        func scan() -> [LocalModel] { lock.withLock { currentModels } }
+    }
+
     @Test func searchMatchesModelName() {
         let store = LocalModelStore(seedModels: sampleModels())
         store.searchQuery = "qwen"
@@ -159,6 +173,32 @@ struct LocalModelStoreTests {
         #expect(store.reclaimableBytes == 10)
     }
 
+    @Test func rescanKeepsDuplicateGroupsWhoseFilesDidNotChange() async {
+        let modified = Date(timeIntervalSince1970: 1_000)
+        func model(_ id: String, digest: String, size: Int64 = 10, modifiedAt: Date = modified) -> LocalModel {
+            LocalModel(id: id, name: id, source: .custom, path: URL(fileURLWithPath: "/models/\(id)"), format: .gguf,
+                       sizeBytes: size, digest: digest, modifiedAt: modifiedAt)
+        }
+        let scanner = ReplaceableModelScanner(models: [
+            model("a", digest: "same"), model("b", digest: "same"), model("c", digest: "other"), model("d", digest: "other"),
+        ])
+        let store = LocalModelStore(makeScanners: { _ in [scanner] })
+        store.configure(LocalModelScanConfiguration())
+        await store.rescan().value
+        await store.findDuplicates()?.value
+        #expect(store.duplicateGroups.count == 2)
+
+        scanner.replaceModels(with: [
+            model("a", digest: "same"), model("b", digest: "same"), model("c", digest: "other"),
+            model("d", digest: "other", modifiedAt: modified.addingTimeInterval(60)),
+        ])
+        await store.rescan().value
+
+        #expect(store.duplicateGroups.map(\.id) == ["digest:same"])
+        #expect(store.copyCount(for: model("a", digest: "same")) == 2)
+        #expect(store.copyCount(for: model("c", digest: "other")) == 1)
+    }
+
     @Test func scanSettingsDefaultToAllSourcesOn() throws {
         let suiteName = "LocalModelScanSettingsTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
@@ -223,9 +263,22 @@ struct LocalModelStoreTests {
         #expect(store.models.count == 2)
     }
 
+    @Test func moveToTrashRefusesAModelThatIsLoaded() async {
+        let monitor = RecordingRuntimeMonitor(states: ["1": ModelRuntimeState(stopTarget: .process(pid: 42, commandName: "llama-server"), hostName: "llama-server")])
+        var trashedPaths: [String] = []
+        let store = LocalModelStore(runtimeMonitor: monitor, moveItemToTrash: { trashedPaths.append($0.path) }, seedModels: sampleModels())
+        await store.refreshRuntimeStates()
+
+        #expect(throws: LocalModelTrashError.loadedInMemory(sampleModels()[0].name)) {
+            try store.moveToTrash(sampleModels()[0])
+        }
+        #expect(trashedPaths.isEmpty)
+        #expect(store.models.count == 2)
+    }
+
     @Test func moveToTrashRefusesSharedOllamaBlobs() {
         let store = LocalModelStore(seedModels: sampleModels())
-        #expect(throws: LocalModelTrashError.notTrashable("llama-3-8b")) {
+        #expect(throws: LocalModelTrashError.managedByOllama("llama-3-8b")) {
             try store.moveToTrash(sampleModels()[1])
         }
         #expect(store.models.count == 2)

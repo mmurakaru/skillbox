@@ -4,6 +4,9 @@ import ModelInventory
 
 /// Models tab: the AI models stored on this Mac, with size, RAM fit, and duplicate copies.
 struct LocalModelListView: View {
+    // Each refresh runs lsof over every weight file, so it stays infrequent.
+    private static let runtimeRefreshInterval: Duration = .seconds(15)
+
     @Environment(LocalModelStore.self) private var store
     @State private var trashErrorMessage: String?
 
@@ -39,7 +42,7 @@ struct LocalModelListView: View {
             guard isWindowVisible else { return }
             while !Task.isCancelled {
                 await store.refreshRuntimeStates()
-                try? await Task.sleep(for: .seconds(5))
+                try? await Task.sleep(for: Self.runtimeRefreshInterval)
             }
         }
         .onAppear { store.watchModelFoldersCreatedSinceLastCheck() }
