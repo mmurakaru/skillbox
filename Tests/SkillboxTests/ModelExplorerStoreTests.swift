@@ -97,6 +97,39 @@ struct ModelExplorerStoreTests {
         #expect(store.displayedResults.map(\.name) == ["Llama-3-70B"])
     }
 
+    @Test func offlineReturnToTheCachedQueryShowsItsResultsAgain() async {
+        let cacheURL = temporaryCacheURL()
+        defer { try? FileManager.default.removeItem(at: cacheURL.deletingLastPathComponent()) }
+        let online = ModelExplorerStore(client: QueryEchoSearch(), cacheURL: cacheURL)
+        online.query.search = "qwen"
+        await online.search()
+
+        let offline = ModelExplorerStore(client: StubHubSearch(result: .failure(.unexpectedStatus(503))), cacheURL: cacheURL)
+        offline.query.search = "llama"
+        await offline.search()
+        offline.query.search = "qwen"
+        await offline.search()
+
+        #expect(offline.results.map(\.id) == ["org/qwen"])
+        #expect(offline.resultsQuery.search == "qwen")
+        #expect(offline.errorMessage == "Could not reach Hugging Face. Showing the last synced results.")
+    }
+
+    @Test func queryEditedDuringASearchDoesNotRelabelItsResults() async {
+        let cacheURL = temporaryCacheURL()
+        defer { try? FileManager.default.removeItem(at: cacheURL.deletingLastPathComponent()) }
+        let store = ModelExplorerStore(client: QueryEchoSearch(), cacheURL: cacheURL)
+
+        store.query.search = "slow"
+        let search = Task { await store.search() }
+        try? await Task.sleep(for: .milliseconds(50))
+        store.query.search = "typing"
+        await search.value
+
+        #expect(store.results.map(\.id) == ["org/slow"])
+        #expect(store.resultsQuery.search == "slow")
+    }
+
     @Test func slowOlderSearchDoesNotReplaceNewerResults() async {
         let cacheURL = temporaryCacheURL()
         defer { try? FileManager.default.removeItem(at: cacheURL.deletingLastPathComponent()) }

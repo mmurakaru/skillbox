@@ -21,6 +21,8 @@ final class ModelExplorerStore {
     private let cacheURL: URL
     // Bumped per search so a slow, older response cannot replace newer results.
     private var searchGeneration = 0
+    /// The last successful search, kept apart from `results` so an offline retry of that query can restore it.
+    private var lastSyncedSearch: CachePayload?
 
     init(client: any HuggingFaceHubSearching = HuggingFaceHubClient(), cacheURL: URL = ModelExplorerStore.defaultCacheURL()) {
         self.client = client
@@ -36,27 +38,36 @@ final class ModelExplorerStore {
     func search() async {
         searchGeneration += 1
         let generation = searchGeneration
+        let submittedQuery = query
         hasSearchedThisSession = true
         isLoading = true
         errorMessage = nil
         do {
-            let found = try await client.search(query)
+            let found = try await client.search(submittedQuery)
             guard generation == searchGeneration else { return }
-            results = found
-            resultsQuery = query
-            lastSynced = Date()
-            saveCache()
+            let synced = CachePayload(models: found, lastSynced: Date(), query: submittedQuery)
+            show(synced)
+            lastSyncedSearch = synced
+            saveCache(synced)
         } catch {
             guard generation == searchGeneration else { return }
-            if resultsQuery == query {
+            if let lastSyncedSearch, lastSyncedSearch.query == submittedQuery {
+                show(lastSyncedSearch)
                 errorMessage = "Could not reach Hugging Face. Showing the last synced results."
             } else {
                 results = []
+                resultsQuery = submittedQuery
                 lastSynced = nil
                 errorMessage = "Could not reach Hugging Face, and there are no saved results for this search."
             }
         }
         isLoading = false
+    }
+
+    private func show(_ search: CachePayload) {
+        results = search.models
+        resultsQuery = search.query
+        lastSynced = search.lastSynced
     }
 
     /// Runs the first live search of this app session; later visits keep the current results.
@@ -75,14 +86,12 @@ final class ModelExplorerStore {
     private func loadCache() {
         guard let data = try? Data(contentsOf: cacheURL),
               let payload = try? JSONDecoder().decode(CachePayload.self, from: data) else { return }
-        results = payload.models
-        lastSynced = payload.lastSynced
+        show(payload)
         query = payload.query
-        resultsQuery = payload.query
+        lastSyncedSearch = payload
     }
 
-    private func saveCache() {
-        let payload = CachePayload(models: results, lastSynced: lastSynced ?? Date(), query: resultsQuery)
+    private func saveCache(_ payload: CachePayload) {
         guard let data = try? JSONEncoder().encode(payload) else { return }
         try? FileManager.default.createDirectory(at: cacheURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? data.write(to: cacheURL, options: .atomic)
