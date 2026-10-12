@@ -24,6 +24,7 @@ final class DirectoryWatcher {
     init?(
         urls: [URL],
         watchesMissingPathsThroughAncestors: Bool = true,
+        // Releasing the watcher while running on `eventQueue` deadlocks, because `deinit` waits for that queue.
         eventQueue: DispatchQueue = .main,
         acceptsPath: @escaping (String) -> Bool = { _ in true },
         onChange: @escaping () -> Void
