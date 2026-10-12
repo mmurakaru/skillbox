@@ -1,5 +1,13 @@
 # skillbox
 
+## 0.7.0
+
+### Minor Changes
+
+- [#30](https://github.com/mmurakaru/skillbox/pull/30) [`bf5bbe8`](https://github.com/mmurakaru/skillbox/commit/bf5bbe82c7f81f814b9ecf0141c8454579330d8f) Thanks [@mmurakaru](https://github.com/mmurakaru)! - Store new Env tab secrets in the login Keychain instead of settings.json, list them with masked values, and move existing plaintext secrets into the Keychain with a verified copy before a separately confirmed removal of the plaintext value.
+
+- [#26](https://github.com/mmurakaru/skillbox/pull/26) [`95d2378`](https://github.com/mmurakaru/skillbox/commit/95d23784085c4eadb317adbf0a5423dd960e36ba) Thanks [@mmurakaru](https://github.com/mmurakaru)! - Connect a Keychain secret to a user-scope Claude Code HTTP MCP server through a headers helper. Skillbox verifies the helper before and after an atomic, lock-respecting config update, keeps static headers as a fallback, and removes a static header only as a separate confirmed step.
+
 ## 0.6.0
 
 ### Minor Changes
