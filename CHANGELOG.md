@@ -1,5 +1,13 @@
 # skillbox
 
+## 0.8.0
+
+### Minor Changes
+
+- [#21](https://github.com/mmurakaru/skillbox/pull/21) [`f2972f4`](https://github.com/mmurakaru/skillbox/commit/f2972f433d2831fbf4b68a23d8cd1749f14f3825) Thanks [@mmurakaru](https://github.com/mmurakaru)! - Add a Models tab listing the AI models stored on this Mac from Ollama, the Hugging Face cache, LM Studio, OpenWhispr, Application Support model folders, and custom folders, with on-disk size, an estimated RAM fit badge, duplicate detection, and reveal in Finder. Choose scan sources under Local models in Settings.
+
+- [#23](https://github.com/mmurakaru/skillbox/pull/23) [`f48c12f`](https://github.com/mmurakaru/skillbox/commit/f48c12fe2a69502a0836adb6b3ad3015e215c180) Thanks [@mmurakaru](https://github.com/mmurakaru)! - Show which local models are loaded in memory while the Models tab is visible, unload Ollama models and dedicated llama-server processes after confirmation, and move flat weight files and Hugging Face cache repos to the Trash.
+
 ## 0.7.0
 
 ### Minor Changes
