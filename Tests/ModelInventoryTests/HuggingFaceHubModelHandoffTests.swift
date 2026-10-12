@@ -22,10 +22,23 @@ struct HuggingFaceHubModelHandoffTests {
         #expect(!installed("Qwen/Qwen3-8B-Base", [local("Qwen/Qwen3-8B", .huggingFaceCache)]))
     }
 
-    @Test func matchesOllamaLibraryNamesAndHubPulls() {
+    @Test func matchesOllamaLibraryNamesIncludingQuantizedTags() {
         #expect(installed("Qwen/Qwen3-8B", [local("qwen3:8b", .ollama)]))
-        #expect(installed("org/Model-8B-GGUF", [local("hf.co/org/Model-8B-GGUF:Q4_K_M", .ollama)]))
+        #expect(installed("Qwen/Qwen3-8B", [local("qwen3:8b-q4_K_M", .ollama)]))
+        #expect(!installed("Qwen/Qwen3-8B", [local("qwen3:latest", .ollama)]))
         #expect(!installed("Qwen/Qwen3-8B", [local("qwen3:14b", .ollama)]))
+    }
+
+    @Test func matchesHubPullsAsTheOllamaScannerListsThem() throws {
+        let store = try ModelInventoryTestDirectory()
+        try store.writeFile("blobs/sha256-w", bytes: 10)
+        try store.writeFile("manifests/hf.co/unsloth/Qwen3-8B-GGUF/Q4_K_M", contents: Data("""
+        {"layers": [{"digest": "sha256:w", "mediaType": "application/vnd.ollama.image.model"}]}
+        """.utf8))
+        let scanned = OllamaModelScanner(root: store.url).scan()
+
+        #expect(installed("unsloth/Qwen3-8B-GGUF", scanned))
+        #expect(!installed("unsloth/Qwen3-14B-GGUF", scanned))
     }
 
     @Test func similarNamesAreNotInstalled() {

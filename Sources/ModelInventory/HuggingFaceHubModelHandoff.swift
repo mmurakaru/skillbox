@@ -12,8 +12,8 @@ public enum HuggingFaceHubModelHandoff {
             case .huggingFaceCache:
                 return local.name.lowercased() == repositoryID
             case .ollama:
-                if let pulledRepositoryID = ollamaPulledRepositoryID(local.name) {
-                    return pulledRepositoryID == repositoryID
+                if let namespacedRepositoryID = ollamaNamespacedRepositoryID(local.name) {
+                    return namespacedRepositoryID == repositoryID
                 }
                 return ollamaIdentity(local.name) == baseName
             default:
@@ -23,25 +23,23 @@ public enum HuggingFaceHubModelHandoff {
         }
     }
 
-    /// `hf.co/<org>/<repo>:<quant>` names come from pulling a Hub repository into Ollama.
-    private static func ollamaPulledRepositoryID(_ ollamaName: String) -> String? {
-        let lowered = ollamaName.lowercased()
-        guard lowered.hasPrefix("hf.co/") else { return nil }
-        let repository = lowered.dropFirst("hf.co/".count)
-        return String(repository.split(separator: ":", maxSplits: 1).first ?? repository)
+    /// The scanner drops the registry, so `ollama pull hf.co/<org>/<repo>:<quant>` lists as `<org>/<repo>:<quant>`.
+    private static func ollamaNamespacedRepositoryID(_ ollamaName: String) -> String? {
+        let repository = ollamaName.lowercased().split(separator: ":", maxSplits: 1).first.map(String.init) ?? ""
+        return repository.contains("/") ? repository : nil
     }
 
-    /// `qwen3:8b` names the Hub repository `Qwen3-8B`; the default `latest` tag adds nothing.
+    /// `qwen3:8b-q4_K_M` names the Hub repository `Qwen3-8B`; quantization and the default `latest` tag add nothing.
     private static func ollamaIdentity(_ ollamaName: String) -> String {
         let parts = ollamaName.split(separator: ":", maxSplits: 1).map(String.init)
-        let modelName = parts[0].split(separator: "/").last.map(String.init) ?? parts[0]
-        guard parts.count == 2, parts[1].lowercased() != "latest" else { return normalizedIdentity(modelName) }
-        return normalizedIdentity(modelName + "-" + parts[1])
+        let tag = parts.count == 2 ? strippingQuantization(from: parts[1]) : ""
+        guard !tag.isEmpty, tag.lowercased() != "latest" else { return normalizedIdentity(parts[0]) }
+        return normalizedIdentity(parts[0] + "-" + tag)
     }
 
     /// Drops quantization suffixes such as `-Q4_K_M`, `.Q8_0`, or `-f16` that local GGUF file names add.
     private static func strippingQuantization(from fileName: String) -> String {
-        fileName.replacing(/(?i)[-_.](?:i?q\d\w*|bf16|fp?16|f32)$/, with: "")
+        fileName.replacing(/(?i)(?:^|[-_.])(?:i?q\d\w*|bf16|fp?16|f32)$/, with: "")
     }
 
     private static func strippingSuffix(_ suffix: String, from name: String) -> String {
