@@ -229,6 +229,8 @@ struct PopoverView: View {
 
     private var skillsBody: some View {
         return VStack(spacing: 0) {
+            TabHeaderView(title: "Skills", subtitle: "Shared skills for every agent harness")
+            Divider()
             HStack(spacing: 6) {
                 classificationControls
                 installButton
