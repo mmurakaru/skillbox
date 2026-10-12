@@ -1,0 +1,153 @@
+included:
+  - Sources
+  - Tests
+  - Tools/StatementPadding/Sources
+  - Tools/StatementPadding/Tests
+excluded:
+  - .build
+  - Tools/StatementPadding/.build
+
+# swift-format owns layout, so SwiftLint's formatting rules stay off to avoid two tools disagreeing.
+disabled_rules:
+  - trailing_comma
+  - statement_position
+  - vertical_whitespace
+  - vertical_parameter_alignment
+  - comma
+  - opening_brace
+  - closure_parameter_position
+  - multiple_closures_with_trailing_closure
+  - type_body_length
+  - function_body_length
+  - file_length
+  - nesting
+  - function_parameter_count
+  - todo
+  # Width belongs to swift-format, which cannot break string literals.
+  - line_length
+  # String(decoding:) is deliberate: tool output decodes leniently and JSON slices are known UTF-8.
+  - optional_data_string_conversion
+
+opt_in_rules:
+  # correctness
+  - identical_operands
+  - unhandled_throwing_task
+  - discarded_notification_center_observer
+  - overridden_super_call
+  - prohibited_super_call
+  - unowned_variable_capture
+  - private_swiftui_state
+  - force_unwrapping
+  - implicitly_unwrapped_optional
+  # suspicious
+  - fatal_error_message
+  - empty_xctest_method
+  - discouraged_assert
+  - weak_delegate
+  # perf
+  - empty_count
+  - empty_string
+  - first_where
+  - last_where
+  - contains_over_filter_count
+  - contains_over_filter_is_empty
+  - contains_over_first_not_nil
+  - contains_over_range_nil_comparison
+  - flatmap_over_map_reduce
+  - reduce_into
+  - sorted_first_last
+  - empty_collection_literal
+
+force_cast: error
+force_try: error
+force_unwrapping: error
+implicitly_unwrapped_optional: error
+
+# A file that parses external JSON states that once at the top instead of on every line.
+blanket_disable_command:
+  allowed_rules:
+    - no_untyped_dictionaries
+    - no_any_parameters
+    - no_widening_to_any
+
+cyclomatic_complexity:
+  warning: 20
+  error: 20
+  ignores_case_statements: false
+
+identifier_name:
+  min_length: 1
+  max_length: 70
+  allowed_symbols: ["_"]
+  validates_start_with_lowercase: error
+
+custom_rules:
+  prefer_for_in:
+    name: Prefer for-in
+    regex: 'for\s+\w+\s+in\s+0\s*\.\.<\s*[\w.]+\.count\b'
+    message: "Iterate the collection itself, or its indices() / enumerated(), instead of counting from 0."
+    severity: error
+  no_any_parameters:
+    name: No Any parameters
+    regex: ':\s*(?:inout\s+)?(?:Any|AnyObject)\??\s*[,)]'
+    match_kinds: [typeidentifier, keyword]
+    message: "Accept a named domain type; parse untyped input at its boundary."
+    severity: error
+  no_any_returns:
+    name: No Any returns
+    regex: '->\s*(?:Any|AnyObject)\??(?![\w.])'
+    message: "Parse the value at its boundary and return a named domain type."
+    severity: error
+  no_any_type_aliases:
+    name: No Any type aliases
+    regex: 'typealias\s+\w+\s*=\s*(?:Any|AnyObject)\b'
+    message: "An alias hides Any; use the parsed owner type."
+    severity: error
+  no_untyped_dictionaries:
+    name: No untyped dictionaries
+    regex: '\[\s*\w+\s*:\s*(?:Any|AnyObject)\??\s*\]|Dictionary<\s*\w+\s*,\s*(?:Any|AnyObject)\s*>'
+    message: "Use a typed value; untyped JSON dictionaries belong only in files that parse external JSON."
+    severity: error
+    excluded: 'Tests/'
+  no_widening_to_any:
+    name: No widening to Any
+    regex: '\bas\s+(?:Any|AnyObject)\b'
+    message: "Keep the precise type; widening to Any discards type evidence."
+    severity: error
+  no_chained_casts:
+    name: No chained casts
+    regex: '\bas[!?]?\s+[\w.<>]+\??\s+as[!?]?\s'
+    message: "A cast chain discards type evidence; keep the original type or parse at the boundary."
+    severity: error
+  no_reflection:
+    name: No reflection
+    regex: '\bMirror\s*\(|\.value\(forKey(?:Path)?:|\bperform\(\s*(?:#selector|Selector)|NSSelectorFromString'
+    message: "Use typed access; model dynamic dispatch behind a named protocol."
+    severity: error
+  no_runtime_type_of:
+    name: No runtime type(of:)
+    regex: '\btype\(of:'
+    message: "Branch on a domain value, not on a runtime type."
+    severity: error
+  no_shape_in_symbol_names:
+    name: No shape in symbol names
+    regex: '(?i)\b(?:let|var|func|class|struct|enum|protocol|typealias|case|actor)\s+\w*shape\w*'
+    message: "Name the symbol for its domain role; 'shape' describes structure, not ownership."
+    severity: error
+  no_em_dash:
+    name: No em dash
+    regex: "—"
+    message: "Use a plain hyphen."
+    severity: error
+  force_suppression_requires_safety:
+    name: Force suppression requires SAFETY
+    regex: 'swiftlint:disable(?::next|:this|:previous)?\s+[^\n]*\b(?:force_cast|force_try|force_unwrapping)\b(?![^\n]*SAFETY:)'
+    match_kinds: [comment]
+    message: "State the checked invariant: append ' - SAFETY: <invariant>'."
+    severity: error
+  lint_suppression_requires_reason:
+    name: Lint suppression requires a reason
+    regex: '(?m)swiftlint:disable(?::next|:this|:previous)?\s+[\w ]+$'
+    match_kinds: [comment]
+    message: "Explain the suppression: append ' - <reason>'."
+    severity: error

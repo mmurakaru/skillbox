@@ -6,8 +6,13 @@ SPARKLE_SRC    = $(BIN_DIR)/Sparkle.framework
 FRAMEWORKS_DIR = $(BUNDLE)/Contents/Frameworks
 SPARKLE_DST    = $(FRAMEWORKS_DIR)/Sparkle.framework
 SIGN_IDENTITY  = -
+SWIFTLINT_VERSION = 0.65.1
+SWIFTLINT_SHA256  = c1e429b0599cf1b516f369a2d9ec04eaf0e436f3c12b637df8851fa52ff694d0
+SWIFTLINT         = .build/tools/swiftlint-$(SWIFTLINT_VERSION)/swiftlint
+STATEMENT_PADDING = Tools/StatementPadding/.build/release/statement-padding
+LINT_PATHS        = Sources Tests Tools/StatementPadding/Sources Tools/StatementPadding/Tests
 
-.PHONY: build bundle run install clean test test-ui
+.PHONY: build bundle run install clean test test-ui lint format
 
 build:
 	swift build -c release
@@ -53,3 +58,20 @@ test:
 
 test-ui:
 	scripts/test-usage-ui.sh
+
+$(SWIFTLINT):
+	scripts/fetch-swiftlint.sh $(SWIFTLINT_VERSION) $(SWIFTLINT_SHA256) $(dir $(SWIFTLINT))
+
+$(STATEMENT_PADDING): Tools/StatementPadding/Package.swift $(wildcard Tools/StatementPadding/Sources/*/*.swift)
+	swift build -c release --package-path Tools/StatementPadding
+
+lint: $(SWIFTLINT) $(STATEMENT_PADDING)
+	$(STATEMENT_PADDING) lint $(LINT_PATHS)
+	swift format lint --strict --recursive $(LINT_PATHS)
+	$(SWIFTLINT) lint --strict --quiet
+
+# Statement padding runs after swift-format, which splits one-line statement pairs that padding skips.
+format: $(SWIFTLINT) $(STATEMENT_PADDING)
+	swift format --in-place --recursive $(LINT_PATHS)
+	$(STATEMENT_PADDING) fix $(LINT_PATHS)
+	$(SWIFTLINT) lint --fix --quiet

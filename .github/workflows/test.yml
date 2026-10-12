@@ -17,5 +17,12 @@ jobs:
         with:
           node-version: 24
       - run: npm ci --ignore-scripts
+      - uses: actions/cache@v6
+        with:
+          path: |
+            .build/tools
+            Tools/StatementPadding/.build
+          key: lint-tools-${{ runner.os }}-${{ hashFiles('Makefile', 'Tools/StatementPadding/Package.resolved', 'Tools/StatementPadding/Sources/**') }}
+      - run: make lint
       - run: swift test
       - run: make bundle
