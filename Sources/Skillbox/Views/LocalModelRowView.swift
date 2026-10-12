@@ -98,12 +98,16 @@ struct LocalModelRowView: View {
     private var hoverActions: some View {
         HStack(spacing: 2) {
             if runtimeState?.stopTarget != nil {
-                rowActionButton(systemImage: "stop.circle", help: "Unload from memory") { isConfirmingStop = true }
+                RowHoverActionButton(systemImage: "stop.circle", help: "Unload from memory", accessibilityLabel: "Unload \(model.name)") {
+                    isConfirmingStop = true
+                }
             }
-            rowActionButton(systemImage: "folder", help: "Reveal in Finder", action: onReveal)
+            RowHoverActionButton(systemImage: "folder", help: "Reveal in Finder", accessibilityLabel: "Reveal \(model.name) in Finder", action: onReveal)
             if canMoveToTrash {
                 if runtimeState == nil {
-                    rowActionButton(systemImage: "trash", help: "Move to Trash") { isConfirmingTrash = true }
+                    RowHoverActionButton(systemImage: "trash", help: "Move to Trash", accessibilityLabel: "Move \(model.name) to the Trash") {
+                        isConfirmingTrash = true
+                    }
                 } else {
                     // A disabled button can drop its tooltip, so the reason shows on a plain icon.
                     Image(systemName: "trash")
@@ -115,19 +119,6 @@ struct LocalModelRowView: View {
                 }
             }
         }
-    }
-
-    private func rowActionButton(systemImage: String, help: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-                .frame(width: 22, height: 22)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help(help)
-        .accessibilityLabel("\(help): \(model.name)")
     }
 
     private var ramFitBadge: some View {
