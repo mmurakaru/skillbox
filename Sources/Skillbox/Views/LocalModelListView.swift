@@ -4,7 +4,13 @@ import ModelInventory
 
 /// Models tab: the AI models stored on this Mac, with size, RAM fit, and duplicate copies.
 struct LocalModelListView: View {
+    // Each refresh runs lsof over every weight file, so it stays infrequent.
+    private static let runtimeRefreshInterval: Duration = .seconds(15)
+
     @Environment(LocalModelStore.self) private var store
+    @State private var trashErrorMessage: String?
+
+    @State private var isWindowVisible = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -25,9 +31,50 @@ struct LocalModelListView: View {
 
             Divider()
 
+            if let trashErrorMessage {
+                trashErrorBanner(trashErrorMessage)
+            }
+
             list
         }
+        .background(WindowVisibilityReader { isWindowVisible = $0 })
+        .task(id: isWindowVisible) {
+            guard isWindowVisible else { return }
+            while !Task.isCancelled {
+                await store.refreshRuntimeStates()
+                try? await Task.sleep(for: Self.runtimeRefreshInterval)
+            }
+        }
         .onAppear { store.watchModelFoldersCreatedSinceLastCheck() }
+    }
+
+    private func moveToTrash(_ model: LocalModel) {
+        do {
+            try store.moveToTrash(model)
+            trashErrorMessage = nil
+        } catch {
+            trashErrorMessage = "Could not move \(model.name) to the Trash: \(error.localizedDescription)"
+        }
+    }
+
+    private func trashErrorBanner(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text(message)
+                .font(.system(size: 11))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            Button(action: { trashErrorMessage = nil }) {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("Dismiss")
+            .accessibilityLabel("Dismiss")
+        }
+        .padding(8)
+        .background(Color.orange.opacity(0.08))
     }
 
     private var summary: some View {
@@ -126,7 +173,11 @@ struct LocalModelListView: View {
                         LocalModelRowView(
                             model: model,
                             copyCount: store.copyCount(for: model),
-                            onReveal: { NSWorkspace.shared.activateFileViewerSelecting([model.path]) }
+                            runtimeState: store.runtimeState(for: model),
+                            canMoveToTrash: LocalModelTrashPolicy.canMoveToTrash(model),
+                            onReveal: { NSWorkspace.shared.activateFileViewerSelecting([model.path]) },
+                            onStop: { Task { await store.stop(model) } },
+                            onMoveToTrash: { moveToTrash(model) }
                         )
                     }
                 }

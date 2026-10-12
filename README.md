@@ -46,6 +46,8 @@ Open the Models tab with ⌘6 to see the AI models stored on this Mac: Ollama, t
 
 **Find duplicate copies** groups byte-identical models and shows the space a single copy would reclaim. Models that share a content digest group immediately; other files are hashed only when another model has the same size. The inventory scans at launch and again when a scanned folder changes. Choose sources and extra folders under **Local models** in Settings. Scanning code lives in the `ModelInventory` library target.
 
+While the panel is visible, the tab checks every five seconds which models are **Loaded** in memory: Ollama's running models through its local API, and other weight files through one `lsof` call. Hover a row to unload a model, reveal it in Finder, or move it to the Trash, each after confirmation. Unload is offered only when it cannot quit another app: Ollama unloads through its API, and a dedicated `llama-server` process gets `SIGTERM` after Skillbox confirms that it still holds the file. Ollama models never go to the Trash, because tags share content-addressed blobs.
+
 ## Native Usage UI checks
 
 Run `make test-ui` on a logged-in macOS desktop. The harness compiles the production Usage views into a separate menu bar app with synthetic provider data and isolated persistence. It never accesses accounts, Keychain, or the network. macOS must allow the invoking terminal to automate System Events and use Accessibility.

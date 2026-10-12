@@ -69,4 +69,17 @@ struct HuggingFaceCacheScannerTests {
         #expect(HuggingFaceCacheScanner.defaultRoot(environment: ["HF_HOME": "/data/hf"], home: home).path == "/data/hf/hub")
         #expect(HuggingFaceCacheScanner.defaultRoot(environment: ["HF_HUB_CACHE": "/data/hub"], home: home).path == "/data/hub")
     }
+
+    @Test func weightFilesAreTheBlobsSnapshotsLinkTo() throws {
+        let hub = try ModelInventoryTestDirectory()
+        let blob = try hub.writeFile("models--Example--Tiny/blobs/weights-blob", bytes: 64)
+        let snapshot = hub.url.appending(path: "models--Example--Tiny/snapshots/abc123")
+        try FileManager.default.createDirectory(at: snapshot, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: snapshot.appending(path: "model.gguf"), withDestinationURL: blob)
+        try FileManager.default.createSymbolicLink(at: snapshot.appending(path: "copy.gguf"), withDestinationURL: blob)
+
+        let model = try #require(HuggingFaceCacheScanner(root: hub.url).scan().first)
+
+        #expect(model.weightFileURLs.map(\.path) == [blob.resolvingSymlinksInPath().path])
+    }
 }

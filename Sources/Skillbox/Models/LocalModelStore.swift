@@ -10,6 +10,7 @@ final class LocalModelStore {
     private(set) var isScanning = false
     private(set) var duplicateGroups: [DuplicateModelGroup] = []
     private(set) var isDetectingDuplicates = false
+    private(set) var runtimeStates: [String: ModelRuntimeState] = [:]
 
     var searchQuery = ""
 
@@ -22,15 +23,21 @@ final class LocalModelStore {
     private static let watcherEventQueue = DispatchQueue(label: "skillbox.local-models.watcher", qos: .utility)
     private static let rootAppearanceCheckInterval: Duration = .seconds(300)
     private let duplicateDetector = DuplicateModelDetector()
+    private let runtimeMonitor: any ModelRuntimeMonitoring
+    private let moveItemToTrash: (URL) throws -> Void
     private let makeScanners: (LocalModelScanConfiguration) -> [any LocalModelScanner]
     // Bumped per scan so a slow, older scan cannot overwrite newer results.
     private var inventoryGeneration = 0
 
     init(
         makeScanners: @escaping (LocalModelScanConfiguration) -> [any LocalModelScanner] = { $0.makeScanners() },
+        runtimeMonitor: any ModelRuntimeMonitoring = ModelRuntimeMonitor(),
+        moveItemToTrash: @escaping (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) },
         seedModels: [LocalModel] = []
     ) {
         self.makeScanners = makeScanners
+        self.runtimeMonitor = runtimeMonitor
+        self.moveItemToTrash = moveItemToTrash
         self.models = seedModels
     }
 
@@ -114,6 +121,38 @@ final class LocalModelStore {
         }?.models.count ?? 1
     }
 
+    /// Reads which models are loaded in memory. Called only while the Models tab is visible.
+    func refreshRuntimeStates() async {
+        guard !models.isEmpty else {
+            runtimeStates = [:]
+            return
+        }
+        runtimeStates = await runtimeMonitor.runtimeStates(for: models)
+    }
+
+    func runtimeState(for model: LocalModel) -> ModelRuntimeState? {
+        runtimeStates[model.id]
+    }
+
+    /// Unloads a cleanly stoppable model, then refreshes runtime state.
+    func stop(_ model: LocalModel) async {
+        guard let target = runtimeStates[model.id]?.stopTarget else { return }
+        await runtimeMonitor.stop(target, weightFileURLs: model.weightFileURLs)
+        await refreshRuntimeStates()
+    }
+
+    /// Moves a model to the Trash and drops it from the inventory and its duplicate group.
+    func moveToTrash(_ model: LocalModel) throws {
+        guard LocalModelTrashPolicy.canMoveToTrash(model) else { throw LocalModelTrashError.managedByOllama(model.name) }
+        guard runtimeStates[model.id] == nil else { throw LocalModelTrashError.loadedInMemory(model.name) }
+        try moveItemToTrash(model.path)
+        models.removeAll { $0.id == model.id }
+        runtimeStates[model.id] = nil
+        duplicateGroups = duplicateGroups
+            .map { DuplicateModelGroup(id: $0.id, models: $0.models.filter { $0.id != model.id }) }
+            .filter { $0.models.count > 1 }
+    }
+
     /// Starts watching model folders created since the last check; returns true when it rescanned.
     @discardableResult
     func watchModelFoldersCreatedSinceLastCheck() -> Bool {
@@ -146,6 +185,19 @@ final class LocalModelStore {
                 guard !Task.isCancelled, let self else { return }
                 if self.watchModelFoldersCreatedSinceLastCheck() { return }
             }
+        }
+    }
+}
+
+/// Why a local model could not be moved to the Trash.
+enum LocalModelTrashError: LocalizedError, Equatable {
+    case managedByOllama(String)
+    case loadedInMemory(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .managedByOllama(let name): "Ollama manages the files of \(name). Remove it with `ollama rm \(name)`."
+        case .loadedInMemory(let name): "\(name) is loaded in memory. Unload it before moving it to the Trash."
         }
     }
 }

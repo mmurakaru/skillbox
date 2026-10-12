@@ -1,13 +1,19 @@
 import SwiftUI
 import ModelInventory
 
-/// One local model row: name, source, estimated RAM, size, and a RAM fit badge.
+/// One local model row: name, source, estimated RAM, size, RAM fit badge, and loaded state.
 struct LocalModelRowView: View {
     let model: LocalModel
     let copyCount: Int
+    let runtimeState: ModelRuntimeState?
+    let canMoveToTrash: Bool
     let onReveal: () -> Void
+    let onStop: () -> Void
+    let onMoveToTrash: () -> Void
 
     @State private var isHovering = false
+    @State private var isConfirmingStop = false
+    @State private var isConfirmingTrash = false
 
     private static let physicalMemoryBytes = Int64(ProcessInfo.processInfo.physicalMemory)
 
@@ -33,6 +39,11 @@ struct LocalModelRowView: View {
                         Text("\(copyCount) copies")
                             .foregroundStyle(.orange)
                     }
+                    if let runtimeState {
+                        Text("Loaded")
+                            .foregroundStyle(.blue)
+                            .help("Loaded in memory by \(runtimeState.hostName)")
+                    }
                 }
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
@@ -42,16 +53,7 @@ struct LocalModelRowView: View {
             .help(model.path.path)
 
             if isHovering {
-                Button(action: onReveal) {
-                    Image(systemName: "folder")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 22, height: 22)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help("Reveal in Finder")
-                .accessibilityLabel("Reveal \(model.name) in Finder")
+                hoverActions
             }
 
             VStack(alignment: .trailing, spacing: 2) {
@@ -71,6 +73,61 @@ struct LocalModelRowView: View {
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.12)) { isHovering = hovering }
         }
+        .confirmationDialog("Unload \(model.name)?", isPresented: $isConfirmingStop, titleVisibility: .visible) {
+            Button("Unload", role: .destructive, action: onStop)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(stopMessage)
+        }
+        .confirmationDialog("Move \(model.name) to the Trash?", isPresented: $isConfirmingTrash, titleVisibility: .visible) {
+            Button("Move to Trash", role: .destructive, action: onMoveToTrash)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("\(model.sizeBytes.formattedFileSize) at \(model.path.path)")
+        }
+    }
+
+    private var stopMessage: String {
+        switch runtimeState?.stopTarget {
+        case .ollama: "Ollama unloads the model and frees about \(estimatedRAMBytes.formattedFileSize) of memory."
+        case .process(_, let commandName): "Stops the \(commandName) process that serves this model."
+        case .none: ""
+        }
+    }
+
+    private var hoverActions: some View {
+        HStack(spacing: 2) {
+            if runtimeState?.stopTarget != nil {
+                rowActionButton(systemImage: "stop.circle", help: "Unload from memory") { isConfirmingStop = true }
+            }
+            rowActionButton(systemImage: "folder", help: "Reveal in Finder", action: onReveal)
+            if canMoveToTrash {
+                if runtimeState == nil {
+                    rowActionButton(systemImage: "trash", help: "Move to Trash") { isConfirmingTrash = true }
+                } else {
+                    // A disabled button can drop its tooltip, so the reason shows on a plain icon.
+                    Image(systemName: "trash")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 22, height: 22)
+                        .help("Unload this model before moving it to the Trash")
+                        .accessibilityLabel("Move to Trash unavailable while \(model.name) is loaded")
+                }
+            }
+        }
+    }
+
+    private func rowActionButton(systemImage: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .frame(width: 22, height: 22)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .accessibilityLabel("\(help): \(model.name)")
     }
 
     private var ramFitBadge: some View {

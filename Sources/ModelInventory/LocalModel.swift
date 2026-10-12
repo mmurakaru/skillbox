@@ -40,6 +40,8 @@ public struct LocalModel: Identifiable, Sendable, Hashable {
     public var modifiedAt: Date?
     /// Content-addressed blobs this model uses, by digest; other models can point at the same blobs.
     public var sharedBlobSizes: [String: Int64]
+    /// Files a runtime holds open while the model is loaded; differs from `path` when `path` is a folder.
+    public var weightFileURLs: [URL]
 
     public init(
         id: String,
@@ -50,7 +52,8 @@ public struct LocalModel: Identifiable, Sendable, Hashable {
         sizeBytes: Int64,
         digest: String? = nil,
         modifiedAt: Date? = nil,
-        sharedBlobSizes: [String: Int64] = [:]
+        sharedBlobSizes: [String: Int64] = [:],
+        weightFileURLs: [URL]? = nil
     ) {
         self.id = id
         self.name = name
@@ -61,6 +64,7 @@ public struct LocalModel: Identifiable, Sendable, Hashable {
         self.digest = digest
         self.modifiedAt = modifiedAt
         self.sharedBlobSizes = sharedBlobSizes
+        self.weightFileURLs = weightFileURLs ?? [path]
     }
 }
 
