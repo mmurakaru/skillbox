@@ -123,6 +123,10 @@ final class LocalModelStore {
 
     /// Reads which models are loaded in memory. Called only while the Models tab is visible.
     func refreshRuntimeStates() async {
+        guard !models.isEmpty else {
+            runtimeStates = [:]
+            return
+        }
         runtimeStates = await runtimeMonitor.runtimeStates(for: models)
     }
 
@@ -139,7 +143,8 @@ final class LocalModelStore {
 
     /// Moves a model to the Trash and drops it from the inventory and its duplicate group.
     func moveToTrash(_ model: LocalModel) throws {
-        guard LocalModelTrashPolicy.canMoveToTrash(model) else { throw LocalModelTrashError.notTrashable(model.name) }
+        guard LocalModelTrashPolicy.canMoveToTrash(model) else { throw LocalModelTrashError.managedByOllama(model.name) }
+        guard runtimeStates[model.id] == nil else { throw LocalModelTrashError.loadedInMemory(model.name) }
         try moveItemToTrash(model.path)
         models.removeAll { $0.id == model.id }
         runtimeStates[model.id] = nil
@@ -186,11 +191,13 @@ final class LocalModelStore {
 
 /// Why a local model could not be moved to the Trash.
 enum LocalModelTrashError: LocalizedError, Equatable {
-    case notTrashable(String)
+    case managedByOllama(String)
+    case loadedInMemory(String)
 
     var errorDescription: String? {
         switch self {
-        case .notTrashable(let name): "Model \(name) shares files with other models and cannot be moved to the Trash"
+        case .managedByOllama(let name): "Ollama manages the files of \(name). Remove it with `ollama rm \(name)`."
+        case .loadedInMemory(let name): "\(name) is loaded in memory. Unload it before moving it to the Trash."
         }
     }
 }

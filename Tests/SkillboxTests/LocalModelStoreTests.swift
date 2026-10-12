@@ -263,9 +263,22 @@ struct LocalModelStoreTests {
         #expect(store.models.count == 2)
     }
 
+    @Test func moveToTrashRefusesAModelThatIsLoaded() async {
+        let monitor = RecordingRuntimeMonitor(states: ["1": ModelRuntimeState(stopTarget: .process(pid: 42, commandName: "llama-server"), hostName: "llama-server")])
+        var trashedPaths: [String] = []
+        let store = LocalModelStore(runtimeMonitor: monitor, moveItemToTrash: { trashedPaths.append($0.path) }, seedModels: sampleModels())
+        await store.refreshRuntimeStates()
+
+        #expect(throws: LocalModelTrashError.loadedInMemory(sampleModels()[0].name)) {
+            try store.moveToTrash(sampleModels()[0])
+        }
+        #expect(trashedPaths.isEmpty)
+        #expect(store.models.count == 2)
+    }
+
     @Test func moveToTrashRefusesSharedOllamaBlobs() {
         let store = LocalModelStore(seedModels: sampleModels())
-        #expect(throws: LocalModelTrashError.notTrashable("llama-3-8b")) {
+        #expect(throws: LocalModelTrashError.managedByOllama("llama-3-8b")) {
             try store.moveToTrash(sampleModels()[1])
         }
         #expect(store.models.count == 2)
