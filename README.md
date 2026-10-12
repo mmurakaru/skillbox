@@ -48,6 +48,10 @@ Open the Models tab with ⌘6 to see the AI models stored on this Mac: Ollama, t
 
 While the panel is visible, the tab checks every five seconds which models are **Loaded** in memory: Ollama's running models through its local API, and other weight files through one `lsof` call. Hover a row to unload a model, reveal it in Finder, or move it to the Trash, each after confirmation. Unload is offered only when it cannot quit another app: Ollama unloads through its API, and a dedicated `llama-server` process gets `SIGTERM` after Skillbox confirms that it still holds the file. Ollama models never go to the Trash, because tags share content-addressed blobs.
 
+## Explore models
+
+Open the Explore tab with ⌘7 to browse the Hugging Face Hub. It queries the public models API without a token and filters by search text, lab, format (GGUF or MLX), and sort order; the parameter size filter works on the size parsed from each model name. The tab runs one live search per app session and caches the last results under `~/Library/Caches/Skillbox`, so they stay visible offline with a notice. A check mark shows models whose name matches one in the Models tab. Hover a result to open its model page or copy a download command: `ollama pull hf.co/<id>` for GGUF repos, `hf download <id>` otherwise.
+
 ## Native Usage UI checks
 
 Run `make test-ui` on a logged-in macOS desktop. The harness compiles the production Usage views into a separate menu bar app with synthetic provider data and isolated persistence. It never accesses accounts, Keychain, or the network. macOS must allow the invoking terminal to automate System Events and use Accessibility.

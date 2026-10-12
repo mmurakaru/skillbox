@@ -8,6 +8,7 @@ enum AppTab: String, CaseIterable, Identifiable {
     case env
     case usage
     case models
+    case explore
 
     var id: String { rawValue }
 
@@ -19,6 +20,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .env: "Env"
         case .usage: "Usage"
         case .models: "Models"
+        case .explore: "Explore"
         }
     }
 
@@ -30,6 +32,7 @@ enum AppTab: String, CaseIterable, Identifiable {
         case .env: "lock"
         case .usage: "chart.bar"
         case .models: "cpu"
+        case .explore: "magnifyingglass"
         }
     }
 }
@@ -46,6 +49,7 @@ struct PopoverView: View {
     @Environment(HookStore.self) private var hookStore
     @Environment(EnvVarStore.self) private var envStore
     @Environment(LocalModelStore.self) private var localModelStore
+    @Environment(ModelExplorerStore.self) private var modelExplorerStore
     @Environment(RemoteSkillService.self) private var remoteSkillService
     @Environment(SkillOverridesStore.self) private var overridesStore
     @Environment(SkillFolderSync.self) private var skillFolderSync
@@ -169,6 +173,7 @@ struct PopoverView: View {
                     case .env: envBody
                     case .usage: UsageOverviewView()
                     case .models: LocalModelListView()
+                    case .explore: ModelExplorerView()
                     }
                 }
             }
@@ -448,6 +453,8 @@ struct PopoverView: View {
                 .keyboardShortcut("5", modifiers: .command)
             Button("") { activeTabRaw = AppTab.models.rawValue }
                 .keyboardShortcut("6", modifiers: .command)
+            Button("") { activeTabRaw = AppTab.explore.rawValue }
+                .keyboardShortcut("7", modifiers: .command)
         }
         .opacity(0)
         .frame(width: 0, height: 0)
@@ -462,6 +469,7 @@ struct PopoverView: View {
         case .env: envStore.filteredEnvVars.count
         case .usage: UsageProvider.allCases.count
         case .models: localModelStore.filteredModels.count
+        case .explore: modelExplorerStore.displayedResults.count
         }
     }
 
@@ -469,6 +477,7 @@ struct PopoverView: View {
         switch activeTab {
         case .usage: "\(activeCount) providers"
         case .models: "\(activeCount) local models"
+        case .explore: "\(activeCount) Hugging Face results"
         default: "\(activeCount) visible items"
         }
     }
