@@ -99,7 +99,7 @@ struct SettingsView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        TextField("Claude skills mount", text: $claudeSkillsMountPath)
+                        TextField("Claude Code skills mount", text: $claudeSkillsMountPath)
                             .textFieldStyle(.roundedBorder)
                         Button("Browse…") { browseForFolder(binding: $claudeSkillsMountPath) }
                     }
@@ -155,11 +155,11 @@ struct SettingsView: View {
                         .textFieldStyle(.roundedBorder)
                     Button("Browse…") { browseForFile(binding: $claudeCommand) }
                 }
-                Text("Leave blank to find `claude` on PATH. Used by the Insights button.")
+                Text("Leave blank to find `claude` on PATH. Used by Claude Code Insights.")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
             } header: {
-                Text("Claude CLI")
+                Text("Claude Code CLI")
             }
 
             Section {

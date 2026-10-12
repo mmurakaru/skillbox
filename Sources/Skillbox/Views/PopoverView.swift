@@ -229,8 +229,7 @@ struct PopoverView: View {
 
     private var skillsBody: some View {
         return VStack(spacing: 0) {
-            TabHeaderView(title: "Skills", subtitle: "Shared skills for every agent harness")
-            Divider()
+            TabHeaderView(title: "Skills", subtitle: "Shared skill store with a Claude Code mount")
             HStack(spacing: 6) {
                 classificationControls
                 installButton
@@ -302,7 +301,6 @@ struct PopoverView: View {
     private var memoryBody: some View {
         VStack(spacing: 0) {
             TabHeaderView(title: "Memory", subtitle: "Claude Code auto-memory")
-            Divider()
             MemoryListView(
                 selectedMemoryID: $selectedMemoryID,
                 rowStates: $memoryRowStates
@@ -313,7 +311,6 @@ struct PopoverView: View {
     private var hooksBody: some View {
         VStack(spacing: 0) {
             TabHeaderView(title: "Hooks", subtitle: "Claude Code hooks in settings.json")
-            Divider()
             HookListView(
                 selectedHookID: $selectedHookID,
                 rowStates: $hookRowStates
@@ -324,7 +321,6 @@ struct PopoverView: View {
     private var envBody: some View {
         VStack(spacing: 0) {
             TabHeaderView(title: "Env", subtitle: "Claude Code env vars in settings.json")
-            Divider()
             EnvListView(
                 selectedEnvID: $selectedEnvID,
                 rowStates: $envRowStates

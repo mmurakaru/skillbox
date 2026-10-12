@@ -13,14 +13,17 @@ struct TabHeaderView<Trailing: View>: View {
     }
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.headline)
-                Text(subtitle).font(.caption).foregroundStyle(.secondary)
+        VStack(spacing: 0) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title).font(.headline)
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                trailing()
             }
-            Spacer()
-            trailing()
+            .padding(14)
+            Divider()
         }
-        .padding(14)
     }
 }

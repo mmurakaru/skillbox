@@ -162,7 +162,7 @@ Jev automatically classifies skill definitions on launch and when added or chang
 Native SwiftUI `Settings { ... }` scene. Fields:
 
 - **Skills source directory** - text field + "Browse..." button. Default `~/.agents/skills/`.
-- **Claude skills mount** - compatibility symlink directory for Claude Code. Default `~/.claude/skills/`.
+- **Claude Code skills mount** - compatibility symlink directory for Claude Code. Default `~/.claude/skills/`.
 - **Editor** - dropdown of detected GUI editors + "Custom command" text field.
 - **Open target** - radio: Folder / SKILL.md.
 - **Launch at login** - toggle (uses `SMAppService`).

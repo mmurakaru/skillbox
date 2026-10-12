@@ -19,7 +19,6 @@ struct UsageOverviewView: View {
                 .help("Refresh live usage")
                 .accessibilityLabel("Refresh live usage")
             }
-            Divider()
             ScrollView {
                 VStack(spacing: 12) {
                     ForEach(UsageProvider.allCases) { provider in
