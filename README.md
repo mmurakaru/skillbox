@@ -40,6 +40,18 @@ Provider marks are bundled from [Lobe Icons](https://github.com/lobehub/lobe-ico
 
 The read-only endpoint formats follow the provider integrations documented by [CodexBar for Codex](https://github.com/steipete/CodexBar/blob/main/docs/codex-oauth.md) and [Claude](https://github.com/steipete/CodexBar/blob/main/docs/claude.md).
 
+## Local models
+
+Open the Models tab with ⌘6 to see the AI models stored on this Mac: Ollama, the Hugging Face cache (honoring `HF_HOME` and `HF_HUB_CACHE`), LM Studio, OpenWhispr, `models` folders under Application Support, and any extra folders you add. Each row shows the source, on-disk size, and an estimated RAM need of size × 1.2, with a badge comparing it to physical memory: **Fits** at 70% or less, **Tight** up to 100%, **Too big** beyond that. The estimate covers typical context lengths; long contexts need more memory.
+
+**Find duplicate copies** groups byte-identical models and shows the space a single copy would reclaim. Models that share a content digest group immediately; other files are hashed only when another model has the same size. The inventory scans at launch and again when a scanned folder changes. Choose sources and extra folders under **Local models** in Settings. Scanning code lives in the `ModelInventory` library target.
+
+While the panel is visible, the tab checks every five seconds which models are **Loaded** in memory: Ollama's running models through its local API, and other weight files through one `lsof` call. Hover a row to unload a model, reveal it in Finder, or move it to the Trash, each after confirmation. Unload is offered only when it cannot quit another app: Ollama unloads through its API, and a dedicated `llama-server` process gets `SIGTERM` after Skillbox confirms that it still holds the file. Ollama models never go to the Trash, because tags share content-addressed blobs.
+
+## Explore models
+
+Open the Explore tab with ⌘7 to browse the Hugging Face Hub. It queries the public models API without a token and filters by search text, lab, format (GGUF or MLX), and sort order; the parameter size filter works on the size parsed from each model name. The tab runs one live search per app session and caches the last results under `~/Library/Caches/Skillbox`, so they stay visible offline with a notice. A check mark shows models whose name matches one in the Models tab. Hover a result to open its model page or copy a download command: `ollama pull hf.co/<id>` for GGUF repos, `hf download <id>` otherwise.
+
 ## Native Usage UI checks
 
 Run `make test-ui` on a logged-in macOS desktop. The harness compiles the production Usage views into a separate menu bar app with synthetic provider data and isolated persistence. It never accesses accounts, Keychain, or the network. macOS must allow the invoking terminal to automate System Events and use Accessibility.

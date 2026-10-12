@@ -217,6 +217,8 @@ The TypeSafe API key is stored in macOS Keychain. Other preferences are stored i
 | `editorCommand`    | String  | first detected of `code,cursor,zed,subl,nova,bbedit,mate` |
 | `openTarget`       | String  | `folder` (or `skill_md`)              |
 | `launchAtLogin`    | Bool    | `false`                               |
+| `localModelsScanOllama`, `localModelsScanHuggingFace`, `localModelsScanLMStudio`, `localModelsScanOpenWhispr`, `localModelsScanAppSupport` | Bool | `true` |
+| `localModelsCustomPaths` | String | empty (comma-separated folders) |
 
 Plain-text TOML at `~/.skillbox/config.toml` from earlier drafts is dropped - fights macOS conventions and adds a parser dep with no benefit.
 
