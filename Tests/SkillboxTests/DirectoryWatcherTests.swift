@@ -78,6 +78,28 @@ struct DirectoryWatcherTests {
         #expect(DirectoryWatcher(urls: [missing], watchesMissingPathsThroughAncestors: false) {} == nil)
     }
 
+    @Test func releasingWatchersWhileEventsArriveOffMainWaitsForInFlightCallbacks() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("skillbox-watchrelease-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let eventQueue = DispatchQueue(label: "watcher-release-test", qos: .utility)
+        let writer = Task.detached {
+            var index = 0
+            while !Task.isCancelled {
+                try? "\(index)".write(to: root.appendingPathComponent("file-\(index % 8).txt"), atomically: true, encoding: .utf8)
+                index += 1
+            }
+        }
+        defer { writer.cancel() }
+
+        for _ in 0..<40 {
+            var watcher = DirectoryWatcher(urls: [root], eventQueue: eventQueue, acceptsPath: { _ in Thread.sleep(forTimeInterval: 0.002); return true }) {}
+            #expect(watcher != nil)
+            try await Task.sleep(for: .milliseconds(15))
+            watcher = nil
+        }
+    }
+
     @Test func eventsOnAPrivateQueueStillCallBackOnTheMainThread() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("skillbox-queue-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
