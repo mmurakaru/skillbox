@@ -160,7 +160,7 @@ struct HookListView: View {
                 Text("No hooks configured")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
-                Text("Hooks live in ~/.claude/settings.json and per-project .claude/settings.json files.")
+                Text("Claude Code hooks live in ~/.claude/settings.json and per-project .claude/settings.json files.")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
                     .multilineTextAlignment(.center)
