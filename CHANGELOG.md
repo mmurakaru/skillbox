@@ -1,5 +1,11 @@
 # skillbox
 
+## 0.9.3
+
+### Patch Changes
+
+- [#33](https://github.com/mmurakaru/skillbox/pull/33) [`f563482`](https://github.com/mmurakaru/skillbox/commit/f5634829f2b51c3cb3b762426720d052667a3ba7) Thanks [@mmurakaru](https://github.com/mmurakaru)! - Shorten the README to one line per tab and move provider connection details to the provider usage doc.
+
 ## 0.9.2
 
 ### Patch Changes
