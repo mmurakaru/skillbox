@@ -103,7 +103,7 @@ struct MCPSecretConnectionSheet: View {
         var items: [String] = []
         if server.staticHeaderNames.contains(headerName) { items.append("the static \(headerName) header") }
         if !plaintextCopies.isEmpty {
-            items.append(plaintextCopies.count == 1 ? "1 plaintext env copy" : "\(plaintextCopies.count) plaintext env copies")
+            items.append(plaintextCopies.count == 1 ? "1 env copy" : "\(plaintextCopies.count) env copies")
         }
         return items
     }
