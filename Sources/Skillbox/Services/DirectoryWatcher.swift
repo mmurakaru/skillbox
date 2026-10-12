@@ -10,6 +10,9 @@ final class DirectoryWatcher {
     private let onChange: () -> Void
     private let acceptsPath: (String) -> Bool
     private let eventQueue: DispatchQueue
+    /// Serial queue for stream callbacks, so `deinit` can wait for an in-flight callback before freeing the watcher.
+    private let streamQueue: DispatchQueue
+    private let streamQueueKey = DispatchSpecificKey<Void>()
     /// Directories the FSEvents stream is rooted at, after resolving symlinks and missing paths.
     let streamRootPaths: Set<String>
 
@@ -29,6 +32,8 @@ final class DirectoryWatcher {
         self.onChange = onChange
         self.acceptsPath = acceptsPath
         self.eventQueue = eventQueue
+        streamQueue = DispatchQueue(label: "DirectoryWatcher.stream", target: eventQueue)
+        streamQueue.setSpecific(key: streamQueueKey, value: ())
         streamRootPaths = Set(watchedPaths.compactMap { path in
             var root = URL(fileURLWithPath: path)
             var directory: ObjCBool = false
@@ -62,7 +67,7 @@ final class DirectoryWatcher {
             }
         }, &context, Array(roots) as CFArray, FSEventStreamEventId(kFSEventStreamEventIdSinceNow), 0.2, flags)
         guard let stream else { return nil }
-        FSEventStreamSetDispatchQueue(stream, eventQueue)
+        FSEventStreamSetDispatchQueue(stream, streamQueue)
         guard FSEventStreamStart(stream) else {
             FSEventStreamInvalidate(stream)
             FSEventStreamRelease(stream)
@@ -86,15 +91,22 @@ final class DirectoryWatcher {
             debounceWorkItem?.cancel()
             debounceWorkItem = work
         }
-        eventQueue.asyncAfter(deadline: .now() + 0.2, execute: work)
+        streamQueue.asyncAfter(deadline: .now() + 0.2, execute: work)
     }
 
     deinit {
         debounceLock.withLock { debounceWorkItem?.cancel() }
-        if let stream {
+        guard let stream else { return }
+        let stopStream = {
             FSEventStreamStop(stream)
             FSEventStreamInvalidate(stream)
             FSEventStreamRelease(stream)
+        }
+        let isOnStreamQueue = DispatchQueue.getSpecific(key: streamQueueKey) != nil || (eventQueue === DispatchQueue.main && Thread.isMainThread)
+        if isOnStreamQueue {
+            stopStream()
+        } else {
+            streamQueue.sync(execute: stopStream)
         }
     }
 }
