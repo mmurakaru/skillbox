@@ -57,7 +57,6 @@ protocol KeychainSecretStoring: Sendable {
     func deleteSecret(named name: String) throws
 }
 
-/// Result of one external process run.
 struct ProcessRunResult: Equatable, Sendable {
     var exitCode: Int32
     var standardOutput: String
@@ -78,9 +77,11 @@ struct SystemProcessRunner: ProcessRunning {
         process.standardError = FileHandle.nullDevice
         let inputPipe = Pipe()
         process.standardInput = standardInput == nil ? FileHandle.nullDevice : inputPipe
+        // A tool that exits before reading stdin would otherwise kill the app with SIGPIPE.
+        _ = fcntl(inputPipe.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
         try process.run()
         if let standardInput {
-            inputPipe.fileHandleForWriting.write(Data(standardInput.utf8))
+            try inputPipe.fileHandleForWriting.write(contentsOf: Data(standardInput.utf8))
             try inputPipe.fileHandleForWriting.close()
         }
         let output = outputPipe.fileHandleForReading.readDataToEndOfFile()
@@ -89,8 +90,7 @@ struct SystemProcessRunner: ProcessRunning {
     }
 }
 
-/// Stores env secrets through Apple's signed `security` tool so items stay readable without prompts
-/// by that same tool after Skillbox's ad-hoc code signature changes on rebuild or update.
+/// Uses Apple's signed `security` tool so helpers read items without prompts after Skillbox's ad-hoc signature changes.
 struct SystemKeychainSecretStore: KeychainSecretStoring {
     static let securityToolPath = "/usr/bin/security"
 

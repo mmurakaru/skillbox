@@ -40,7 +40,6 @@ final class KeychainSecretsModel {
         }
     }
 
-    /// Shows a failed Keychain action in the Env tab's error banner.
     func reportError(_ error: Error) {
         lastError = error.localizedDescription
     }
@@ -53,8 +52,11 @@ final class KeychainSecretsModel {
         secretNames.contains(name)
     }
 
-    func filteredSecretNames(matching query: String) -> [String] {
-        let trimmed = query.trimmingCharacters(in: .whitespaces)
+    /// Keychain secrets show under "All scopes" and the Keychain filter, never under a settings scope.
+    func visibleSecretNames(scopeKey: String?, searchQuery: String) -> [String] {
+        let key = scopeKey ?? ""
+        guard key.isEmpty || key == EnvVarStore.keychainScopeKey else { return [] }
+        let trimmed = searchQuery.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return secretNames }
         return secretNames.filter { $0.localizedCaseInsensitiveContains(trimmed) }
     }

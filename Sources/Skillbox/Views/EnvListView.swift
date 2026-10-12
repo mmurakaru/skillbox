@@ -233,11 +233,8 @@ struct EnvListView: View {
         }
     }
 
-    /// Keychain secrets show under "All scopes" and the Keychain filter, never under a settings scope.
     private var visibleKeychainSecretNames: [String] {
-        let key = store.selectedScopeKey ?? ""
-        guard key.isEmpty || key == EnvVarStore.keychainScopeKey else { return [] }
-        return keychainSecrets.filteredSecretNames(matching: store.searchQuery)
+        keychainSecrets.visibleSecretNames(scopeKey: store.selectedScopeKey, searchQuery: store.searchQuery)
     }
 
     private func keychainErrorBanner(_ message: String) -> some View {

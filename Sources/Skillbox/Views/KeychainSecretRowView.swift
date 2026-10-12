@@ -148,7 +148,6 @@ struct KeychainSecretRowView: View {
     }
 }
 
-/// Green "Keychain" capsule matching the scope badges on settings-backed rows.
 struct KeychainStorageBadge: View {
     var body: some View {
         Text("Keychain")
