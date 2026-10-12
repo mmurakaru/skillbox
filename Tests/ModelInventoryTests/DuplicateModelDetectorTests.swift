@@ -56,4 +56,14 @@ struct DuplicateModelDetectorTests {
         #expect(groups.count == 1)
         #expect(groups.first?.reclaimableBytes == 10)
     }
+
+    @Test func ollamaTagsSharingABlobAreNotReclaimableDuplicates() async {
+        let blobs: [String: Int64] = ["sha256:abc": 10]
+        let first = LocalModel(id: "ollama:a", name: "a", source: .ollama, path: URL(fileURLWithPath: "/nonexistent/a"),
+                               format: .ollamaBlob, sizeBytes: 10, digest: "sha256:abc", sharedBlobSizes: blobs)
+        let copiedTag = LocalModel(id: "ollama:b", name: "b", source: .ollama, path: URL(fileURLWithPath: "/nonexistent/b"),
+                                   format: .ollamaBlob, sizeBytes: 10, digest: "sha256:abc", sharedBlobSizes: blobs)
+
+        #expect(await DuplicateModelDetector().findDuplicates(in: [first, copiedTag]).isEmpty)
+    }
 }

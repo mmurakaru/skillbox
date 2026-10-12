@@ -37,4 +37,17 @@ struct FlatFileModelScannerTests {
 
         #expect(models.map(\.name) == ["big", "small"])
     }
+
+    @Test func cancelledScanStopsWalking() async throws {
+        let directory = try ModelInventoryTestDirectory()
+        try directory.writeFile("a/model.gguf", bytes: 16)
+        let scanner = FlatFileModelScanner(source: .custom, roots: [directory.url])
+
+        let found = await Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return scanner.scan()
+        }.value
+
+        #expect(found.isEmpty)
+    }
 }

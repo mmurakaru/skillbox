@@ -46,15 +46,17 @@ public struct HuggingFaceCacheScanner: LocalModelScanner {
             guard totals.size > 0 else { continue }
 
             let modified = try? repositoryDirectory.resourceValues(forKeys: [.contentModificationDateKey])
+            let snapshotsDirectory = repositoryDirectory.appending(path: "snapshots")
             results.append(LocalModel(
                 id: "\(source.rawValue):\(repositoryDirectory.path)",
                 name: repositoryID,
                 source: source,
                 path: repositoryDirectory,
-                format: detectFormat(in: repositoryDirectory.appending(path: "snapshots")),
+                format: detectFormat(in: snapshotsDirectory),
                 sizeBytes: totals.size,
                 digest: totals.largestBlobName,
-                modifiedAt: modified?.contentModificationDate
+                modifiedAt: modified?.contentModificationDate,
+                weightFileURLs: weightBlobs(in: snapshotsDirectory)
             ))
         }
         return results
@@ -82,6 +84,21 @@ public struct HuggingFaceCacheScanner: LocalModelScanner {
             }
         }
         return (total, largestName)
+    }
+
+    /// Snapshot entries are symlinks into `blobs/`, and runtimes hold the blob open, so return the link targets.
+    private func weightBlobs(in snapshotsDirectory: URL) -> [URL] {
+        guard let enumerator = FileManager.default.enumerator(
+            at: snapshotsDirectory,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+        var blobs: [URL] = []
+        for case let url as URL in enumerator where ["gguf", "safetensors"].contains(url.pathExtension.lowercased()) {
+            let blob = url.resolvingSymlinksInPath()
+            if !blobs.contains(blob) { blobs.append(blob) }
+        }
+        return blobs
     }
 
     private func detectFormat(in snapshotsDirectory: URL) -> LocalModelFormat {

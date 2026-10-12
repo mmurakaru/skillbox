@@ -4,7 +4,7 @@ import Darwin
 /// Reads which local models are loaded in memory and unloads the ones that can be stopped cleanly.
 public protocol ModelRuntimeMonitoring: Sendable {
     func runtimeStates(for models: [LocalModel]) async -> [String: ModelRuntimeState]
-    func stop(_ target: ModelStopTarget, modelPath: URL) async
+    func stop(_ target: ModelStopTarget, weightFileURLs: [URL]) async
 }
 
 /// Uses Ollama's local HTTP API and one `lsof` call per refresh for weight files held open by other processes.
@@ -20,28 +20,32 @@ public struct ModelRuntimeMonitor: ModelRuntimeMonitoring {
     public func runtimeStates(for models: [LocalModel]) async -> [String: ModelRuntimeState] {
         let hasOllamaModels = models.contains { $0.source == .ollama }
         let loadedOllamaNames = hasOllamaModels ? await loadedOllamaModelNames() : []
-        let weightFilePaths = models.filter { $0.source != .ollama && Self.isWeightFile($0) }.map(\.path.path)
-        let holders = await Self.fileHolders(forPaths: weightFilePaths)
+        let weightFilePathsByModelID = Dictionary(uniqueKeysWithValues: models
+            .filter { $0.source != .ollama && Self.isWeightFile($0) }
+            .map { ($0.id, $0.weightFileURLs.map(CanonicalFilePath.of)) })
+        let holders = await Self.fileHolders(forPaths: Array(Set(weightFilePathsByModelID.values.joined())).sorted())
 
         var states: [String: ModelRuntimeState] = [:]
         for model in models {
             let state = ModelRuntimeDecision.evaluate(
                 model: model,
                 loadedOllamaModelName: ModelRuntimeDecision.loadedOllamaName(for: model, among: loadedOllamaNames),
-                fileHolder: holders[model.path.path]
+                fileHolder: weightFilePathsByModelID[model.id]?.lazy.compactMap { holders[$0] }.first
             )
             if let state { states[model.id] = state }
         }
         return states
     }
 
-    public func stop(_ target: ModelStopTarget, modelPath: URL) async {
+    public func stop(_ target: ModelStopTarget, weightFileURLs: [URL]) async {
         switch target {
         case .ollama(let modelName):
             await unloadOllamaModel(named: modelName)
         case .process(let pid, let commandName):
-            // The pid may have been reused since the last refresh, so confirm it still holds this file.
-            guard await Self.fileHolders(forPaths: [modelPath.path])[modelPath.path] == ModelFileHolder(pid: pid, commandName: commandName) else { return }
+            // The pid may have been reused since the last refresh, so confirm it still holds one of these files.
+            let paths = weightFileURLs.map(CanonicalFilePath.of)
+            let holders = await Self.fileHolders(forPaths: paths)
+            guard paths.contains(where: { holders[$0] == ModelFileHolder(pid: pid, commandName: commandName) }) else { return }
             kill(pid, SIGTERM)
         }
     }
@@ -72,7 +76,7 @@ public struct ModelRuntimeMonitor: ModelRuntimeMonitoring {
         // Waiting on lsof blocks its thread, so keep it off the Swift concurrency pool.
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .utility).async {
-                let output = runTool("/usr/sbin/lsof", ["-F", "pcn", "--"] + paths)
+                let output = runTool("/usr/sbin/lsof", ["-F", "pcfn", "--"] + paths)
                 continuation.resume(returning: output.map(LsofFileHolders.parse(fieldOutput:)) ?? [:])
             }
         }
@@ -104,12 +108,25 @@ public enum OllamaRunningModels {
     }
 }
 
-/// Parses `lsof -F pcn` output into the first process holding each file path.
+/// `lsof` reports canonical paths (for example `/private/tmp`), so lookups must use the same form.
+public enum CanonicalFilePath {
+    public static func of(_ url: URL) -> String {
+        guard let resolved = realpath(url.path, nil) else { return url.path }
+        defer { free(resolved) }
+        return String(cString: resolved)
+    }
+}
+
+/// Parses `lsof -F pcfn` output into the first process holding each file path.
 public enum LsofFileHolders {
+    /// A working or root directory is not a loaded model, even when it is a model folder.
+    private static let directoryDescriptors: Set<String> = ["cwd", "rtd"]
+
     public static func parse(fieldOutput: String) -> [String: ModelFileHolder] {
         var holders: [String: ModelFileHolder] = [:]
         var currentPID: Int32?
         var currentCommandName = ""
+        var currentDescriptor = ""
         for line in fieldOutput.split(separator: "\n") {
             guard let field = line.first else { continue }
             let value = String(line.dropFirst())
@@ -119,8 +136,10 @@ public enum LsofFileHolders {
                 currentCommandName = ""
             case "c":
                 currentCommandName = value
+            case "f":
+                currentDescriptor = value
             case "n":
-                if let currentPID, holders[value] == nil {
+                if let currentPID, holders[value] == nil, !directoryDescriptors.contains(currentDescriptor) {
                     holders[value] = ModelFileHolder(pid: currentPID, commandName: currentCommandName)
                 }
             default:

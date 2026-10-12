@@ -38,6 +38,10 @@ public struct LocalModel: Identifiable, Sendable, Hashable {
     public var sizeBytes: Int64
     public var digest: String?
     public var modifiedAt: Date?
+    /// Content-addressed blobs this model uses, by digest; other models can point at the same blobs.
+    public var sharedBlobSizes: [String: Int64]
+    /// Files a runtime holds open while the model is loaded; differs from `path` when `path` is a folder.
+    public var weightFileURLs: [URL]
 
     public init(
         id: String,
@@ -47,7 +51,9 @@ public struct LocalModel: Identifiable, Sendable, Hashable {
         format: LocalModelFormat,
         sizeBytes: Int64,
         digest: String? = nil,
-        modifiedAt: Date? = nil
+        modifiedAt: Date? = nil,
+        sharedBlobSizes: [String: Int64] = [:],
+        weightFileURLs: [URL]? = nil
     ) {
         self.id = id
         self.name = name
@@ -57,6 +63,24 @@ public struct LocalModel: Identifiable, Sendable, Hashable {
         self.sizeBytes = sizeBytes
         self.digest = digest
         self.modifiedAt = modifiedAt
+        self.sharedBlobSizes = sharedBlobSizes
+        self.weightFileURLs = weightFileURLs ?? [path]
+    }
+}
+
+extension Collection where Element == LocalModel {
+    /// Disk space the models use, counting each shared blob once.
+    public var totalStorageBytes: Int64 {
+        var blobSizes: [String: Int64] = [:]
+        var otherBytes: Int64 = 0
+        for model in self {
+            if model.sharedBlobSizes.isEmpty {
+                otherBytes += model.sizeBytes
+            } else {
+                blobSizes.merge(model.sharedBlobSizes) { first, _ in first }
+            }
+        }
+        return blobSizes.values.reduce(otherBytes, +)
     }
 }
 

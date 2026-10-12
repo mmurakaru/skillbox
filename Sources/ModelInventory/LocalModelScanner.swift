@@ -37,6 +37,7 @@ public struct FlatFileModelScanner: LocalModelScanner {
             ) else { continue }
 
             for case let url as URL in enumerator {
+                if Task.isCancelled { return results }
                 let fileExtension = url.pathExtension.lowercased()
                 guard Self.weightFileExtensions.contains(fileExtension) else { continue }
                 let values = try? url.resourceValues(forKeys: Set(keys))

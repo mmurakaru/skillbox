@@ -42,9 +42,11 @@ public struct OllamaModelScanner: LocalModelScanner {
 
             let layers = manifest.layers ?? []
             let digests = ([manifest.config?.digest] + layers.map(\.digest)).compactMap { $0 }
-            let size = digests.reduce(into: Int64(0)) { total, digest in
-                total += blobSize(for: digest, in: blobsDirectory)
+            var blobSizes: [String: Int64] = [:]
+            for digest in digests {
+                blobSizes[digest] = blobSize(for: digest, in: blobsDirectory)
             }
+            let size = blobSizes.values.reduce(0, +)
             // The weights layer identifies identical models across tags.
             let weightsDigest = layers.first { $0.mediaType?.contains("model") == true }?.digest
 
@@ -56,7 +58,8 @@ public struct OllamaModelScanner: LocalModelScanner {
                 format: .ollamaBlob,
                 sizeBytes: size,
                 digest: weightsDigest,
-                modifiedAt: values?.contentModificationDate
+                modifiedAt: values?.contentModificationDate,
+                sharedBlobSizes: blobSizes
             ))
         }
         return results

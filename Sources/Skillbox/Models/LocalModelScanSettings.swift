@@ -9,10 +9,11 @@ enum LocalModelScanSettings {
     static let scanOpenWhisprKey = "localModelsScanOpenWhispr"
     static let scanAppSupportKey = "localModelsScanAppSupport"
     static let customPathsKey = "localModelsCustomPaths"
+    static let sourceEnabledByDefault = true
 
     /// Reads the saved scan configuration; sources nobody has turned off default to on.
     static func configuration(from defaults: UserDefaults = .standard) -> LocalModelScanConfiguration {
-        func isEnabled(_ key: String) -> Bool { defaults.object(forKey: key) as? Bool ?? true }
+        func isEnabled(_ key: String) -> Bool { defaults.object(forKey: key) as? Bool ?? sourceEnabledByDefault }
         return LocalModelScanConfiguration(
             ollama: isEnabled(scanOllamaKey),
             huggingFace: isEnabled(scanHuggingFaceKey),

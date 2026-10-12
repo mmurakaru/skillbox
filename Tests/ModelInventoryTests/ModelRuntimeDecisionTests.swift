@@ -86,4 +86,31 @@ struct ModelRuntimeDecisionTests {
         #expect(LocalModelTrashPolicy.canMoveToTrash(model("b", source: .huggingFaceCache, format: .safetensors)))
         #expect(!LocalModelTrashPolicy.canMoveToTrash(model("c", source: .ollama, format: .ollamaBlob)))
     }
+
+    @Test func aWorkingDirectoryIsNotALoadedModel() {
+        let output = """
+        p100
+        czsh
+        fcwd
+        n/models/folder
+        p200
+        cllama-server
+        f7
+        n/models/folder
+        """
+        #expect(LsofFileHolders.parse(fieldOutput: output)["/models/folder"] == ModelFileHolder(pid: 200, commandName: "llama-server"))
+    }
+
+    @Test func canonicalPathsFollowSymlinksTheWayLsofReportsThem() throws {
+        let directory = try ModelInventoryTestDirectory()
+        let file = try directory.writeFile("real/model.gguf", bytes: 8)
+        let link = directory.url.appending(path: "linked")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: directory.url.appending(path: "real"))
+
+        let canonical = CanonicalFilePath.of(link.appending(path: "model.gguf"))
+
+        #expect(canonical == CanonicalFilePath.of(file))
+        #expect(!canonical.contains("/linked/"))
+        #expect(canonical.hasPrefix("/private/") || !file.path.hasPrefix("/var/"))
+    }
 }
