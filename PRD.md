@@ -6,9 +6,9 @@
 
 ## 1. Overview
 
-Skillbox is a lightweight, native macOS menu bar app for the local setup of AI coding agents. It is harness-agnostic: features that apply to every agent (shared skills, provider usage) work across Claude Code, Codex, and Grok, and features that exist in only one harness (Claude Code memory, hooks, and env vars) name that harness in the UI.
+Skillbox is a lightweight, native macOS menu bar app for the local setup of AI coding agents. It is harness-agnostic: features that apply to several agents (a shared skill store, provider usage for Claude Code, Codex, and Grok) are not tied to one harness, and features that exist in only one harness (Claude Code memory, hooks, and env vars) name that harness in the UI.
 
-Skills live in one canonical store at `~/.agents/skills/`, which each harness reads directly or through a compatibility mount such as `~/.claude/skills/`. The skill list is scrollable and searchable, with one-click actions to open a skill folder in your editor or move it to Trash.
+Skills live in one canonical store at `~/.agents/skills/`, and Skillbox keeps `~/.claude/skills/` as a compatibility mount of symlinks for Claude Code. The skill list is scrollable and searchable, with one-click actions to open a skill folder in your editor or move it to Trash.
 
 **v1 ships macOS-only, personal-use, ad-hoc signed.** Cross-platform builds (Linux, Windows) are roadmap items captured in §14.
 
@@ -161,8 +161,8 @@ Jev automatically classifies skill definitions on launch and when added or chang
 
 Native SwiftUI `Settings { ... }` scene. Fields:
 
-- **Skills directory** - text field + "Browse..." button. Default `~/.agents/skills/`.
-- **Claude Code mount** - compatibility symlink directory. Default `~/.claude/skills/`.
+- **Skills source directory** - text field + "Browse..." button. Default `~/.agents/skills/`.
+- **Claude skills mount** - compatibility symlink directory for Claude Code. Default `~/.claude/skills/`.
 - **Editor** - dropdown of detected GUI editors + "Custom command" text field.
 - **Open target** - radio: Folder / SKILL.md.
 - **Launch at login** - toggle (uses `SMAppService`).
@@ -213,7 +213,7 @@ The TypeSafe API key is stored in macOS Keychain. Other preferences are stored i
 | Key                | Type    | Default                               |
 |--------------------|---------|---------------------------------------|
 | `skillsRootPath`   | String  | `~/.agents/skills`                    |
-| `claudeSkillsMountPath` | String | `~/.claude/skills`                |
+| `claudeSkillsMountPath` | String | `~/.claude/skills`               |
 | `editorCommand`    | String  | first detected of `code,cursor,zed,subl,nova,bbedit,mate` |
 | `openTarget`       | String  | `folder` (or `skill_md`)              |
 | `launchAtLogin`    | Bool    | `false`                               |

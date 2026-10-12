@@ -8,12 +8,7 @@ struct UsageOverviewView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Usage").font(.headline)
-                    Text("Subscription limits · refreshes every 5 minutes").font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer()
+            TabHeaderView(title: "Usage", subtitle: "Subscription limits · refreshes every 5 minutes") {
                 Button {
                     Task { await store.refreshAll() }
                 } label: {
@@ -24,7 +19,6 @@ struct UsageOverviewView: View {
                 .help("Refresh live usage")
                 .accessibilityLabel("Refresh live usage")
             }
-            .padding(14)
             Divider()
             ScrollView {
                 VStack(spacing: 12) {

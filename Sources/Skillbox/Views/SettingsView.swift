@@ -32,7 +32,7 @@ struct SettingsView: View {
                 Button(action: { insightsModel.run(claudeOverride: claudeCommand) }) {
                     HStack {
                         if insightsModel.isRunning { ProgressView().controlSize(.small) }
-                        Label("Insights", systemImage: "lightbulb")
+                        Label("Claude Code Insights", systemImage: "lightbulb")
                     }
                 }
                 .disabled(insightsModel.isRunning)
@@ -118,7 +118,7 @@ struct SettingsView: View {
                     Button("Browse…") { browseForFolder(binding: $memoryRootPath) }
                 }
             } header: {
-                Text("Memory")
+                Text("Claude Code memory")
             }
 
             Section {

@@ -298,24 +298,36 @@ struct PopoverView: View {
     }
 
     private var memoryBody: some View {
-        MemoryListView(
-            selectedMemoryID: $selectedMemoryID,
-            rowStates: $memoryRowStates
-        )
+        VStack(spacing: 0) {
+            TabHeaderView(title: "Memory", subtitle: "Claude Code auto-memory")
+            Divider()
+            MemoryListView(
+                selectedMemoryID: $selectedMemoryID,
+                rowStates: $memoryRowStates
+            )
+        }
     }
 
     private var hooksBody: some View {
-        HookListView(
-            selectedHookID: $selectedHookID,
-            rowStates: $hookRowStates
-        )
+        VStack(spacing: 0) {
+            TabHeaderView(title: "Hooks", subtitle: "Claude Code hooks in settings.json")
+            Divider()
+            HookListView(
+                selectedHookID: $selectedHookID,
+                rowStates: $hookRowStates
+            )
+        }
     }
 
     private var envBody: some View {
-        EnvListView(
-            selectedEnvID: $selectedEnvID,
-            rowStates: $envRowStates
-        )
+        VStack(spacing: 0) {
+            TabHeaderView(title: "Env", subtitle: "Claude Code env vars in settings.json")
+            Divider()
+            EnvListView(
+                selectedEnvID: $selectedEnvID,
+                rowStates: $envRowStates
+            )
+        }
     }
 
     private var installButton: some View {
