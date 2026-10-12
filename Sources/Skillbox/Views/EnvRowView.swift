@@ -39,8 +39,8 @@ struct EnvRowView: View {
     let onEdit: () -> Void
     let onDelete: () -> Void
     let onSetSecretMark: (Bool) -> Void
-    /// True when the login Keychain holds this var's exact value.
-    let isCopiedToKeychain: Bool
+    /// Names only: values are read on explicit actions, so removal re-checks that the stored value matches.
+    let hasKeychainSecretWithSameName: Bool
     let onCopyToKeychain: () -> Void
     /// Removes the settings.json and stash copy after the caller verifies the Keychain value matches.
     let onRemovePlaintextCopy: () -> Void
@@ -132,8 +132,9 @@ struct EnvRowView: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
                     EnvScopeBadge(scope: envVar.scope)
-                    if envVar.isSecret && isCopiedToKeychain {
+                    if envVar.isSecret && hasKeychainSecretWithSameName {
                         KeychainStorageBadge()
+                            .help("The login Keychain has a secret with this name")
                     } else if envVar.isSecret {
                         Image(systemName: "key.fill")
                             .font(.system(size: 9))
@@ -174,12 +175,12 @@ struct EnvRowView: View {
                     action: { SecretPasteboard.copyConcealed(envVar.value) }
                 )
                 iconButton(
-                    systemName: isCopiedToKeychain ? "xmark.bin" : "key.horizontal",
+                    systemName: hasKeychainSecretWithSameName ? "xmark.bin" : "key.horizontal",
                     isHovering: $isHoveringKeychain,
-                    tint: isCopiedToKeychain ? .orange : .green,
-                    help: isCopiedToKeychain ? "Remove plaintext copy (the Keychain copy stays)" : "Copy to Keychain",
+                    tint: hasKeychainSecretWithSameName ? .orange : .green,
+                    help: hasKeychainSecretWithSameName ? "Remove plaintext copy after checking the Keychain holds the same value" : "Copy to Keychain",
                     action: {
-                        if isCopiedToKeychain {
+                        if hasKeychainSecretWithSameName {
                             isConfirmingPlaintextRemoval = true
                         } else {
                             onCopyToKeychain()
