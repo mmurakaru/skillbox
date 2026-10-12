@@ -2,7 +2,20 @@
 
 Native macOS menu bar toolbox for AI coding agents: shared skills, provider usage for Claude Code, Codex, and Grok, and Claude Code memory, hooks, and env vars.
 
-See [PRD.md](PRD.md) for the spec.
+<img width="433" height="520" alt="skillbox_screenshot" src="https://github.com/user-attachments/assets/42d95c04-6555-4df7-b944-0b16d847b358" />
+
+
+
+## Tabs
+
+- **Skills**
+- **Memory**
+- **Env**
+- **Usage**
+- **Models**
+- **Explore**
+
+Provider marks come from [Lobe Icons](https://github.com/lobehub/lobe-icons) (MIT, see `Sources/Skillbox/Resources/ProviderLogos`).
 
 ## Skill storage model
 
@@ -36,19 +49,6 @@ make lint      # the same checks CI runs
 ```
 
 `swift format` comes with the Swift toolchain and reads `.swift-format`. SwiftLint is a pinned, checksum-verified binary that `make` downloads into `.build/tools`, so nothing is installed system-wide. `.swiftlint.yml` holds the type-safety rules: no force casts, tries, or unwraps without a `SAFETY:` reason, no `Any` parameters, returns, or aliases, and untyped JSON dictionaries only in files that state they parse external JSON. `Tools/StatementPadding` adds blank lines around `if` statements, after declaration groups, and before `return`.
-
-## Tabs
-
-- **Skills** (⌘1): list, open, classify, install, and sync skills in the shared store.
-- **Memory** (⌘2), **Hooks** (⌘3): browse and edit Claude Code auto-memory and hooks.
-- **Env** (⌘4): edit Claude Code env vars. Secrets are masked, kept out of shared project files, and can move to the login Keychain. A Keychain secret can authenticate a Claude Code HTTP MCP server through `headersHelper`, so the value leaves `settings.json`.
-- **Usage** (⌘5): live Codex, Grok, and Claude Code quota cards with manual snapshots. Provider connections and credential handling are in [docs/provider-usage.md](docs/provider-usage.md).
-- **Models** (⌘6): local models from Ollama, the Hugging Face cache, LM Studio, and other folders, with size, an estimated RAM fit (size × 1.2), duplicates, loaded state, unload, and Move to Trash.
-- **Explore** (⌘7): search the Hugging Face Hub without a token, filter by lab, format, and size, and copy an `ollama pull` or `hf download` command.
-
-Keychain secrets are readable by processes running as you through the `security` tool; the benefit is keeping values out of files, agent environments, version control, and screenshots.
-
-Provider marks come from [Lobe Icons](https://github.com/lobehub/lobe-icons) (MIT, see `Sources/Skillbox/Resources/ProviderLogos`).
 
 ## Tests
 
