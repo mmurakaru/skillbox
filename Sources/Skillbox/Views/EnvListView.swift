@@ -194,7 +194,7 @@ struct EnvListView: View {
                                 onEdit: { open(envVar: envVar) },
                                 onDelete: { performDelete(envVar) },
                                 onSetSecretMark: { marked in performSetSecretMark(marked, for: envVar) },
-                                isCopiedToKeychain: keychainSecrets.containsSecret(named: envVar.key),
+                                hasKeychainSecretWithSameName: keychainSecrets.containsSecret(named: envVar.key),
                                 onCopyToKeychain: { performCopyToKeychain(envVar) },
                                 onRemovePlaintextCopy: { performRemovePlaintextCopy(envVar) },
                                 rowState: binding(for: envVar.id),

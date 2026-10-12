@@ -103,6 +103,8 @@ struct KeychainSecretStoreTests {
         #expect(throws: KeychainSecretError.self) { try store.writeSecretValue("value", named: "BAD NAME; rm") }
         #expect(throws: KeychainSecretError.self) { try store.writeSecretValue("line one\nline two", named: "EXAMPLE_API_TOKEN") }
         #expect(throws: KeychainSecretError.self) { try store.writeSecretValue("", named: "EXAMPLE_API_TOKEN") }
+        #expect(throws: KeychainSecretError.self) { try store.writeSecretValue("caf\u{E9}-token", named: "EXAMPLE_API_TOKEN") }
+        #expect(throws: KeychainSecretError.self) { try store.writeSecretValue("tab\tseparated", named: "EXAMPLE_API_TOKEN") }
         #expect(throws: KeychainSecretError.self) {
             try store.writeSecretValue(String(repeating: "a", count: KeychainSecretValidation.maximumValueByteCount + 1), named: "EXAMPLE_API_TOKEN")
         }

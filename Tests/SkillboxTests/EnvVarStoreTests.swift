@@ -306,6 +306,26 @@ struct EnvVarStoreTests {
         #expect(store.items.first(where: { $0.key == "DATABASE_URL" })?.isSecret == false)
     }
 
+    @Test func setSecretMark_onVarInSharedProjectScope_throws() {
+        let store = EnvVarStore(seedItems: [
+            makeEnvVar(
+                key: "DATABASE_URL",
+                scope: .project(name: "example-project", path: "/p/example-project"),
+                fileURL: URL(fileURLWithPath: "/p/example-project/.claude/settings.json")
+            ),
+        ])
+        #expect(throws: EnvVarStoreError.self) {
+            try store.setSecretMark(true, forName: "DATABASE_URL")
+        }
+    }
+
+    @Test func setSecretMark_onDisabledVar_throwsSoTheStashedValueIsNotOrphaned() {
+        let store = EnvVarStore(seedItems: [makeEnvVar(key: "DATABASE_URL", state: .disabled)])
+        #expect(throws: EnvVarStoreError.self) {
+            try store.setSecretMark(true, forName: "DATABASE_URL")
+        }
+    }
+
     @Test func filtered_searchBySecretValue_doesNotMatch() {
         var secret = makeEnvVar(key: "EXAMPLE_API_TOKEN", value: "needle-value")
         secret.isSecret = true

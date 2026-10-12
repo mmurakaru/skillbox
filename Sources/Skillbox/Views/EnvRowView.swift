@@ -39,8 +39,8 @@ struct EnvRowView: View {
     let onEdit: () -> Void
     let onDelete: () -> Void
     let onSetSecretMark: (Bool) -> Void
-    /// True when the login Keychain holds a secret with this name.
-    let isCopiedToKeychain: Bool
+    /// Names only: values are read on explicit actions, so removal re-checks that the stored value matches.
+    let hasKeychainSecretWithSameName: Bool
     let onCopyToKeychain: () -> Void
     /// Removes the settings.json and stash copy after the caller verifies the Keychain value matches.
     let onRemovePlaintextCopy: () -> Void
@@ -98,6 +98,10 @@ struct EnvRowView: View {
             Text("Secret (detected from its name)")
         } else if envVar.isSecret {
             Button("Unmark as Secret") { onSetSecretMark(false) }
+        } else if !envVar.isEnabled {
+            Text("Enable to mark as secret")
+        } else if envVar.scope.isSharedWithVersionControl {
+            Text("Move to the local scope to mark as secret")
         } else {
             Button("Mark as Secret") { onSetSecretMark(true) }
         }
@@ -128,13 +132,20 @@ struct EnvRowView: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
                     EnvScopeBadge(scope: envVar.scope)
-                    if envVar.isSecret && isCopiedToKeychain {
+                    if envVar.isSecret && hasKeychainSecretWithSameName {
                         KeychainStorageBadge()
+                            .help("The login Keychain has a secret with this name")
                     } else if envVar.isSecret {
                         Image(systemName: "key.fill")
                             .font(.system(size: 9))
                             .foregroundStyle(.secondary)
                             .accessibilityLabel("Secret")
+                    }
+                    if envVar.isSecret && envVar.scope.isSharedWithVersionControl {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.orange)
+                            .accessibilityLabel("Secret in a shared project file")
                     }
                     Spacer(minLength: 0)
                 }
@@ -164,12 +175,12 @@ struct EnvRowView: View {
                     action: { SecretPasteboard.copyConcealed(envVar.value) }
                 )
                 iconButton(
-                    systemName: isCopiedToKeychain ? "xmark.bin" : "key.horizontal",
+                    systemName: hasKeychainSecretWithSameName ? "xmark.bin" : "key.horizontal",
                     isHovering: $isHoveringKeychain,
-                    tint: isCopiedToKeychain ? .orange : .green,
-                    help: isCopiedToKeychain ? "Remove plaintext copy (the Keychain copy stays)" : "Copy to Keychain",
+                    tint: hasKeychainSecretWithSameName ? .orange : .green,
+                    help: hasKeychainSecretWithSameName ? "Remove plaintext copy after checking the Keychain holds the same value" : "Copy to Keychain",
                     action: {
-                        if isCopiedToKeychain {
+                        if hasKeychainSecretWithSameName {
                             isConfirmingPlaintextRemoval = true
                         } else {
                             onCopyToKeychain()
@@ -225,8 +236,11 @@ struct EnvRowView: View {
         if envVar.isSecret {
             lines.append("secret - value hidden; env values reach every process Claude Code starts")
         }
-        if let desc = EnvVarCatalog.description(for: envVar.key) {
-            lines.append(desc)
+        if envVar.isSecret && envVar.scope.isSharedWithVersionControl {
+            lines.append("this file is meant for version control - move the secret to the local scope")
+        }
+        if let catalogDescription = EnvVarCatalog.description(for: envVar.key) {
+            lines.append(catalogDescription)
         }
         switch envVar.scope {
         case .userGlobal:

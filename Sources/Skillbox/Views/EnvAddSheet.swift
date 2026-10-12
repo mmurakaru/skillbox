@@ -79,8 +79,8 @@ struct EnvAddSheet: View {
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
                     Picker("", selection: $selectedScopeIndex) {
-                        ForEach(Array(availableScopes.enumerated()), id: \.offset) { idx, scope in
-                            Text(scopeLabel(scope)).tag(idx)
+                        ForEach(Array(availableScopes.enumerated()), id: \.offset) { index, scope in
+                            Text(scopeLabel(scope)).tag(index)
                         }
                     }
                     .labelsHidden()
@@ -88,8 +88,8 @@ struct EnvAddSheet: View {
                 }
             }
 
-            if let err = errorMessage {
-                Text(err)
+            if let errorMessage {
+                Text(errorMessage)
                     .font(.system(size: 11))
                     .foregroundStyle(.red)
             }
@@ -179,8 +179,8 @@ struct EnvAddSheet: View {
             guard availableScopes.indices.contains(selectedScopeIndex) else { return }
             destination = .settings(availableScopes[selectedScopeIndex])
         }
-        if let err = onAdd(trimmedKey, valueText, destination) {
-            errorMessage = err
+        if let addError = onAdd(trimmedKey, valueText, destination) {
+            errorMessage = addError
         }
     }
 }

@@ -1,6 +1,5 @@
 import Foundation
 
-/// Decides whether an env var holds a secret (credential), by name rule or explicit user mark.
 enum EnvSecretDetection {
     /// Name fragments that mark an env var as a credential, matched case-insensitively.
     static let secretNameMarkers = ["KEY", "TOKEN", "SECRET", "PASSWORD", "AUTH"]
@@ -17,7 +16,6 @@ enum EnvSecretDetection {
     }
 }
 
-/// Persists the env var names that the user marked as secrets.
 struct EnvSecretMarksFile {
     let fileURL: URL
 
