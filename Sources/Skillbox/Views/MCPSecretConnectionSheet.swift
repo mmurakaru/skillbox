@@ -4,6 +4,9 @@ import SwiftUI
 struct MCPSecretConnectionSheet: View {
     let secretName: String
     let connector: MCPSecretConnector
+    /// Settings.json copies of this secret that keep it in every agent subprocess environment.
+    let plaintextCopies: [EnvVar]
+    let onRemovePlaintextCopies: () throws -> Void
     let onClose: () -> Void
 
     @State private var servers: [ClaudeHTTPMCPServer] = []
@@ -12,7 +15,7 @@ struct MCPSecretConnectionSheet: View {
     @State private var valuePrefix = MCPSecretHeadersHelper.defaultValuePrefix
     @State private var errorMessage: String?
     @State private var statusMessage: String?
-    @State private var isConfirmingStaticHeaderRemoval = false
+    @State private var isConfirmingCleanup = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -52,13 +55,13 @@ struct MCPSecretConnectionSheet: View {
                 .frame(width: 110)
             }
 
-            Text("Claude Code runs a helper on each connection that reads the secret from the Keychain. Existing static headers stay as a fallback until you remove them. Remove a plaintext env copy from its row in the Env list.")
+            Text("Claude Code runs a helper on each connection that reads the secret from the Keychain. Existing static headers and plaintext env copies stay as a fallback until you remove them.")
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            if let selectedServer, selectedServerUsesThisSecret, selectedServer.staticHeaderNames.contains(headerName) {
-                staticHeaderCleanup(for: selectedServer)
+            if let selectedServer, selectedServerUsesThisSecret, !cleanupItems(for: selectedServer).isEmpty {
+                fallbackCleanup(for: selectedServer)
             }
 
             if let errorMessage {
@@ -96,27 +99,38 @@ struct MCPSecretConnectionSheet: View {
         return MCPSecretHeadersHelper.commandReadsSecret(helper, secretName: secretName)
     }
 
-    private func staticHeaderCleanup(for server: ClaudeHTTPMCPServer) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if isConfirmingStaticHeaderRemoval {
-                Text("Sessions that started before the helper was added still send the static header until they reconnect. Remove it now?")
+    private func cleanupItems(for server: ClaudeHTTPMCPServer) -> [String] {
+        var items: [String] = []
+        if server.staticHeaderNames.contains(headerName) { items.append("the static \(headerName) header") }
+        if !plaintextCopies.isEmpty {
+            items.append(plaintextCopies.count == 1 ? "1 plaintext env copy" : "\(plaintextCopies.count) plaintext env copies")
+        }
+        return items
+    }
+
+    private func fallbackCleanup(for server: ClaudeHTTPMCPServer) -> some View {
+        let items = cleanupItems(for: server).joined(separator: " and ")
+        return VStack(alignment: .leading, spacing: 6) {
+            if isConfirmingCleanup {
+                Text("Sessions that started before the helper was added still use \(items) until they restart or reconnect. Remove \(items) now?")
                     .font(.system(size: 11))
                     .fixedSize(horizontal: false, vertical: true)
                 HStack {
-                    Button("Cancel") { isConfirmingStaticHeaderRemoval = false }
+                    Button("Cancel") { isConfirmingCleanup = false }
                         .controlSize(.small)
-                    Button("Remove static header") { removeStaticHeader(from: server) }
+                    Button("Remove") { removeFallbacks(from: server) }
                         .controlSize(.small)
                         .buttonStyle(.borderedProminent)
                         .tint(.orange)
                 }
             } else {
                 HStack {
-                    Text("\(server.name) still has a static \(headerName) header.")
+                    Text("Still in plaintext: \(items).")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     Spacer()
-                    Button("Remove…") { isConfirmingStaticHeaderRemoval = true }
+                    Button("Remove…") { isConfirmingCleanup = true }
                         .controlSize(.small)
                 }
             }
@@ -161,15 +175,19 @@ struct MCPSecretConnectionSheet: View {
         }
     }
 
-    private func removeStaticHeader(from server: ClaudeHTTPMCPServer) {
+    private func removeFallbacks(from server: ClaudeHTTPMCPServer) {
         errorMessage = nil
         do {
-            try connector.removeStaticHeader(named: headerName, fromServer: server.name)
-            isConfirmingStaticHeaderRemoval = false
-            statusMessage = "Removed the static \(headerName) header from \(server.name)."
+            if server.staticHeaderNames.contains(headerName) {
+                try connector.removeStaticHeader(named: headerName, fromServer: server.name)
+            }
+            try onRemovePlaintextCopies()
+            isConfirmingCleanup = false
+            statusMessage = "\(server.name) now reads \(headerName) only from the Keychain."
             loadServers()
         } catch {
             errorMessage = error.localizedDescription
+            loadServers()
         }
     }
 }

@@ -194,6 +194,89 @@ struct ClaudeGlobalConfigEditorTests {
         #expect(try editor.userScopeHTTPServers().first?.headersHelper == "previous-helper")
     }
 
+    private static let claudeStyleFixture = #"""
+    {
+      "numStartups": 42,
+      "tipsHistory": {
+        "zeta": 1,
+        "alpha": 0.1
+      },
+      "mcpServers": {
+        "example-http": {
+          "type": "http",
+          "url": "https://mcp.example.com/mcp",
+          "headers": {
+            "Authorization": "Bearer ${EXAMPLE_API_TOKEN}",
+            "X-Trace": "1"
+          }
+        },
+        "other-http": {
+          "type": "http",
+          "url": "https://other.example.com/mcp"
+        }
+      },
+      "note": "café/x",
+      "ratio": 1.0
+    }
+    """#
+
+    @Test func update_rewritesOnlyTheTargetServerText() throws {
+        let configURL = try makeConfig()
+        try Self.claudeStyleFixture.write(to: configURL, atomically: true, encoding: .utf8)
+        let editor = ClaudeGlobalConfigEditor(configURL: configURL)
+
+        try editor.updateUserScopeHTTPServer(named: "example-http") { $0["headersHelper"] = "example-helper" }
+        let expectedAfterConnect = Self.claudeStyleFixture.replacingOccurrences(of: """
+                "X-Trace": "1"
+              }
+            },
+        """, with: """
+                "X-Trace": "1"
+              },
+              "headersHelper": "example-helper"
+            },
+        """)
+        #expect(try String(contentsOf: configURL, encoding: .utf8) == expectedAfterConnect)
+
+        try MCPSecretConnector(configEditor: editor, processRunner: RecordingProcessRunner())
+            .removeStaticHeader(named: "Authorization", fromServer: "example-http")
+        let expectedAfterCleanup = expectedAfterConnect.replacingOccurrences(of: """
+                "Authorization": "Bearer ${EXAMPLE_API_TOKEN}",
+
+        """, with: "")
+        #expect(try String(contentsOf: configURL, encoding: .utf8) == expectedAfterCleanup)
+    }
+
+    @Test func update_throughSymlink_keepsLinkAndTargetPermissions() throws {
+        let targetURL = try makeConfig(permissions: 0o600)
+        let linkDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("skillbox-link-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: linkDirectory, withIntermediateDirectories: true)
+        let linkURL = linkDirectory.appendingPathComponent(".claude.json")
+        try FileManager.default.createSymbolicLink(at: linkURL, withDestinationURL: targetURL)
+        let editor = ClaudeGlobalConfigEditor(configURL: linkURL)
+
+        try editor.updateUserScopeHTTPServer(named: "example-http") { $0["headersHelper"] = "example-helper" }
+
+        let linkType = try FileManager.default.attributesOfItem(atPath: linkURL.path)[.type] as? FileAttributeType
+        #expect(linkType == .typeSymbolicLink)
+        let targetPermissions = try FileManager.default.attributesOfItem(atPath: targetURL.path)[.posixPermissions] as? NSNumber
+        #expect(targetPermissions?.intValue == 0o600)
+        #expect(try editor.userScopeHTTPServers().first?.headersHelper == "example-helper")
+        #expect(editor.lockDirectoryURL.deletingLastPathComponent().resolvingSymlinksInPath() == targetURL.deletingLastPathComponent().resolvingSymlinksInPath())
+    }
+
+    @Test func connect_whenRollbackCannotTakeTheLock_reportsRollbackFailure() throws {
+        let configURL = try makeConfig()
+        var editor = ClaudeGlobalConfigEditor(configURL: configURL)
+        editor.lockWaitLimit = 0.2
+        let runner = LockTakingProcessRunner(lockDirectoryURL: editor.lockDirectoryURL)
+        let connector = MCPSecretConnector(configEditor: editor, processRunner: runner)
+
+        #expect(throws: MCPSecretConnectorError.rollbackFailed("example-http")) {
+            try connector.connect(secretName: "EXAMPLE_API_TOKEN", serverName: "example-http", headerName: "Authorization", valuePrefix: "Bearer ")
+        }
+    }
+
     @Test func removeStaticHeader_dropsHeaderAndEmptyMap() throws {
         let configURL = try makeConfig()
         let connector = MCPSecretConnector(configEditor: ClaudeGlobalConfigEditor(configURL: configURL), processRunner: RecordingProcessRunner())
@@ -204,5 +287,20 @@ struct ClaudeGlobalConfigEditorTests {
         try connector.removeStaticHeader(named: "X-Trace", fromServer: "example-http")
         let servers = try #require(try readRoot(configURL)["mcpServers"] as? [String: Any])
         #expect((servers["example-http"] as? [String: Any])?["headers"] == nil)
+    }
+}
+
+/// Passes the first helper check, then holds the config lock and fails the second, so the rollback cannot write.
+final class LockTakingProcessRunner: ProcessRunning, @unchecked Sendable {
+    private let lockDirectoryURL: URL
+    private var runCount = 0
+
+    init(lockDirectoryURL: URL) { self.lockDirectoryURL = lockDirectoryURL }
+
+    func run(executablePath: String, arguments: [String], standardInput: String?) throws -> ProcessRunResult {
+        runCount += 1
+        guard runCount > 1 else { return ProcessRunResult(exitCode: 0, standardOutput: #"{"Authorization":"Bearer x"}"#) }
+        try FileManager.default.createDirectory(at: lockDirectoryURL, withIntermediateDirectories: false)
+        return ProcessRunResult(exitCode: 1, standardOutput: "")
     }
 }

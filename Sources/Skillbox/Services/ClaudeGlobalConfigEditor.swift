@@ -45,8 +45,12 @@ struct ClaudeGlobalConfigEditor {
         return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude.json")
     }
 
+    /// Writes go to the symlink target so a linked config stays linked.
+    var resolvedConfigURL: URL { configURL.resolvingSymlinksInPath() }
+
+    /// The CLI's lock library locks the real path, so a symlinked config shares the same lock.
     var lockDirectoryURL: URL {
-        configURL.deletingLastPathComponent().appendingPathComponent(configURL.lastPathComponent + ".lock")
+        resolvedConfigURL.deletingLastPathComponent().appendingPathComponent(resolvedConfigURL.lastPathComponent + ".lock")
     }
 
     func userScopeHTTPServers() throws -> [ClaudeHTTPMCPServer] {
@@ -64,41 +68,52 @@ struct ClaudeGlobalConfigEditor {
         .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
-    /// Changes only the named user-scope HTTP server; every other key is written back as read.
+    /// Changes only the named user-scope HTTP server's text; every other byte of the file stays as written.
     func updateUserScopeHTTPServer(named serverName: String, _ mutate: (inout [String: Any]) -> Void) throws {
         try withConfigLock {
-            var root = try readConfigRoot()
-            var servers = root["mcpServers"] as? [String: Any] ?? [:]
+            let text = try readConfigText()
+            let root = try parseConfigRoot(text)
+            let servers = root["mcpServers"] as? [String: Any] ?? [:]
             guard var server = servers[serverName] as? [String: Any] else {
                 throw ClaudeGlobalConfigError.serverNotFound(serverName)
             }
             guard server["type"] as? String == "http" else { throw ClaudeGlobalConfigError.serverIsNotHTTP(serverName) }
             mutate(&server)
-            servers[serverName] = server
-            root["mcpServers"] = servers
-            try replaceConfigAtomically(with: root)
+            let updatedText = try JSONMemberTextEditor.replacingMember(at: ["mcpServers", serverName], in: text, with: server)
+            guard (try? parseConfigRoot(updatedText)) != nil else { throw ClaudeGlobalConfigError.configUnreadable }
+            try replaceConfigAtomically(with: Data(updatedText.utf8))
         }
     }
 
     private func readConfigRoot() throws -> [String: Any] {
-        guard let data = try? Data(contentsOf: configURL),
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        try parseConfigRoot(try readConfigText())
+    }
+
+    private func readConfigText() throws -> String {
+        guard let data = try? Data(contentsOf: resolvedConfigURL), let text = String(data: data, encoding: .utf8) else {
+            throw ClaudeGlobalConfigError.configUnreadable
+        }
+        return text
+    }
+
+    private func parseConfigRoot(_ text: String) throws -> [String: Any] {
+        guard let root = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any] else {
             throw ClaudeGlobalConfigError.configUnreadable
         }
         return root
     }
 
     /// Writes a sibling temp file with the original permissions, then renames it over the config.
-    private func replaceConfigAtomically(with root: [String: Any]) throws {
-        let data = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .withoutEscapingSlashes])
+    private func replaceConfigAtomically(with data: Data) throws {
         let fileManager = FileManager.default
-        let permissions = (try fileManager.attributesOfItem(atPath: configURL.path)[.posixPermissions] as? NSNumber) ?? 0o600
-        let temporaryURL = configURL.deletingLastPathComponent()
-            .appendingPathComponent(".\(configURL.lastPathComponent).skillbox-\(UUID().uuidString).tmp")
+        let targetURL = resolvedConfigURL
+        let permissions = (try fileManager.attributesOfItem(atPath: targetURL.path)[.posixPermissions] as? NSNumber) ?? 0o600
+        let temporaryURL = targetURL.deletingLastPathComponent()
+            .appendingPathComponent(".\(targetURL.lastPathComponent).skillbox-\(UUID().uuidString).tmp")
         guard fileManager.createFile(atPath: temporaryURL.path, contents: data, attributes: [.posixPermissions: permissions]) else {
             throw CocoaError(.fileWriteUnknown)
         }
-        guard rename(temporaryURL.path, configURL.path) == 0 else {
+        guard rename(temporaryURL.path, targetURL.path) == 0 else {
             let renameError = POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
             try? fileManager.removeItem(at: temporaryURL)
             throw renameError
