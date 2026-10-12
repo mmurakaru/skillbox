@@ -1,5 +1,13 @@
 # skillbox
 
+## 0.9.1
+
+### Patch Changes
+
+- [#29](https://github.com/mmurakaru/skillbox/pull/29) [`edb4f09`](https://github.com/mmurakaru/skillbox/commit/edb4f090f6b9a43b892c52631e66ff7207df9608) Thanks [@mmurakaru](https://github.com/mmurakaru)! - Show the name of every icon-only action in the menu bar panel on hover, and keep scope and Keychain badges on one line so variable names have more room.
+
+- [#27](https://github.com/mmurakaru/skillbox/pull/27) [`d5e90a6`](https://github.com/mmurakaru/skillbox/commit/d5e90a60d4cfb1c0bc164f432f162529ccb2cf98) Thanks [@mmurakaru](https://github.com/mmurakaru)! - Add `make lint` and `make format` with swift-format, SwiftLint type-safety rules, and blank-line padding, and run them in CI.
+
 ## 0.9.0
 
 ### Minor Changes

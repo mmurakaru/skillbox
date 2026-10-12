@@ -1,6 +1,6 @@
 {
   "name": "skillbox",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "description": "Native macOS menu bar toolbox for AI coding agents. This package.json exists only to drive @changesets/cli for versioning and changelog generation; nothing is published to npm.",
   "scripts": {
