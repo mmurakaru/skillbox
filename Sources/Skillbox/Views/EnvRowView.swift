@@ -86,6 +86,10 @@ struct EnvRowView: View {
             Text("Secret (detected from its name)")
         } else if envVar.isSecret {
             Button("Unmark as Secret") { onSetSecretMark(false) }
+        } else if !envVar.isEnabled {
+            Text("Enable to mark as secret")
+        } else if envVar.scope.isSharedWithVersionControl {
+            Text("Move to the local scope to mark as secret")
         } else {
             Button("Mark as Secret") { onSetSecretMark(true) }
         }
@@ -120,6 +124,12 @@ struct EnvRowView: View {
                             .font(.system(size: 9))
                             .foregroundStyle(.secondary)
                             .accessibilityLabel("Secret")
+                    }
+                    if envVar.isSecret && envVar.scope.isSharedWithVersionControl {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.orange)
+                            .accessibilityLabel("Secret in a shared project file")
                     }
                     Spacer(minLength: 0)
                 }
@@ -197,8 +207,11 @@ struct EnvRowView: View {
         if envVar.isSecret {
             lines.append("secret - value hidden; env values reach every process Claude Code starts")
         }
-        if let desc = EnvVarCatalog.description(for: envVar.key) {
-            lines.append(desc)
+        if envVar.isSecret && envVar.scope.isSharedWithVersionControl {
+            lines.append("this file is meant for version control - move the secret to the local scope")
+        }
+        if let catalogDescription = EnvVarCatalog.description(for: envVar.key) {
+            lines.append(catalogDescription)
         }
         switch envVar.scope {
         case .userGlobal:

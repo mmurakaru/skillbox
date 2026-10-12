@@ -2,7 +2,7 @@ import SwiftUI
 
 struct EnvAddSheet: View {
     let availableScopes: [EnvScope]
-    /// Receives key, value, scope, and whether the user marked the var as a secret; returns an error message or nil.
+    /// Returns an error message to show, or nil on success.
     let onAdd: (String, String, EnvScope, Bool) -> String?
     let onCancel: () -> Void
 
@@ -71,10 +71,10 @@ struct EnvAddSheet: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Picker("", selection: $selectedScopeIndex) {
-                    ForEach(Array(availableScopes.enumerated()), id: \.offset) { idx, scope in
+                    ForEach(Array(availableScopes.enumerated()), id: \.offset) { index, scope in
                         Text(scopeLabel(scope))
-                            .tag(idx)
-                            .selectionDisabled(isSecret && Self.isSharedProjectScope(scope))
+                            .tag(index)
+                            .selectionDisabled(isSecret && scope.isSharedWithVersionControl)
                     }
                 }
                 .labelsHidden()
@@ -126,12 +126,7 @@ struct EnvAddSheet: View {
 
     private var selectedScopeRejectsSecret: Bool {
         guard isSecret, availableScopes.indices.contains(selectedScopeIndex) else { return false }
-        return Self.isSharedProjectScope(availableScopes[selectedScopeIndex])
-    }
-
-    private static func isSharedProjectScope(_ scope: EnvScope) -> Bool {
-        if case .project = scope { return true }
-        return false
+        return availableScopes[selectedScopeIndex].isSharedWithVersionControl
     }
 
     /// Falls back to User Global when the project has no local scope entry.
@@ -197,8 +192,8 @@ struct EnvAddSheet: View {
         guard !trimmedKey.isEmpty else { return }
         guard availableScopes.indices.contains(selectedScopeIndex) else { return }
         let scope = availableScopes[selectedScopeIndex]
-        if let err = onAdd(trimmedKey, valueText, scope, isMarkedSecret) {
-            errorMessage = err
+        if let addError = onAdd(trimmedKey, valueText, scope, isMarkedSecret) {
+            errorMessage = addError
         }
     }
 }

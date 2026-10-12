@@ -304,6 +304,52 @@ struct EnvVarStoreTests {
         #expect(store.items.first(where: { $0.key == "DATABASE_URL" })?.isSecret == false)
     }
 
+    @Test func setSecretMark_onVarInSharedProjectScope_throws() {
+        let store = EnvVarStore(seedItems: [
+            makeEnvVar(
+                key: "DATABASE_URL",
+                scope: .project(name: "example-project", path: "/p/example-project"),
+                fileURL: URL(fileURLWithPath: "/p/example-project/.claude/settings.json")
+            ),
+        ])
+        #expect(throws: EnvVarStoreError.self) {
+            try store.setSecretMark(true, forName: "DATABASE_URL")
+        }
+    }
+
+    @Test func setSecretMark_onDisabledVar_throwsSoTheStashedValueIsNotOrphaned() {
+        let store = EnvVarStore(seedItems: [makeEnvVar(key: "DATABASE_URL", state: .disabled)])
+        #expect(throws: EnvVarStoreError.self) {
+            try store.setSecretMark(true, forName: "DATABASE_URL")
+        }
+    }
+
+    @Test func add_markedAsSecret_whenSettingsWriteFails_persistsNoMark() throws {
+        let home = try makeTempHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        try "{ not json".write(to: home.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
+        let store = EnvVarStore()
+        store.configure(claudeHomePath: home.path)
+
+        #expect(throws: (any Error).self) {
+            try store.add(key: "DATABASE_URL", value: "postgres://example", scope: .userGlobal, markedAsSecret: true)
+        }
+        #expect(store.secretMarksFile.load().isEmpty)
+    }
+
+    @Test func add_markedAsSecret_forNameRuleSecret_persistsNoRedundantMark() throws {
+        let home = try makeTempHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        try "{}".write(to: home.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
+        let store = EnvVarStore()
+        store.configure(claudeHomePath: home.path)
+
+        try store.add(key: "EXAMPLE_API_TOKEN", value: "abc", scope: .userGlobal, markedAsSecret: true)
+
+        #expect(store.secretMarksFile.load().isEmpty)
+        #expect(store.items.first(where: { $0.key == "EXAMPLE_API_TOKEN" })?.isSecret == true)
+    }
+
     @Test func filtered_searchBySecretValue_doesNotMatch() {
         var secret = makeEnvVar(key: "EXAMPLE_API_TOKEN", value: "needle-value")
         secret.isSecret = true
