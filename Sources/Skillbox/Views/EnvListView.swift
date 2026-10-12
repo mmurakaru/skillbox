@@ -14,6 +14,7 @@ struct EnvListView: View {
     @State private var showingAddSheet = false
     /// Row awaiting confirmation before an enabled secret is disabled (its value is removed).
     @State private var secretDisableConfirmationID: String?
+    @State private var mcpConnectionTarget: MCPConnectionTarget?
     @FocusState private var searchFocused: Bool
     @State private var isConfirmingStashPurge = false
 
@@ -99,6 +100,21 @@ struct EnvListView: View {
                 onCancel: { showingAddSheet = false }
             )
         }
+        .sheet(item: $mcpConnectionTarget) { target in
+            MCPSecretConnectionSheet(
+                secretName: target.secretName,
+                connector: MCPSecretConnector(),
+                plaintextCopies: plaintextCopies(ofSecretNamed: target.secretName),
+                keychainHoldsSameValue: { await keychainSecrets.keychainHoldsSameValue(as: $0) },
+                onRemovePlaintextCopy: { try store.delete($0) },
+                onClose: { mcpConnectionTarget = nil }
+            )
+        }
+    }
+
+    private struct MCPConnectionTarget: Identifiable {
+        let secretName: String
+        var id: String { secretName }
     }
 
     private var scopePicker: some View {
@@ -214,6 +230,7 @@ struct EnvListView: View {
                                 secretName: secretName,
                                 readValue: { try await keychainSecrets.readSecretValue(named: secretName) },
                                 onDelete: { performDeleteKeychainSecret(named: secretName) },
+                                onConnectToMCPServer: { mcpConnectionTarget = MCPConnectionTarget(secretName: secretName) },
                                 onError: { keychainSecrets.reportError($0) }
                             )
                         }
@@ -315,6 +332,10 @@ struct EnvListView: View {
                 keychainSecrets.reportError(error)
             }
         }
+    }
+
+    private func plaintextCopies(ofSecretNamed secretName: String) -> [EnvVar] {
+        store.items.filter { $0.key == secretName && $0.isSecret }
     }
 
     /// Re-verifies the Keychain value right before deleting, so a changed or missing copy never loses data.

@@ -13,12 +13,16 @@ final class RecordingProcessRunner: ProcessRunning, @unchecked Sendable {
     private let lock = NSLock()
     private var recorded: [Invocation] = []
     var cannedResult = ProcessRunResult(exitCode: 0, standardOutput: "")
+    /// Returned one per call before falling back to `cannedResult`.
+    var cannedResultSequence: [ProcessRunResult] = []
 
     var invocations: [Invocation] { lock.withLock { recorded } }
 
     func run(executablePath: String, arguments: [String], standardInput: String?) throws -> ProcessRunResult {
-        lock.withLock { recorded.append(Invocation(executablePath: executablePath, arguments: arguments, standardInput: standardInput)) }
-        return cannedResult
+        lock.withLock {
+            recorded.append(Invocation(executablePath: executablePath, arguments: arguments, standardInput: standardInput))
+            return cannedResultSequence.isEmpty ? cannedResult : cannedResultSequence.removeFirst()
+        }
     }
 }
 
