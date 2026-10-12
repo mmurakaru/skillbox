@@ -9,26 +9,31 @@ struct EnvProjectSummary: Identifiable, Hashable {
     var id: String { path }
 }
 
-enum EnvVarStoreError: Error, LocalizedError {
+enum EnvVarStoreError: Error, LocalizedError, Equatable {
     case parseFailed
     case duplicateKey(String)
+    case secretInSharedProjectScope(String)
+    case secretMarkOnDisabledVar(String)
 
     var errorDescription: String? {
         switch self {
         case .parseFailed: "Could not parse settings.json"
         case .duplicateKey(let key): "An env var named '\(key)' already exists in this scope"
+        case .secretInSharedProjectScope(let key):
+            "Secret '\(key)' cannot go in the shared project settings.json, which is meant for version control. Use the local or User Global scope."
+        case .secretMarkOnDisabledVar(let key):
+            "'\(key)' is disabled, so its value sits in the plaintext stash. Enable or delete it before marking it as a secret."
         }
     }
 }
 
-/// Multi-source store: aggregates env vars from `~/.claude/settings.json` plus
-/// each project's `.claude/settings.json` and `.claude/settings.local.json`.
-/// Disabled vars live in `~/.claude/skillbox-env-stash.json` until re-enabled.
+/// Disabled non-secret vars wait in `~/.claude/skillbox-env-stash.json`; secrets never go there.
 @MainActor
 @Observable
 final class EnvVarStore {
     private(set) var items: [EnvVar] = []
     private(set) var lastError: String?
+    private(set) var markedSecretNames: Set<String> = []
 
     var searchQuery: String = ""
 
@@ -53,6 +58,7 @@ final class EnvVarStore {
     }
 
     func rescan() {
+        markedSecretNames = secretMarksFile.load()
         let stash = EnvVarScanner.loadStash(stashURL: stashURL)
         let sources = discoverSources()
         var collected: [EnvVar] = []
@@ -63,6 +69,12 @@ final class EnvVarStore {
                 stashEntries: stash[source.fileURL.path] ?? [:]
             )
             collected.append(contentsOf: entries)
+        }
+        for index in collected.indices {
+            collected[index].isSecret = EnvSecretDetection.isSecret(
+                key: collected[index].key,
+                markedSecretNames: markedSecretNames
+            )
         }
         self.items = Self.sort(collected)
         ensureValidSelection()
@@ -132,12 +144,15 @@ final class EnvVarStore {
     // MARK: - Mutations
 
     /// Move a var between settings.json and the stash without losing its value.
+    /// Disabling a secret removes its value instead; the UI confirms that first.
     func toggle(_ envVar: EnvVar) throws {
         switch envVar.state {
         case .enabled:
             try removeFromSettings(key: envVar.key, fileURL: envVar.fileURL)
-            try writeStashChange(filePath: envVar.fileURL.path) { entries in
-                entries[envVar.key] = envVar.value
+            if !envVar.isSecret {
+                try writeStashChange(filePath: envVar.fileURL.path) { entries in
+                    entries[envVar.key] = envVar.value
+                }
             }
         case .disabled:
             try writeSettingsChange(fileURL: envVar.fileURL) { root in
@@ -145,6 +160,20 @@ final class EnvVarStore {
                 env[envVar.key] = envVar.value
                 root["env"] = env
             }
+            try writeStashChange(filePath: envVar.fileURL.path) { entries in
+                entries.removeValue(forKey: envVar.key)
+            }
+        }
+        rescan()
+    }
+
+    /// Secrets disabled before secret detection existed still sit in the plaintext stash.
+    var stashedSecrets: [EnvVar] {
+        items.filter { $0.isSecret && $0.state == .disabled }
+    }
+
+    func purgeStashedSecrets() throws {
+        for envVar in stashedSecrets {
             try writeStashChange(filePath: envVar.fileURL.path) { entries in
                 entries.removeValue(forKey: envVar.key)
             }
@@ -163,12 +192,22 @@ final class EnvVarStore {
 
     /// Add a brand-new env var. Creates the settings.json file if missing.
     /// Throws `.duplicateKey` if the key already exists in that scope (enabled or disabled).
-    func add(key: String, value: String, scope: EnvScope) throws {
+    /// Throws `.secretInSharedProjectScope` for a secret aimed at the committed project file.
+    func add(key: String, value: String, scope: EnvScope, markedAsSecret: Bool = false) throws {
         let fileURL = settingsURL(for: scope)
 
         // Check for collisions against current state.
         if items.contains(where: { $0.fileURL.path == fileURL.path && $0.key == key }) {
             throw EnvVarStoreError.duplicateKey(key)
+        }
+        let isSecret = markedAsSecret || EnvSecretDetection.isSecret(key: key, markedSecretNames: markedSecretNames)
+        if isSecret, scope.isSharedWithVersionControl {
+            throw EnvVarStoreError.secretInSharedProjectScope(key)
+        }
+        let writesSecretMark = markedAsSecret && !EnvSecretDetection.nameLooksSecret(key) && !markedSecretNames.contains(key)
+        // The mark is name-wide, so other vars with this name must pass its guards before the value is written.
+        if writesSecretMark {
+            try validateSecretMark(forName: key)
         }
 
         try ensureParentDirectory(for: fileURL)
@@ -177,10 +216,42 @@ final class EnvVarStore {
             env[key] = value
             root["env"] = env
         }
+        if writesSecretMark {
+            try saveSecretMark(true, forName: key)
+        }
         rescan()
     }
 
+    /// Marks or unmarks an env var name as a secret. Names matching the name rule stay secret regardless.
+    func setSecretMark(_ marked: Bool, forName key: String) throws {
+        if marked {
+            try validateSecretMark(forName: key)
+        }
+        try saveSecretMark(marked, forName: key)
+        rescan()
+    }
+
+    private func validateSecretMark(forName key: String) throws {
+        let instances = items.filter { $0.key == key }
+        if instances.contains(where: { $0.scope.isSharedWithVersionControl }) {
+            throw EnvVarStoreError.secretInSharedProjectScope(key)
+        }
+        if instances.contains(where: { !$0.isEnabled }) {
+            throw EnvVarStoreError.secretMarkOnDisabledVar(key)
+        }
+    }
+
+    private func saveSecretMark(_ marked: Bool, forName key: String) throws {
+        var names = secretMarksFile.load()
+        if marked { names.insert(key) } else { names.remove(key) }
+        try secretMarksFile.save(names)
+    }
+
     // MARK: - Internals (exposed for tests)
+
+    var secretMarksFile: EnvSecretMarksFile {
+        EnvSecretMarksFile(fileURL: URL(fileURLWithPath: claudeHomePath).appendingPathComponent("skillbox-env-secret-names.json"))
+    }
 
     var stashURL: URL {
         URL(fileURLWithPath: claudeHomePath).appendingPathComponent("skillbox-env-stash.json")
@@ -349,7 +420,8 @@ final class EnvVarStore {
 
     private static func matches(_ item: EnvVar, _ query: String) -> Bool {
         if item.key.localizedCaseInsensitiveContains(query) { return true }
-        if item.value.localizedCaseInsensitiveContains(query) { return true }
+        // Matching on a secret's value would reveal it one keystroke at a time.
+        if !item.isSecret, item.value.localizedCaseInsensitiveContains(query) { return true }
         if let desc = EnvVarCatalog.description(for: item.key),
            desc.localizedCaseInsensitiveContains(query) { return true }
         return false

@@ -1,6 +1,6 @@
 # <img src="Sources/Skillbox/Resources/AppIcon.svg" alt="" height="48" valign="middle" /> skillbox
 
-Native macOS menu bar app for Claude Code: skills, auto-memory, hooks, and env vars.
+Native macOS menu bar toolbox for AI coding agents: shared skills, provider usage for Claude Code, Codex, and Grok, and Claude Code memory, hooks, and env vars.
 
 See [PRD.md](PRD.md) for the spec.
 

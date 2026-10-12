@@ -238,7 +238,7 @@ struct SkillRowView: View {
     }
 
     private var claudeBlockedTooltip: String {
-        "Locked by author (disable-model-invocation: true). Claude can't auto-invoke this skill regardless of override."
+        "Locked by author (disable-model-invocation: true). Claude Code can't auto-invoke this skill regardless of override."
     }
 
     @ViewBuilder
