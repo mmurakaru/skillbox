@@ -15,6 +15,7 @@ struct EnvListView: View {
     /// Row awaiting confirmation before an enabled secret is disabled (its value is removed).
     @State private var secretDisableConfirmationID: String?
     @FocusState private var searchFocused: Bool
+    @State private var isConfirmingStashPurge = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -39,6 +40,12 @@ struct EnvListView: View {
 
             if let keychainError = keychainSecrets.lastError {
                 keychainErrorBanner(keychainError)
+                Divider()
+            }
+
+            if !store.stashedSecrets.isEmpty {
+                stashedSecretsBanner
+                Divider()
             }
 
             list
@@ -153,6 +160,45 @@ struct EnvListView: View {
         .padding(.vertical, 4)
         .padding(.horizontal, 6)
         .glassEffect(.regular, in: .rect(cornerRadius: 6))
+    }
+
+    private var stashedSecretsBanner: some View {
+        let count = store.stashedSecrets.count
+        let subject = count == 1 ? "1 disabled secret sits" : "\(count) disabled secrets sit"
+        return HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text(isConfirmingStashPurge
+                ? "Delete these stashed values? Enable a secret first to keep it."
+                : "\(subject) in plaintext in the Skillbox stash.")
+                .font(.system(size: 11))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 4)
+            if isConfirmingStashPurge {
+                Button("Cancel") { isConfirmingStashPurge = false }
+                    .controlSize(.small)
+                Button("Purge") { performPurgeStashedSecrets() }
+                    .controlSize(.small)
+                    .buttonStyle(.borderedProminent)
+                    .tint(.orange)
+            } else {
+                Button("Purge…") { isConfirmingStashPurge = true }
+                    .controlSize(.small)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color.orange.opacity(0.1))
+    }
+
+    private func performPurgeStashedSecrets() {
+        do {
+            try store.purgeStashedSecrets()
+            isConfirmingStashPurge = false
+        } catch {
+            NSSound.beep()
+            print("Env stash purge failed: \(error)")
+        }
     }
 
     private var list: some View {
