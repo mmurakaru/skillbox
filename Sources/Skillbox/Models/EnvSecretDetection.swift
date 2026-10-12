@@ -17,7 +17,7 @@ enum EnvSecretDetection {
     }
 }
 
-/// Persists env var names the user explicitly marked as secrets, as a JSON array of names.
+/// Persists the env var names that the user marked as secrets.
 struct EnvSecretMarksFile {
     let fileURL: URL
 

@@ -35,7 +35,6 @@ struct EnvRowView: View {
     let onToggle: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
-    /// Marks or unmarks the var as a secret by name.
     let onSetSecretMark: (Bool) -> Void
 
     @Binding var rowState: SkillRowView.RowState
@@ -267,7 +266,6 @@ struct EnvRowView: View {
         )
     }
 
-    /// Inline "<verb> KEY<detail>" prompt with Cancel and a tinted confirm button titled by the verb.
     private func confirmationRow(
         verb: String,
         detail: String,

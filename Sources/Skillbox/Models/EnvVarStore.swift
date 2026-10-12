@@ -33,7 +33,6 @@ enum EnvVarStoreError: Error, LocalizedError {
 final class EnvVarStore {
     private(set) var items: [EnvVar] = []
     private(set) var lastError: String?
-    /// Names the user explicitly marked as secrets, in addition to the name rule.
     private(set) var markedSecretNames: Set<String> = []
 
     var searchQuery: String = ""
@@ -178,8 +177,8 @@ final class EnvVarStore {
     }
 
     /// Add a brand-new env var. Creates the settings.json file if missing.
-    /// Throws `.duplicateKey` if the key already exists in that scope (enabled or disabled),
-    /// and `.secretInSharedProjectScope` for a secret aimed at the committed project file.
+    /// Throws `.duplicateKey` if the key already exists in that scope (enabled or disabled).
+    /// Throws `.secretInSharedProjectScope` for a secret aimed at the committed project file.
     func add(key: String, value: String, scope: EnvScope, markedAsSecret: Bool = false) throws {
         let fileURL = settingsURL(for: scope)
 

@@ -134,7 +134,7 @@ struct EnvAddSheet: View {
         return false
     }
 
-    /// Moves a shared-project selection to the same project's local scope, or to User Global.
+    /// Falls back to User Global when the project has no local scope entry.
     private func moveSelectionOffSharedProjectScope() {
         guard availableScopes.indices.contains(selectedScopeIndex),
               case .project(_, let path) = availableScopes[selectedScopeIndex] else { return }
