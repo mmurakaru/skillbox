@@ -65,9 +65,9 @@ struct EnvListView: View {
         .sheet(isPresented: $showingAddSheet) {
             EnvAddSheet(
                 availableScopes: store.addableScopes,
-                onAdd: { key, value, scope in
+                onAdd: { key, value, scope, markedAsSecret in
                     do {
-                        try store.add(key: key, value: value, scope: scope)
+                        try store.add(key: key, value: value, scope: scope, markedAsSecret: markedAsSecret)
                         showingAddSheet = false
                         return nil
                     } catch {
@@ -154,6 +154,7 @@ struct EnvListView: View {
                                 onToggle: { performToggle(envVar) },
                                 onEdit: { open(envVar: envVar) },
                                 onDelete: { performDelete(envVar) },
+                                onSetSecretMark: { marked in performSetSecretMark(marked, for: envVar) },
                                 rowState: binding(for: envVar.id)
                             )
                             .id(envVar.id)
@@ -266,6 +267,15 @@ struct EnvListView: View {
         } catch {
             NSSound.beep()
             print("Env toggle failed: \(error)")
+        }
+    }
+
+    private func performSetSecretMark(_ marked: Bool, for envVar: EnvVar) {
+        do {
+            try store.setSecretMark(marked, forName: envVar.key)
+        } catch {
+            NSSound.beep()
+            print("Env secret mark failed: \(error)")
         }
     }
 

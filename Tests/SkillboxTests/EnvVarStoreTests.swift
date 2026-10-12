@@ -221,6 +221,114 @@ struct EnvVarStoreTests {
         #expect(!store.items.contains(where: { $0.key == "DOOMED" }))
     }
 
+    // MARK: - Secrets
+
+    @Test func rescan_flagsSecretsByNameRule() throws {
+        let home = try makeTempHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        try #"{"env": {"EXAMPLE_API_TOKEN": "abc", "PLAIN_FLAG": "1"}}"#
+            .write(to: home.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
+
+        let store = EnvVarStore()
+        store.configure(claudeHomePath: home.path)
+
+        #expect(store.items.first(where: { $0.key == "EXAMPLE_API_TOKEN" })?.isSecret == true)
+        #expect(store.items.first(where: { $0.key == "PLAIN_FLAG" })?.isSecret == false)
+    }
+
+    @Test func toggle_disablingSecret_removesValueWithoutStashing() throws {
+        let home = try makeTempHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let settings = home.appendingPathComponent("settings.json")
+        try #"{"env": {"EXAMPLE_API_TOKEN": "abc", "PLAIN_FLAG": "1"}}"#
+            .write(to: settings, atomically: true, encoding: .utf8)
+
+        let store = EnvVarStore()
+        store.configure(claudeHomePath: home.path)
+        let secret = try #require(store.items.first(where: { $0.key == "EXAMPLE_API_TOKEN" }))
+
+        try store.toggle(secret)
+
+        let parsed = try JSONSerialization.jsonObject(with: Data(contentsOf: settings)) as? [String: Any]
+        let env = try #require(parsed?["env"] as? [String: Any])
+        #expect(env["EXAMPLE_API_TOKEN"] == nil)
+        #expect(env["PLAIN_FLAG"] as? String == "1")
+        #expect(!FileManager.default.fileExists(atPath: store.stashURL.path))
+        #expect(!store.items.contains(where: { $0.key == "EXAMPLE_API_TOKEN" }))
+    }
+
+    @Test func add_secretToSharedProjectScope_throwsAndWritesNothing() throws {
+        let home = try makeTempHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let project = home.appendingPathComponent("example-project")
+        let store = EnvVarStore()
+        store.configure(claudeHomePath: home.path)
+        let sharedScope = EnvScope.project(name: "example-project", path: project.path)
+
+        #expect(throws: EnvVarStoreError.self) {
+            try store.add(key: "EXAMPLE_API_TOKEN", value: "abc", scope: sharedScope)
+        }
+        #expect(throws: EnvVarStoreError.self) {
+            try store.add(key: "DATABASE_URL", value: "abc", scope: sharedScope, markedAsSecret: true)
+        }
+        #expect(!FileManager.default.fileExists(atPath: store.settingsURL(for: sharedScope).path))
+    }
+
+    @Test func add_secretToLocalProjectScope_isAllowed() throws {
+        let home = try makeTempHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let project = home.appendingPathComponent("example-project")
+        let store = EnvVarStore()
+        store.configure(claudeHomePath: home.path)
+        let localScope = EnvScope.projectLocal(name: "example-project", path: project.path)
+
+        try store.add(key: "EXAMPLE_API_TOKEN", value: "abc", scope: localScope)
+
+        let parsed = try JSONSerialization.jsonObject(with: Data(contentsOf: store.settingsURL(for: localScope))) as? [String: Any]
+        #expect((parsed?["env"] as? [String: Any])?["EXAMPLE_API_TOKEN"] as? String == "abc")
+    }
+
+    @Test func add_markedAsSecret_persistsMarkAndFlagsItem() throws {
+        let home = try makeTempHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        try "{}".write(to: home.appendingPathComponent("settings.json"), atomically: true, encoding: .utf8)
+        let store = EnvVarStore()
+        store.configure(claudeHomePath: home.path)
+
+        try store.add(key: "DATABASE_URL", value: "postgres://example", scope: .userGlobal, markedAsSecret: true)
+
+        #expect(store.markedSecretNames == ["DATABASE_URL"])
+        #expect(store.items.first(where: { $0.key == "DATABASE_URL" })?.isSecret == true)
+
+        try store.setSecretMark(false, forName: "DATABASE_URL")
+        #expect(store.items.first(where: { $0.key == "DATABASE_URL" })?.isSecret == false)
+    }
+
+    @Test func filtered_searchBySecretValue_doesNotMatch() {
+        var secret = makeEnvVar(key: "EXAMPLE_API_TOKEN", value: "needle-value")
+        secret.isSecret = true
+        let store = EnvVarStore(seedItems: [secret, makeEnvVar(key: "PLAIN", value: "needle-value")])
+        store.searchQuery = "needle"
+        #expect(store.filteredEnvVars.map(\.key) == ["PLAIN"])
+    }
+
+    @Test func rescan_leavesExistingStashedSecretUntouched() throws {
+        let home = try makeTempHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let settings = home.appendingPathComponent("settings.json")
+        try "{}".write(to: settings, atomically: true, encoding: .utf8)
+        let stash = home.appendingPathComponent("skillbox-env-stash.json")
+        let stashContents = #"{"\#(settings.path)": {"EXAMPLE_API_TOKEN": "abc"}}"#
+        try stashContents.write(to: stash, atomically: true, encoding: .utf8)
+
+        let store = EnvVarStore()
+        store.configure(claudeHomePath: home.path)
+
+        let stashed = try #require(store.items.first)
+        #expect(stashed.isSecret && stashed.state == .disabled)
+        #expect(try String(contentsOf: stash, encoding: .utf8) == stashContents)
+    }
+
     @Test func toggle_offCollapsesEmptyEnvBlock_butLeavesOtherKeys() async throws {
         let home = try makeTempHome()
         defer { try? FileManager.default.removeItem(at: home) }
