@@ -8,14 +8,20 @@ enum SecretPasteboard {
     /// Long enough to paste once, short enough that a forgotten secret does not stay on the clipboard.
     static let clearDelay: Duration = .seconds(60)
 
-    static func copyConcealed(_ value: String, to pasteboard: NSPasteboard = .general, clearAfter delay: Duration = clearDelay) {
+    /// Returns the pending clear so callers can await it instead of guessing a sleep.
+    @discardableResult
+    static func copyConcealed(
+        _ value: String,
+        to pasteboard: NSPasteboard = .general,
+        clearAfter delay: Duration = clearDelay
+    ) -> Task<Void, Never> {
         pasteboard.clearContents()
         pasteboard.declareTypes([.string, concealedPasteboardType], owner: nil)
         pasteboard.setString(value, forType: .string)
         pasteboard.setString("", forType: concealedPasteboardType)
         let copiedChangeCount = pasteboard.changeCount
 
-        Task {
+        return Task {
             try? await Task.sleep(for: delay)
             clearIfUnchanged(pasteboard, since: copiedChangeCount)
         }
