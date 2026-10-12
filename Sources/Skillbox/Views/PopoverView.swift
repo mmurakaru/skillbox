@@ -48,9 +48,9 @@ struct PopoverView: View {
     @Environment(MemoryStore.self) private var memoryStore
     @Environment(HookStore.self) private var hookStore
     @Environment(EnvVarStore.self) private var envStore
-    @Environment(KeychainSecretsModel.self) private var keychainSecrets
     @Environment(LocalModelStore.self) private var localModelStore
     @Environment(ModelExplorerStore.self) private var modelExplorerStore
+    @Environment(KeychainSecretsModel.self) private var keychainSecrets
     @Environment(RemoteSkillService.self) private var remoteSkillService
     @Environment(SkillOverridesStore.self) private var overridesStore
     @Environment(SkillFolderSync.self) private var skillFolderSync
