@@ -9,12 +9,12 @@ struct HuggingFaceHubClientTests {
         return Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0.value ?? "") })
     }
 
-    @Test func requestIncludesSearchAuthorLibraryAndSort() {
-        let request = HuggingFaceHubClient().makeRequest(HuggingFaceHubQuery(search: "qwen", author: "Qwen", library: "gguf", sort: .recent))
+    @Test func requestIncludesSearchAuthorFormatTagAndSort() {
+        let request = HuggingFaceHubClient().makeRequest(HuggingFaceHubQuery(search: "qwen", author: "Qwen", formatFilter: "gguf", sort: .recent))
         #expect(request.url?.absoluteString.hasPrefix("https://huggingface.co/api/models?") == true)
-        #expect(queryItems(HuggingFaceHubQuery(search: "qwen", author: "Qwen", library: "gguf", sort: .recent)) == [
+        #expect(queryItems(HuggingFaceHubQuery(search: "qwen", author: "Qwen", formatFilter: "gguf", sort: .recent)) == [
             "limit": "50", "sort": "lastModified", "direction": "-1",
-            "search": "qwen", "author": "Qwen", "library": "gguf",
+            "search": "qwen", "author": "Qwen", "filter": "gguf",
         ])
     }
 
@@ -45,6 +45,12 @@ struct HuggingFaceHubClientTests {
         #expect(models.first?.name == "Qwen3-8B")
         #expect(models.first?.libraryName == "transformers")
         #expect(models.map(\.parameterHint) == ["8B", "8X7B"])
+    }
+
+    @Test func parameterHintReadsMillionsAndUppercaseMixtures() {
+        #expect(HuggingFaceHubModel(id: "org/SmolLM2-135M").parameterHint == "135M")
+        #expect(HuggingFaceHubModel(id: "org/gemma-3-270m-it").parameterHint == "270M")
+        #expect(HuggingFaceHubModel(id: "org/Mixtral-8X7B-v0.1").parameterHint == "8X7B")
     }
 
     @Test func parameterHintIsNilWithoutSize() {

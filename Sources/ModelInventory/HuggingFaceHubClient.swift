@@ -32,15 +32,15 @@ public struct HuggingFaceHubModel: Sendable, Codable, Identifiable, Equatable {
         return String(id[id.index(after: slash)...])
     }
 
-    /// Parameter count parsed from the name, such as "8B", "8X7B", or "70B"; a hint, not an exact size.
+    /// Parameter count parsed from the name, such as "135M", "8B", "8X7B", or "70B"; a hint, not an exact size.
     public var parameterHint: String? {
-        guard let match = name.firstMatch(of: /(\d+(?:\.\d+)?(?:x\d+)?)[bB](?:[-_. ]|$)/) else { return nil }
-        return String(match.1).uppercased() + "B"
+        guard let match = name.firstMatch(of: /(\d+(?:\.\d+)?(?:[xX]\d+)?)([bBmM])(?:[-_. ]|$)/) else { return nil }
+        return String(match.1).uppercased() + String(match.2).uppercased()
     }
 }
 
 /// Sort order of Hugging Face Hub model search results.
-public enum HuggingFaceHubSort: String, Sendable, CaseIterable, Identifiable {
+public enum HuggingFaceHubSort: String, Sendable, Codable, CaseIterable, Identifiable {
     case downloads
     case trending
     case recent
@@ -64,17 +64,17 @@ public enum HuggingFaceHubSort: String, Sendable, CaseIterable, Identifiable {
     }
 }
 
-/// Server-side Hub search: free text, lab (author), format library, and sort.
-public struct HuggingFaceHubQuery: Sendable, Equatable {
+/// Server-side Hub search: free text, lab (author), weight format tag such as `gguf` or `mlx`, and sort.
+public struct HuggingFaceHubQuery: Sendable, Equatable, Codable {
     public var search: String
     public var author: String
-    public var library: String?
+    public var formatFilter: String?
     public var sort: HuggingFaceHubSort
 
-    public init(search: String = "", author: String = "", library: String? = nil, sort: HuggingFaceHubSort = .downloads) {
+    public init(search: String = "", author: String = "", formatFilter: String? = nil, sort: HuggingFaceHubSort = .downloads) {
         self.search = search
         self.author = author
-        self.library = library
+        self.formatFilter = formatFilter
         self.sort = sort
     }
 }
@@ -113,8 +113,9 @@ public struct HuggingFaceHubClient: HuggingFaceHubSearching {
         if !author.isEmpty {
             items.append(URLQueryItem(name: "author", value: author))
         }
-        if let library = query.library, !library.isEmpty {
-            items.append(URLQueryItem(name: "library", value: library))
+        // The list API ignores `library`; format repos are tagged, and `filter` matches tags.
+        if let formatFilter = query.formatFilter, !formatFilter.isEmpty {
+            items.append(URLQueryItem(name: "filter", value: formatFilter))
         }
         components.queryItems = items
 

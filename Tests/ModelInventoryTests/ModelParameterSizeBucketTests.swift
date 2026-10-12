@@ -7,6 +7,8 @@ struct ModelParameterSizeBucketTests {
         #expect(ModelParameterSizeBucket.billions(from: "70B") == 70)
         #expect(ModelParameterSizeBucket.billions(from: "1.5B") == 1.5)
         #expect(ModelParameterSizeBucket.billions(from: "8X7B") == 56)
+        #expect(ModelParameterSizeBucket.billions(from: "135M") == 0.135)
+        #expect(ModelParameterSizeBucket.small.matches("270M"))
         #expect(ModelParameterSizeBucket.billions(from: nil) == nil)
         #expect(ModelParameterSizeBucket.billions(from: "") == nil)
     }

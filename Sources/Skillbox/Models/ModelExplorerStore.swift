@@ -7,6 +7,8 @@ import ModelInventory
 @Observable
 final class ModelExplorerStore {
     private(set) var results: [HuggingFaceHubModel] = []
+    /// The search that produced `results`, so cached results never show under other filters.
+    private(set) var resultsQuery = HuggingFaceHubQuery()
     private(set) var lastSynced: Date?
     private(set) var isLoading = false
     private(set) var errorMessage: String?
@@ -41,11 +43,18 @@ final class ModelExplorerStore {
             let found = try await client.search(query)
             guard generation == searchGeneration else { return }
             results = found
+            resultsQuery = query
             lastSynced = Date()
             saveCache()
         } catch {
             guard generation == searchGeneration else { return }
-            errorMessage = "Could not reach Hugging Face. Showing the last synced results."
+            if resultsQuery == query {
+                errorMessage = "Could not reach Hugging Face. Showing the last synced results."
+            } else {
+                results = []
+                lastSynced = nil
+                errorMessage = "Could not reach Hugging Face, and there are no saved results for this search."
+            }
         }
         isLoading = false
     }
@@ -59,17 +68,21 @@ final class ModelExplorerStore {
     private struct CachePayload: Codable {
         var models: [HuggingFaceHubModel]
         var lastSynced: Date
+        var query: HuggingFaceHubQuery
     }
 
+    /// Restores the cached search as well, so the filters on screen describe the cached results.
     private func loadCache() {
         guard let data = try? Data(contentsOf: cacheURL),
               let payload = try? JSONDecoder().decode(CachePayload.self, from: data) else { return }
         results = payload.models
         lastSynced = payload.lastSynced
+        query = payload.query
+        resultsQuery = payload.query
     }
 
     private func saveCache() {
-        let payload = CachePayload(models: results, lastSynced: lastSynced ?? Date())
+        let payload = CachePayload(models: results, lastSynced: lastSynced ?? Date(), query: resultsQuery)
         guard let data = try? JSONEncoder().encode(payload) else { return }
         try? FileManager.default.createDirectory(at: cacheURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? data.write(to: cacheURL, options: .atomic)

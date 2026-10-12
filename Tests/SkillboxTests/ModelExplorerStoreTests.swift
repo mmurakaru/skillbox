@@ -52,6 +52,34 @@ struct ModelExplorerStoreTests {
         #expect(offline.errorMessage == "Could not reach Hugging Face. Showing the last synced results.")
     }
 
+    @Test func cachedResultsComeBackWithTheirSearch() async {
+        let cacheURL = temporaryCacheURL()
+        defer { try? FileManager.default.removeItem(at: cacheURL.deletingLastPathComponent()) }
+        let online = ModelExplorerStore(client: QueryEchoSearch(), cacheURL: cacheURL)
+        online.query.search = "qwen"
+        await online.search()
+
+        let relaunched = ModelExplorerStore(client: StubHubSearch(result: .failure(.unexpectedStatus(503))), cacheURL: cacheURL)
+
+        #expect(relaunched.query.search == "qwen")
+        #expect(relaunched.results.map(\.id) == ["org/qwen"])
+    }
+
+    @Test func offlineSearchForAnotherQueryShowsNoStaleResults() async {
+        let cacheURL = temporaryCacheURL()
+        defer { try? FileManager.default.removeItem(at: cacheURL.deletingLastPathComponent()) }
+        let online = ModelExplorerStore(client: QueryEchoSearch(), cacheURL: cacheURL)
+        online.query.search = "qwen"
+        await online.search()
+
+        let offline = ModelExplorerStore(client: StubHubSearch(result: .failure(.unexpectedStatus(503))), cacheURL: cacheURL)
+        offline.query.search = "llama"
+        await offline.search()
+
+        #expect(offline.results.isEmpty)
+        #expect(offline.errorMessage == "Could not reach Hugging Face, and there are no saved results for this search.")
+    }
+
     @Test func sizeBucketFiltersDisplayedResults() async {
         let cacheURL = temporaryCacheURL()
         defer { try? FileManager.default.removeItem(at: cacheURL.deletingLastPathComponent()) }

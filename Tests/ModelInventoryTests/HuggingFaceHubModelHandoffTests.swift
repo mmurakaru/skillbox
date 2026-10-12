@@ -1,20 +1,38 @@
 import Testing
+import Foundation
 @testable import ModelInventory
 
 struct HuggingFaceHubModelHandoffTests {
+    private func local(_ name: String, _ source: LocalModelSource) -> LocalModel {
+        LocalModel(id: "\(source.rawValue):\(name)", name: name, source: source,
+                   path: URL(fileURLWithPath: "/models/\(name)"), format: .gguf, sizeBytes: 1)
+    }
+
+    private func installed(_ hubID: String, _ localModels: [LocalModel]) -> Bool {
+        HuggingFaceHubModelHandoff.isInstalled(HuggingFaceHubModel(id: hubID), localModels: localModels)
+    }
+
     @Test func matchesLocalFileNamedAfterTheRepository() {
-        #expect(HuggingFaceHubModelHandoff.isInstalled(
-            HuggingFaceHubModel(id: "Qwen/Qwen3.5-9B"), localModelNames: ["Qwen_Qwen3.5-9B-Q4_K_M"]
-        ))
+        #expect(installed("Qwen/Qwen3.5-9B", [local("Qwen_Qwen3.5-9B-Q4_K_M", .lmStudio)]))
+        #expect(installed("org/Model-8B-GGUF", [local("Model-8B.Q8_0", .custom)]))
     }
 
-    @Test func notInstalledWithoutOverlap() {
-        #expect(!HuggingFaceHubModelHandoff.isInstalled(HuggingFaceHubModel(id: "meta/Llama-3-70B"), localModelNames: ["Qwen3-8B"]))
-        #expect(!HuggingFaceHubModelHandoff.isInstalled(HuggingFaceHubModel(id: "meta/Llama-3-8B"), localModelNames: []))
+    @Test func matchesHuggingFaceCacheRepositoryExactly() {
+        #expect(installed("Qwen/Qwen3-8B", [local("Qwen/Qwen3-8B", .huggingFaceCache)]))
+        #expect(!installed("Qwen/Qwen3-8B-Base", [local("Qwen/Qwen3-8B", .huggingFaceCache)]))
     }
 
-    @Test func veryShortLocalNamesNeverMatch() {
-        #expect(!HuggingFaceHubModelHandoff.isInstalled(HuggingFaceHubModel(id: "org/phi-4"), localModelNames: ["4", "ph"]))
+    @Test func matchesOllamaLibraryNamesAndHubPulls() {
+        #expect(installed("Qwen/Qwen3-8B", [local("qwen3:8b", .ollama)]))
+        #expect(installed("org/Model-8B-GGUF", [local("hf.co/org/Model-8B-GGUF:Q4_K_M", .ollama)]))
+        #expect(!installed("Qwen/Qwen3-8B", [local("qwen3:14b", .ollama)]))
+    }
+
+    @Test func similarNamesAreNotInstalled() {
+        #expect(!installed("Qwen/Qwen3-8B-Base", [local("Qwen3-8B", .custom)]))
+        #expect(!installed("Qwen/Qwen3-8B-AWQ", [local("Qwen3-8B", .custom)]))
+        #expect(!installed("org/model-embeddings", [local("model", .custom)]))
+        #expect(!installed("meta/Llama-3-8B", []))
     }
 
     @Test func ggufRepositoriesPullIntoOllama() {

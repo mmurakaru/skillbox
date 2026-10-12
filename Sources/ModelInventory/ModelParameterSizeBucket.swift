@@ -21,22 +21,27 @@ public enum ModelParameterSizeBucket: String, CaseIterable, Identifiable, Sendab
     }
 
     public func matches(_ parameterHint: String?) -> Bool {
-        guard self != .any else { return true }
+        guard let bounds = billionBounds else { return true }
         guard let billions = Self.billions(from: parameterHint) else { return false }
+        return billions > bounds.exclusiveLower && billions <= bounds.inclusiveUpper
+    }
+
+    private var billionBounds: (exclusiveLower: Double, inclusiveUpper: Double)? {
         switch self {
-        case .any: return true
-        case .small: return billions <= 4
-        case .medium: return billions > 4 && billions <= 13
-        case .large: return billions > 13 && billions <= 34
-        case .extraLarge: return billions > 34
+        case .any: nil
+        case .small: (-.infinity, 4)
+        case .medium: (4, 13)
+        case .large: (13, 34)
+        case .extraLarge: (34, .infinity)
         }
     }
 
-    /// Parses "8B", "70B", "1.5B", or "8X7B" (56, the mixture total) into billions of parameters.
+    /// Parses "135M", "8B", "1.5B", or "8X7B" (56, the mixture total) into billions of parameters.
     public static func billions(from parameterHint: String?) -> Double? {
-        guard let hint = parameterHint?.lowercased().replacingOccurrences(of: "b", with: ""), !hint.isEmpty else { return nil }
-        let factors = hint.split(separator: "x").compactMap { Double($0) }
+        guard let hint = parameterHint?.lowercased(), let unit = hint.last, unit == "b" || unit == "m" else { return nil }
+        let factors = hint.dropLast().split(separator: "x").compactMap { Double($0) }
         guard !factors.isEmpty else { return nil }
-        return factors.reduce(1, *)
+        let count = factors.reduce(1, *)
+        return unit == "m" ? count / 1_000 : count
     }
 }

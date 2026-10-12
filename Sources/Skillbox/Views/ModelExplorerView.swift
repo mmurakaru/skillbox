@@ -64,7 +64,7 @@ struct ModelExplorerView: View {
                 .onSubmit { runSearch() }
                 .help("Organization on Hugging Face, for example Qwen")
 
-            Picker("Format", selection: $explorer.query.library) {
+            Picker("Format", selection: $explorer.query.formatFilter) {
                 Text("Format").tag(String?.none)
                 Text("GGUF").tag(String?("gguf"))
                 Text("MLX").tag(String?("mlx"))
@@ -72,7 +72,7 @@ struct ModelExplorerView: View {
             .labelsHidden()
             .fixedSize()
             .help("Weight format")
-            .onChange(of: explorer.query.library) { runSearch() }
+            .onChange(of: explorer.query.formatFilter) { runSearch() }
 
             Picker("Size", selection: $explorer.sizeBucket) {
                 ForEach(ModelParameterSizeBucket.allCases) { Text($0.label).tag($0) }
@@ -104,13 +104,12 @@ struct ModelExplorerView: View {
         } else if explorer.displayedResults.isEmpty {
             emptyState
         } else {
-            let localModelNames = localModels.models.map(\.name)
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
                     ForEach(explorer.displayedResults) { hubModel in
                         HuggingFaceHubModelRowView(
                             model: hubModel,
-                            isInstalled: HuggingFaceHubModelHandoff.isInstalled(hubModel, localModelNames: localModelNames)
+                            isInstalled: HuggingFaceHubModelHandoff.isInstalled(hubModel, localModels: localModels.models)
                         )
                     }
                 }
