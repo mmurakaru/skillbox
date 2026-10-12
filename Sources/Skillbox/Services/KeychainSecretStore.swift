@@ -43,8 +43,9 @@ enum KeychainSecretValidation {
         guard value.utf8.count <= maximumValueByteCount else {
             throw KeychainSecretError.invalidSecretValue("the value is longer than \(maximumValueByteCount) bytes")
         }
-        guard !value.unicodeScalars.contains(where: { $0.properties.generalCategory == .control }) else {
-            throw KeychainSecretError.invalidSecretValue("the value contains a newline or another control character")
+        // `security find-generic-password -w` prints any value outside printable ASCII as hex, so helpers would read the wrong bytes.
+        guard value.unicodeScalars.allSatisfy({ (0x20...0x7E).contains($0.value) }) else {
+            throw KeychainSecretError.invalidSecretValue("the value has characters outside printable ASCII, such as accented letters, emoji, tabs, or newlines")
         }
     }
 }

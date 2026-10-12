@@ -99,6 +99,8 @@ struct KeychainSecretStoreTests {
         #expect(throws: KeychainSecretError.self) { try store.writeSecretValue("value", named: "BAD NAME; rm") }
         #expect(throws: KeychainSecretError.self) { try store.writeSecretValue("line one\nline two", named: "EXAMPLE_API_TOKEN") }
         #expect(throws: KeychainSecretError.self) { try store.writeSecretValue("", named: "EXAMPLE_API_TOKEN") }
+        #expect(throws: KeychainSecretError.self) { try store.writeSecretValue("caf\u{E9}-token", named: "EXAMPLE_API_TOKEN") }
+        #expect(throws: KeychainSecretError.self) { try store.writeSecretValue("tab\tseparated", named: "EXAMPLE_API_TOKEN") }
         #expect(throws: KeychainSecretError.self) {
             try store.writeSecretValue(String(repeating: "a", count: KeychainSecretValidation.maximumValueByteCount + 1), named: "EXAMPLE_API_TOKEN")
         }
@@ -113,9 +115,9 @@ struct KeychainSecretStoreTests {
 
 @MainActor
 struct KeychainSecretsModelTests {
-    private func makeEnvVar(key: String, value: String) -> EnvVar {
+    private func makeEnvVar(key: String, value: String, fileURL: URL = URL(fileURLWithPath: "/tmp/settings.json")) -> EnvVar {
         EnvVar(key: key, value: value, state: .enabled, scope: .userGlobal,
-               fileURL: URL(fileURLWithPath: "/tmp/settings.json"), modifiedAt: Date(), isSecret: true)
+               fileURL: fileURL, modifiedAt: Date(), isSecret: true)
     }
 
     @Test func addSecret_storesAndListsName() throws {
@@ -176,5 +178,17 @@ struct KeychainSecretsModelTests {
 
         #expect(model.keychainHoldsSameValue(as: makeEnvVar(key: "EXAMPLE_API_TOKEN", value: "abc")))
         #expect(!model.keychainHoldsSameValue(as: makeEnvVar(key: "EXAMPLE_API_TOKEN", value: "changed")))
+    }
+
+    @Test func refreshKeychainMatches_flagsOnlyRowsWithTheStoredValue() {
+        let keychain = InMemoryKeychainSecretStore(values: ["EXAMPLE_API_TOKEN": "abc"])
+        let model = KeychainSecretsModel(secretStore: keychain)
+        model.reload()
+        let sameValue = makeEnvVar(key: "EXAMPLE_API_TOKEN", value: "abc")
+        let otherValue = makeEnvVar(key: "EXAMPLE_API_TOKEN", value: "changed", fileURL: URL(fileURLWithPath: "/tmp/project/.claude/settings.local.json"))
+
+        model.refreshKeychainMatches(for: [sameValue, otherValue])
+
+        #expect(model.envVarIDsMatchingKeychain == [sameValue.id])
     }
 }

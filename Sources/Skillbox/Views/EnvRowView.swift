@@ -39,7 +39,7 @@ struct EnvRowView: View {
     let onEdit: () -> Void
     let onDelete: () -> Void
     let onSetSecretMark: (Bool) -> Void
-    /// True when the login Keychain holds a secret with this name.
+    /// True when the login Keychain holds this var's exact value.
     let isCopiedToKeychain: Bool
     let onCopyToKeychain: () -> Void
     /// Removes the settings.json and stash copy after the caller verifies the Keychain value matches.

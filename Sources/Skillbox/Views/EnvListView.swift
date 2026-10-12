@@ -48,6 +48,8 @@ struct EnvListView: View {
             applyStickyOrDefault()
         }
         .onChange(of: store.items.count) { _, _ in applyStickyOrDefault() }
+        .onChange(of: store.items) { _, items in keychainSecrets.refreshKeychainMatches(for: items) }
+        .onChange(of: keychainSecrets.secretNames) { _, _ in keychainSecrets.refreshKeychainMatches(for: store.items) }
         .onChange(of: store.selectedScopeKey) { _, newValue in
             envSelectedScope = newValue ?? ""
             selectedEnvID = store.filteredEnvVars.first?.id
@@ -180,7 +182,7 @@ struct EnvListView: View {
                                 onEdit: { open(envVar: envVar) },
                                 onDelete: { performDelete(envVar) },
                                 onSetSecretMark: { marked in performSetSecretMark(marked, for: envVar) },
-                                isCopiedToKeychain: keychainSecrets.containsSecret(named: envVar.key),
+                                isCopiedToKeychain: keychainSecrets.envVarIDsMatchingKeychain.contains(envVar.id),
                                 onCopyToKeychain: { performCopyToKeychain(envVar) },
                                 onRemovePlaintextCopy: { performRemovePlaintextCopy(envVar) },
                                 rowState: binding(for: envVar.id),

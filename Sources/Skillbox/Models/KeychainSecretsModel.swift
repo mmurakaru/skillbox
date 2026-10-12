@@ -23,6 +23,8 @@ enum KeychainSecretsModelError: Error, LocalizedError, Equatable {
 @Observable
 final class KeychainSecretsModel {
     private(set) var secretNames: [String] = []
+    /// Cached because each comparison reads a value through the `security` tool.
+    private(set) var envVarIDsMatchingKeychain: Set<String> = []
     private(set) var lastError: String?
 
     private let secretStore: any KeychainSecretStoring
@@ -95,6 +97,10 @@ final class KeychainSecretsModel {
         }
         try writeAndVerifyNewSecret(named: envVar.key, value: envVar.value)
         reload()
+    }
+
+    func refreshKeychainMatches(for envVars: [EnvVar]) {
+        envVarIDsMatchingKeychain = Set(envVars.filter { $0.isSecret && keychainHoldsSameValue(as: $0) }.map(\.id))
     }
 
     /// True when the Keychain holds this env var's exact value, so removing the plaintext copy loses nothing.
