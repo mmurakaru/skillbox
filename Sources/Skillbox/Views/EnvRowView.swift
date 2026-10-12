@@ -39,6 +39,8 @@ struct EnvRowView: View {
     let onSetSecretMark: (Bool) -> Void
 
     @Binding var rowState: SkillRowView.RowState
+    /// Owned by the list so keyboard toggles reach the same confirmation as the switch.
+    @Binding var isConfirmingSecretDisable: Bool
 
     @State private var isHoveringRow = false
     @State private var isHoveringEdit = false
@@ -46,7 +48,6 @@ struct EnvRowView: View {
     @State private var isHoveringReveal = false
     @State private var isHoveringCopy = false
     @State private var isSecretValueRevealed = false
-    @State private var isConfirmingSecretDisable = false
 
     private static let maskedSecretValue = "••••••••"
 
@@ -241,60 +242,61 @@ struct EnvRowView: View {
     }
 
     private var confirmContent: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
-                .frame(width: 18)
-
-            Text("Delete ")
-                .font(.system(size: 12)) +
-            Text(envVar.key)
-                .font(.system(size: 12, weight: .semibold, design: .monospaced)) +
-            Text("?")
-                .font(.system(size: 12))
-
-            Spacer()
-
-            Button("Cancel") { rowState = .normal }
-                .controlSize(.small)
-                .keyboardShortcut(.cancelAction)
-
-            Button("Delete") {
+        confirmationRow(
+            verb: "Delete",
+            detail: "?",
+            confirmTint: .red,
+            onCancel: { rowState = .normal },
+            onConfirm: {
                 onDelete()
                 rowState = .normal
             }
-            .controlSize(.small)
-            .buttonStyle(.borderedProminent)
-            .tint(.red)
-        }
+        )
     }
 
     private var confirmSecretDisableContent: some View {
+        confirmationRow(
+            verb: "Disable",
+            detail: "? Its value is removed, not stashed.",
+            confirmTint: .orange,
+            onCancel: { isConfirmingSecretDisable = false },
+            onConfirm: {
+                onToggle()
+                isConfirmingSecretDisable = false
+            }
+        )
+    }
+
+    /// Inline "<verb> KEY<detail>" prompt with Cancel and a tinted confirm button titled by the verb.
+    private func confirmationRow(
+        verb: String,
+        detail: String,
+        confirmTint: Color,
+        onCancel: @escaping () -> Void,
+        onConfirm: @escaping () -> Void
+    ) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
                 .frame(width: 18)
 
-            Text("Disable ")
+            Text("\(verb) ")
                 .font(.system(size: 12)) +
             Text(envVar.key)
                 .font(.system(size: 12, weight: .semibold, design: .monospaced)) +
-            Text("? Its value is removed, not stashed.")
+            Text(detail)
                 .font(.system(size: 12))
 
             Spacer()
 
-            Button("Cancel") { isConfirmingSecretDisable = false }
+            Button("Cancel", action: onCancel)
                 .controlSize(.small)
                 .keyboardShortcut(.cancelAction)
 
-            Button("Disable") {
-                onToggle()
-                isConfirmingSecretDisable = false
-            }
-            .controlSize(.small)
-            .buttonStyle(.borderedProminent)
-            .tint(.orange)
+            Button(verb, action: onConfirm)
+                .controlSize(.small)
+                .buttonStyle(.borderedProminent)
+                .tint(confirmTint)
         }
     }
 }

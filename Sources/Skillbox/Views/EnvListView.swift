@@ -11,6 +11,8 @@ struct EnvListView: View {
     @Binding var rowStates: [String: SkillRowView.RowState]
 
     @State private var showingAddSheet = false
+    /// Row awaiting confirmation before an enabled secret is disabled (its value is removed).
+    @State private var secretDisableConfirmationID: String?
     @FocusState private var searchFocused: Bool
 
     var body: some View {
@@ -155,7 +157,8 @@ struct EnvListView: View {
                                 onEdit: { open(envVar: envVar) },
                                 onDelete: { performDelete(envVar) },
                                 onSetSecretMark: { marked in performSetSecretMark(marked, for: envVar) },
-                                rowState: binding(for: envVar.id)
+                                rowState: binding(for: envVar.id),
+                                isConfirmingSecretDisable: secretDisableConfirmationBinding(for: envVar.id)
                             )
                             .id(envVar.id)
                             .onTapGesture { selectedEnvID = envVar.id }
@@ -213,6 +216,13 @@ struct EnvListView: View {
         )
     }
 
+    private func secretDisableConfirmationBinding(for id: String) -> Binding<Bool> {
+        Binding(
+            get: { secretDisableConfirmationID == id },
+            set: { secretDisableConfirmationID = $0 ? id : nil }
+        )
+    }
+
     private func applyStickyOrDefault() {
         if !envSelectedScope.isEmpty,
            store.selectedScopeKey != envSelectedScope {
@@ -251,7 +261,11 @@ struct EnvListView: View {
     private func triggerToggleOnSelected() {
         guard let id = selectedEnvID,
               let envVar = store.filteredEnvVars.first(where: { $0.id == id }) else { return }
-        performToggle(envVar)
+        if envVar.isSecret && envVar.isEnabled {
+            secretDisableConfirmationID = envVar.id
+        } else {
+            performToggle(envVar)
+        }
     }
 
     private func open(envVar: EnvVar) {
