@@ -170,8 +170,15 @@ struct PopoverView: View {
             }.value
 
             if syncRemoteSkillsOnLaunch {
-                await skillFolderSync.syncAll(store.items.filter { $0.provenance != nil })
-                store.rescan()
+                let remoteSkills = store.items.filter { $0.provenance != nil }
+
+                Task.detached(priority: .background) { [weak skillFolderSync] in
+                    await skillFolderSync?.syncAll(remoteSkills)
+                    await MainActor.run {
+                        ensureClaudeSkillMounts()
+                        store.rescan()
+                    }
+                }
             }
         case .memory:
             memoryStore.configure(rootPath: memoryRootPath)

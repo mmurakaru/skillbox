@@ -49,6 +49,7 @@ final class FileBackedItemStore<Item: Identifiable & Sendable> {
         if expanded == self.rootPath { return nil }
 
         self.rootPath = expanded
+
         return rescan()
     }
 
@@ -65,10 +66,12 @@ final class FileBackedItemStore<Item: Identifiable & Sendable> {
         startWatching()
         let task = Task.detached(priority: .utility) {
             try Task.checkCancellation()
+
             return try scan(url).sorted(by: sort)
         }
 
         scanTask = task
+
         return Task {
             let result = await task.result
 
@@ -80,8 +83,10 @@ final class FileBackedItemStore<Item: Identifiable & Sendable> {
             case .failure(is CancellationError):
                 return
             case .failure(let error):
+                items = []
                 lastError = "Failed to scan \(url.path): \(error.localizedDescription)"
             }
+
             // Reconcile edits made between the scan and adding a newly discovered symlink target.
             if startWatching() { rescan() }
         }

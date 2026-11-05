@@ -13,6 +13,7 @@ struct FileBackedItemStoreTests {
         let store = SkillStore(
             scan: { _ in
                 #expect(!Thread.isMainThread, "Skill scanning must not block startup or navigation")
+
                 return []
             }, matchesQuery: { _, _ in true }, sort: { _, _ in false })
 
@@ -46,6 +47,15 @@ struct FileBackedItemStoreTests {
         release.signal()
         await oldScan?.value
         #expect(store.items.map(\.name) == ["newer"])
+    }
+
+    @Test func failedRootChangeDoesNotKeepActionableItemsFromThePreviousRoot() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("skillbox-missing-\(UUID().uuidString)")
+        let store = SkillStore(seedSkills: [makeSkill(name: "previous-root")])
+
+        await store.configure(rootPath: root.path)?.value
+        #expect(store.items.isEmpty)
+        #expect(store.lastError != nil)
     }
 
     private func makeSkill(name: String, description: String = "") -> Skill {
