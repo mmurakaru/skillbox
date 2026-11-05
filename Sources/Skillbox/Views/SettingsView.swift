@@ -382,6 +382,14 @@ struct SettingsView: View {
             } header: {
                 Text("Updates")
             }
+        } else {
+            Section("Updates") {
+                Text(currentVersionLine)
+                Text("Build and install the latest source release to update Skillbox.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Link("View releases", destination: URL(string: "https://github.com/mmurakaru/skillbox/releases")!)
+            }
         }
     }
 

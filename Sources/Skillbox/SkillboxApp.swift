@@ -19,7 +19,7 @@ struct SkillboxApp: App {
     @State private var typeSafeSettings: TypeSafeSettings
     @State private var classificationAutomation: SkillClassificationAutomation
 
-    private let updaterController: SPUStandardUpdaterController
+    private let updaterController: SPUStandardUpdaterController?
 
     init() {
         let usageStore = ProviderUsageStore()
@@ -53,11 +53,15 @@ struct SkillboxApp: App {
         }
         self._insightsModel = State(initialValue: model)
 
-        self.updaterController = SPUStandardUpdaterController(
-            startingUpdater: true,
-            updaterDelegate: nil,
-            userDriverDelegate: nil
-        )
+        if SparkleUpdateConfiguration.hasValidSigningKey(Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String) {
+            self.updaterController = SPUStandardUpdaterController(
+                startingUpdater: true,
+                updaterDelegate: nil,
+                userDriverDelegate: nil
+            )
+        } else {
+            self.updaterController = nil
+        }
     }
 
     var body: some Scene {
@@ -77,7 +81,7 @@ struct SkillboxApp: App {
                 .environment(skillFolderSync)
                 .environment(classificationStore)
                 .environment(typeSafeSettings)
-                .environment(\.sparkleUpdater, updaterController.updater)
+                .environment(\.sparkleUpdater, updaterController?.updater)
         } label: {
             Image(nsImage: MenuBarIcon.nsImage)
         }
@@ -95,7 +99,7 @@ struct SkillboxApp: App {
                 .environment(typeSafeSettings)
                 .environment(insightsModel)
                 .environment(localModelStore)
-                .environment(\.sparkleUpdater, updaterController.updater)
+                .environment(\.sparkleUpdater, updaterController?.updater)
         }
     }
 }
