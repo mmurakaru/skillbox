@@ -118,6 +118,10 @@ struct ProviderUsageRefreshTests {
 
         #expect(Set(initialProviders) == Set([UsageProvider.codex, .claude]))
         #expect(await clock.interval == .seconds(300))
+        // Re-entering the Usage tab must reuse the running timer without another request.
+        store.startAutoRefresh(sleep: { try await clock.sleep($0) })
+        for _ in 0..<20 { await Task.yield() }
+        #expect(await fetcher.providers.count == 2)
         await clock.advance()
         await clock.waitUntilSleeping()
         #expect(await fetcher.providers.count == 4)

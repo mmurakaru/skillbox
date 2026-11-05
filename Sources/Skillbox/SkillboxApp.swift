@@ -29,11 +29,9 @@ struct SkillboxApp: App {
         let classifications = SkillClassificationStore()
         let credentials = TypeSafeSettings()
 
-        store.configure(rootPath: UserDefaults.standard.string(forKey: "skillsRootPath") ?? "~/.agents/skills")
         self._store = State(initialValue: store)
         let localModelStore = LocalModelStore()
 
-        localModelStore.configure(LocalModelScanSettings.configuration())
         self._localModelStore = State(initialValue: localModelStore)
         self._classificationStore = State(initialValue: classifications)
         self._typeSafeSettings = State(initialValue: credentials)
@@ -66,7 +64,6 @@ struct SkillboxApp: App {
         MenuBarExtra {
             PopoverView()
                 .environment(usageStore)
-                .task { usageStore.startAutoRefresh() }
                 .environment(store)
                 .environment(memoryStore)
                 .environment(hookStore)

@@ -112,34 +112,13 @@ struct PopoverView: View {
         .hoverActionLabelHost()
         .task {
             migrateLegacySkillsRootIfNeeded()
-            store.configure(rootPath: skillsRootPath)
-            ensureClaudeSkillMounts()
-            memoryStore.configure(rootPath: memoryRootPath)
-            hookStore.configure(claudeHomePath: hooksClaudeHomePath)
-            envStore.configure(claudeHomePath: hooksClaudeHomePath)
-            overridesStore.configure(claudeHomePath: hooksClaudeHomePath)
             ensureEditorDefault()
-
-            if selectedSkillID == nil {
-                selectedSkillID = visibleSkills.first?.id
-            }
-
             try? await Task.sleep(for: .milliseconds(80))
             searchFocused = true
-
-            if syncRemoteSkillsOnLaunch {
-                let remoteSkills = store.items.filter { $0.provenance != nil }
-
-                Task.detached(priority: .background) { [weak skillFolderSync] in
-                    await skillFolderSync?.syncAll(remoteSkills)
-                    await MainActor.run {
-                        ensureClaudeSkillMounts()
-                        store.rescan()
-                    }
-                }
-            }
         }
+        .task(id: activeTab) { await loadActiveTab() }
         .onChange(of: skillsRootPath) { _, newValue in
+            guard activeTab == .skills else { return }
             store.configure(rootPath: newValue)
             ensureClaudeSkillMounts()
         }
@@ -147,12 +126,15 @@ struct PopoverView: View {
             ensureClaudeSkillMounts()
         }
         .onChange(of: memoryRootPath) { _, newValue in
+            guard activeTab == .memory else { return }
             memoryStore.configure(rootPath: newValue)
         }
         .onChange(of: hooksClaudeHomePath) { _, newValue in
-            hookStore.configure(claudeHomePath: newValue)
-            envStore.configure(claudeHomePath: newValue)
-            overridesStore.configure(claudeHomePath: newValue)
+            if activeTab == .hooks { hookStore.configure(claudeHomePath: newValue) }
+
+            if activeTab == .env { envStore.configure(claudeHomePath: newValue) }
+
+            if activeTab == .skills { overridesStore.configure(claudeHomePath: newValue) }
         }
         .onKeyPress(.escape) {
             if skillsRoute != .list {
@@ -166,6 +148,48 @@ struct PopoverView: View {
             NSApp.deactivate()
 
             return .handled
+        }
+    }
+
+    private func loadActiveTab() async {
+        switch activeTab {
+        case .skills:
+            overridesStore.configure(claudeHomePath: hooksClaudeHomePath)
+            guard let scan = store.configure(rootPath: skillsRootPath) else { return }
+            let sourcePath = skillsRootPath
+            let mountPath = claudeSkillsMountPath
+
+            await scan.value
+            selectedSkillID = visibleSkills.first?.id
+            await Task.detached(priority: .utility) {
+                do {
+                    try SkillMountSync.ensureAll(sourceRootPath: sourcePath, mountRootPath: mountPath)
+                } catch {
+                    print("Claude skills mount sync failed: \(error)")
+                }
+            }.value
+
+            if syncRemoteSkillsOnLaunch {
+                let remoteSkills = store.items.filter { $0.provenance != nil }
+
+                Task.detached(priority: .background) { [weak skillFolderSync] in
+                    await skillFolderSync?.syncAll(remoteSkills)
+                    await MainActor.run {
+                        ensureClaudeSkillMounts()
+                        store.rescan()
+                    }
+                }
+            }
+        case .memory:
+            memoryStore.configure(rootPath: memoryRootPath)
+        case .hooks:
+            hookStore.configure(claudeHomePath: hooksClaudeHomePath)
+        case .env:
+            envStore.configure(claudeHomePath: hooksClaudeHomePath)
+        case .models:
+            localModelStore.configure(LocalModelScanSettings.configuration())
+        case .usage, .explore:
+            break
         }
     }
 

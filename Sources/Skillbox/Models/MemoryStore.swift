@@ -51,8 +51,12 @@ final class MemoryStore {
 
     func configure(rootPath: String) { backing.configure(rootPath: rootPath) }
     func rescan() {
-        backing.rescan()
-        ensureValidSelection()
+        let scan = backing.rescan()
+
+        Task {
+            await scan.value
+            ensureValidSelection()
+        }
     }
     func remove(_ memory: Memory) { backing.remove(memory) }
 
