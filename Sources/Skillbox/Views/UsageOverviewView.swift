@@ -43,7 +43,7 @@ struct UsageOverviewView: View {
             .scrollEdgeEffectStyle(.soft, for: .all)
         }
         .background(HostingWindowReader { hostingWindow.window = $0 })
-        .task { await store.refreshAll() }
+        .task { store.startAutoRefresh() }
 
     }
 }
