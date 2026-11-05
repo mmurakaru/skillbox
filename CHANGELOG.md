@@ -1,5 +1,11 @@
 # skillbox
 
+## 0.9.5
+
+### Patch Changes
+
+- [#36](https://github.com/mmurakaru/skillbox/pull/36) [`b4cb0a5`](https://github.com/mmurakaru/skillbox/commit/b4cb0a5dcb46b8b717e17513b99f83ea37b401e0) Thanks [@mmurakaru](https://github.com/mmurakaru)! - Prevent an updater error dialog from blocking local source builds when update signing is not configured, and link to source releases in Settings.
+
 ## 0.9.4
 
 ### Patch Changes
