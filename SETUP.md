@@ -2,6 +2,8 @@
 
 Source releases work without an Apple Developer account or repository secrets. The setup below is optional and enables Sparkle updates when binary distribution is enabled.
 
+Until a valid Sparkle public key is configured, local builds leave automatic updates disabled and link to source releases in Settings.
+
 ## 1. Generate Sparkle EdDSA keys
 
 Sparkle signs every released zip with an EdDSA private key. The matching public key is embedded in the app's `Info.plist` so installed copies can verify the update is authentic.
