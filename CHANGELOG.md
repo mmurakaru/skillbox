@@ -1,5 +1,11 @@
 # skillbox
 
+## 0.9.4
+
+### Patch Changes
+
+- [#35](https://github.com/mmurakaru/skillbox/pull/35) [`cdf312a`](https://github.com/mmurakaru/skillbox/commit/cdf312ad0d0e82a422e7202ba9ea9c826175b593) Thanks [@mmurakaru](https://github.com/mmurakaru)! - Load tabs when opened, scan skills and memory off the UI thread, and stop subscription usage from refreshing on every tab visit.
+
 ## 0.9.3
 
 ### Patch Changes
